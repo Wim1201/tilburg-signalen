@@ -159,10 +159,20 @@
         " van de gebruikelijke circa " + gap.verwacht.toLocaleString("nl-NL") + " publicaties door. " +
         "De app haalt die dag bij elke volgende verversing opnieuw op.");
     });
+    (state.data.bronnen || []).forEach(function (source) {
+      if (source.status === "fout") {
+        lines.push("De bron " + source.naam + " was bij de laatste verversing niet bereikbaar. " +
+          "Berichten uit die bron ontbreken tot een volgende verversing lukt.");
+      }
+    });
     var failed = state.data.ophaalfouten || {}, missing = (failed.tekst || 0) + (failed.perceel || 0);
     if (missing) {
       lines.push("Bij de laatste verversing konden " + missing + " bekendmakingen niet volledig worden gelezen. " +
         "Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw.");
+    }
+    if (failed.insolventie) {
+      lines.push("Bij de laatste verversing konden " + failed.insolventie + " rechtbankpublicaties over faillissementen niet worden gelezen. " +
+        "De volgende verversing probeert het opnieuw.");
     }
     var hours = (Date.now() - new Date(state.data.bijgewerkt).getTime()) / 3600000;
     if (hours > 26) {

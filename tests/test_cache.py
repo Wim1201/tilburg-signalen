@@ -7,7 +7,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from unittest import mock
 
-from signalen import bekendmakingen, cache as cachemodule, insolventies, update
+from signalen import bekendmakingen, cache as cachemodule, http, insolventies, update
 
 CENTRE = (134458.696, 396511.411)
 CONFIG = {"centrum": {"rd": list(CENTRE)}, "straal_km": 15, "postcode_bereik": [[4840, 5299]]}
@@ -172,17 +172,21 @@ def premises(postcode, number):
 
 
 class InsolventieCacheTest(unittest.TestCase):
-    def fetch(self, cache, lookup=premises):
+    def fetch(self, cache, lookup=premises, broken=(), statistiek=None):
         asked = []
 
         def download(url, **kwargs):
             asked.append(url)
-            return DOCS[url.rsplit("/", 1)[-1].removesuffix(".xml")].encode()
+            doc = url.rsplit("/", 1)[-1].removesuffix(".xml")
+            if doc in broken:
+                raise http.OphaalFout(url, "HTTP 429", 2)
+            return DOCS[doc].encode()
 
         with mock.patch.object(bekendmakingen, "search", lambda query: court_records()), \
-                mock.patch.object(insolventies.http, "get", download):
-            found = insolventies.fetch(CONFIG, AREA, "2026-10-19", cache, lookup)
-        return found, asked
+                mock.patch.object(insolventies.http, "get", download), \
+                mock.patch.object(http.time, "sleep", lambda seconds: None):
+            found = insolventies.fetch(CONFIG, AREA, "2026-10-19", cache, lookup, statistiek)
+        return found, sorted(set(asked))
 
     def test_publication_without_hit_is_skipped_next_time_and_outcome_is_equal(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -201,6 +205,19 @@ class InsolventieCacheTest(unittest.TestCase):
 
             warm, asked = self.fetch(cachemodule.Cache(pad))
             self.assertEqual((warm, asked), (without, ["https://repository/stcrt-1.xml"]))
+
+    def test_unreadable_publication_is_counted_and_read_again_next_time(self):
+        with tempfile.TemporaryDirectory() as folder:
+            pad = pathlib.Path(folder) / "c.json"
+            first, stats = cachemodule.Cache(pad), {}
+            found, _ = self.fetch(first, broken={"stcrt-2"}, statistiek=stats)
+            self.assertEqual(len(found), 1)
+            self.assertEqual((stats["insolventie"]["gevraagd"], stats["insolventie"]["definitiefMislukt"],
+                              stats["insolventie"]["redenen"]), (2, 1, {"HTTP 429": 1}))
+            self.assertNotIn("stcrt-2", first.data["insolventie"])
+            first.bewaar()
+            _, asked = self.fetch(cachemodule.Cache(pad))
+            self.assertIn("https://repository/stcrt-2.xml", asked)
 
     def test_failed_address_lookup_is_not_cached_as_no_hit(self):
         def down(postcode, number):

@@ -1,6 +1,7 @@
 """Tests for incomplete publication days and for catching up after an outage (no network)."""
 import datetime
 import unittest
+import unittest.mock
 
 from signalen import update, volledigheid
 
@@ -109,6 +110,18 @@ class InhalenTest(unittest.TestCase):
         document = update.run(CONFIG, {"gemeenten": []}, at(14), fetchers={"officielebekendmakingen": lambda: [item("gmb-1", "2026-11-13")]},
                               verrijker=lambda found: (found, {}), dagcontrole=broken)
         self.assertEqual((len(document["berichten"]), document["onvolledigeDagen"]), (1, []))
+
+    def test_unread_court_publications_end_up_in_the_failure_counts(self):
+        stats = {"gevraagd": 209, "eersteRondeMislukt": 60, "hersteld": 8, "definitiefMislukt": 52, "redenen": {"HTTP 429": 60}}
+        with unittest.mock.patch.object(update.insolventies, "fetch",
+                                        lambda config, area, since, cache, statistiek=None: statistiek.update(insolventie=stats) or []), \
+                unittest.mock.patch.object(update.bekendmakingen, "fetch", lambda *a: []), \
+                unittest.mock.patch.object(update.bekendmakingen, "fetch_sales", lambda *a: []), \
+                unittest.mock.patch.object(update.vlaanderen, "fetch", lambda *a: []):
+            document = update.run(dict(CONFIG, postcode_bereik=[]), {"gemeenten": []}, at(14),
+                                  verrijker=lambda found: (found, {}), dagcontrole=lambda now: [])
+        self.assertEqual(document["ophaalfouten"], {"insolventie": 52})
+        self.assertEqual(document["ophaalstatistiek"]["insolventie"]["redenen"], {"HTTP 429": 60})
 
     def test_failing_source_is_reported_not_hidden(self):
         def down():

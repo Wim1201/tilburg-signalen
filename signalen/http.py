@@ -9,6 +9,8 @@ import urllib.request
 
 USER_AGENT = "tilburg-signalen/1.0 (open data reader)"
 MAX_WACHT = 30  # seconds; the wait between attempts never grows beyond this
+RETRY_SECONDEN = 180  # time allowed for trying failed downloads once more
+MAX_RETRY_WACHT = 20  # seconds; longest pause before such a retry
 VERZOEKEN = collections.Counter()  # requests sent in this process, per host (every attempt counts)
 
 
@@ -69,3 +71,39 @@ def get(url, params=None, timeout=90, attempts=4, slaap=time.sleep):
 
 def get_json(url, params=None, **kwargs):
     return json.loads(get(url, params, **kwargs))
+
+
+def parallel(functie, argumenten, pool, slaap=time.sleep):
+    """Call `functie` for every argument tuple in parallel. Returns (results, statistiek).
+
+    results is a list of (value, ok). A call that fails is tried once more, one at a time, after the
+    parallel round: a public service that refuses a burst of requests usually answers a calm one.
+    Before each retry there is a pause that doubles while the service keeps failing, up to
+    MAX_RETRY_WACHT seconds, and drops back after a success. The whole retry round stops after
+    RETRY_SECONDEN.
+    """
+    def probeer(args):
+        try:
+            return functie(*args), True
+        except Exception as error:
+            return error, False
+
+    def oorzaak(error):
+        return getattr(error, "reden", None) or type(error).__name__
+
+    results = list(pool.map(probeer, argumenten))
+    eerste = [value for value, ok in results if not ok]
+    redenen = collections.Counter(oorzaak(error) for error in eerste)
+    deadline = time.monotonic() + RETRY_SECONDEN
+    wacht = 1
+    for index, (value, ok) in enumerate(results):
+        if ok or time.monotonic() >= deadline:
+            continue
+        slaap(wacht)
+        results[index] = probeer(argumenten[index])
+        wacht = 1 if results[index][1] else min(MAX_RETRY_WACHT, wacht * 2)
+    definitief = [value for value, ok in results if not ok]
+    statistiek = {"gevraagd": len(argumenten), "eersteRondeMislukt": len(eerste),
+                  "hersteld": len(eerste) - len(definitief), "definitiefMislukt": len(definitief),
+                  "redenen": dict(redenen.most_common(5))}
+    return [(value if ok else None, ok) for value, ok in results], statistiek
