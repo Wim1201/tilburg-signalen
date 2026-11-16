@@ -13,6 +13,10 @@
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 17:40 uur | **Het schema van de geplande runs is gewijzigd en staat nu in Nederlandse tijd.** De tijden "Zondag 03:30 UTC (04:30 of 05:30 uur Nederlandse tijd)" onder "Volledige verversing" en "08:40 of 09:40 uur" onder "Nog te doen (stand 17:25 uur)" gelden niet meer. Zie "Schema van de geplande runs". |
+| 16-11-2026, 17:40 uur | **Het vermoeden "een derde run op GitHub komt rond de 34 verzoeken uit" is bevestigd.** Run 7 deed 34 verzoeken. PR #6 (herstel van de twee gebreken en het verslag tot 17:25 uur) is samengevoegd; de regels "Herstel van de twee gebreken samenvoegen" en "Derde run op GitHub" onder "Nog te doen (stand 17:25 uur)" zijn daarmee afgehandeld. |
+| 16-11-2026, 17:40 uur | **De drie "ongelezen" rechtbankpublicaties waren geen blijvende fout.** Run 7 las ze alle drie bij de eerste poging. Zie "De drie overgebleven rechtbankpublicaties". |
+| 16-11-2026, 17:40 uur | De opmerking in de workflow "Gemeenten publiceren op werkdagen rond 09:00 uur" was een aanname. Nu gemeten: tussen 09:00 en 09:21 uur. Het oude schema had in de winter de eerste run om 08:40 uur, dus vóór de publicatie; de berichten van de dag kwamen toen pas met de run van 09:40 uur. |
 | 16-11-2026, 17:25 uur | **De cache is samengevoegd en op GitHub gemeten; de kop "Cache (… werkbranch, nog niet samengevoegd)" en de zin "Op GitHub is dit nog niet gemeten" zijn achterhaald.** PR #5 is samengevoegd met `main`. Run 5 schreef de eerste cache zelf (1.056 verzoeken), run 6 gebruikte hem (98 verzoeken). Zie "Cache op GitHub: run 5 en run 6". |
 | 16-11-2026, 17:25 uur | **De 209 bij "insolventie" in de tabel "Wat er in de cache staat" is een lokaal getal.** Op GitHub stonden er na run 5 maar 157 en na run 6 206, omdat een deel van de rechtbankpublicaties niet werd gelezen zonder dat dat werd geteld. Zie "Twee gebreken gevonden in run 5". |
 | 16-11-2026, 17:25 uur | **"Cache op GitHub controleren" onder "Nog te doen" is gedaan voor het terugzetten van de cache en het aantal verzoeken.** De handmatige en de wekelijkse volledige verversing zijn nog niet op GitHub uitgevoerd. |
@@ -448,6 +452,119 @@ Twee dingen om te weten bij de gekozen opzet:
 | Geplande runs volgen | Nagaan of de run van morgenochtend (08:40 of 09:40 uur) vanzelf start. |
 | Volledige verversing op GitHub | Handmatig (vinkje "Volledige verversing") en wekelijks (zondag) zijn nog niet uitgevoerd. |
 | **Actions-versies (Node) bijwerken** | Ongewijzigd open; de waarschuwing stond ook in het log van run 6. Zie "Nog te doen" onder "Cache". |
+
+## Schema, run 7 en rechtbankpublicaties (toegevoegd 16-11-2026, 17:40 uur)
+
+### Waarom de geplande run van 16:10 uur niet is gestart
+
+| Vraag | Uitkomst |
+|---|---|
+| Cron-regel | `10 15 * * 1-5` |
+| Tijdzone | UTC. Zonder aanduiding rekent GitHub in UTC. |
+| Tijd in Amsterdam | 16:10 uur in de winter (nu), 17:10 uur in de zomer |
+| Staat het schema op `main`? | Ja. De regel staat er sinds de eerste versie (PR #1, 12:32 uur) en is door PR #5 niet gewijzigd. `main` is de standaardbranch; GitHub draait geplande runs alleen vanaf die branch. |
+| Is de workflow actief? | Ja, status "active". |
+| Liep er op dat moment een andere run? | Nee. Run 5 was om 15:50 uur klaar, run 6 begon om 17:21 uur. De concurrency-regel heeft dus niets tegengehouden. |
+| Aantal geplande runs tot 17:38 uur | 0. Alle zeven runs zijn gestart door samenvoegen of met de hand. |
+
+Feit: het schema stond goed en op de juiste plek; de run is door GitHub niet gestart. Het was het
+enige geplande moment sinds de workflow bestaat (het moment van 12:10 uur viel vóór het samenvoegen
+van PR #1).
+
+Niet vastgesteld: de oorzaak. GitHub geeft geen log van een run die niet is gestart. De
+documentatie van GitHub zegt dat geplande runs bij drukte later starten en dat ze bij grote drukte
+kunnen vervallen. Of dat hier speelde, of dat een nieuw schema pas na enige tijd gaat lopen, is niet
+na te gaan. Of geplande runs hier wel werken, blijkt pas als de eerste is gestart.
+
+### Schema van de geplande runs
+
+Gemeten bij de bron (tijdstip van publicatie per Gemeenteblad-bericht, landelijk):
+
+| Dag | Publicaties | Vroegste | Midden | 95% binnen | Later op de dag |
+|---|---|---|---|---|---|
+| Donderdag 12-11 | 2.630 | 09:07 | 09:14 | 09:20 | 3 (10, 11 en 14 uur) |
+| Vrijdag 13-11 | 2.083 | 09:08 | 09:14 | 09:20 | 0 |
+| Maandag 16-11 | 2.147 | 09:00 | 09:06 | 09:12 | 1 (12:53 uur) |
+
+De bron publiceert dus één keer per werkdag, tussen 09:00 en 09:21 uur. Berichten van vandaag kunnen
+niet eerder in de app staan dan kort daarna.
+
+Nieuw schema, in Nederlandse tijd (`timezone: "Europe/Amsterdam"` bij elke regel, zomer en winter
+gelijk):
+
+| Tijd | Dagen | Doel |
+|---|---|---|
+| 06:45 uur | ma–vr | Alles tot en met gisteren staat klaar bij het opstaan, inclusief wat een eerdere run miste. |
+| 09:35 uur | ma–vr | De publicaties van vandaag. |
+| 10:20 uur | ma–vr | Vangnet voor de ochtend. Vanaf 10 uur beoordeelt de dagcontrole ook de lopende dag. |
+| 12:10 uur | elke dag | Vangnet, ook in het weekend. |
+| 16:10 uur | ma–vr | Publicaties die later op de dag verschijnen. |
+| 04:30 uur | zondag | Wekelijkse volledige verversing (cache negeren). |
+
+Wat dit betekent voor de ochtend: om 06:45 uur is de app bij tot en met de vorige werkdag; de
+berichten van de dag zelf staan er rond 09:40 uur in. Eerder kan niet, omdat de bron ze dan nog niet
+heeft. De minuten liggen bewust niet op het hele uur, omdat GitHub het daar het drukst heeft.
+
+Meer runs dan strikt nodig, omdat GitHub een geplande run kan overslaan. Een run met cache kost
+ongeveer 34 verzoeken en anderhalve minuut.
+
+De wekelijkse volledige verversing wordt herkend aan de klok (een geplande run op zondag vóór 9 uur
+Nederlandse tijd) en niet meer aan de tekst van de cron-regel.
+
+Herkomst van `timezone`: de documentatie van GitHub (Workflow syntax, `on.schedule`): "By default,
+scheduled workflows run in UTC. You can optionally specify a timezone using an IANA timezone string".
+
+Nog niet bewezen: dat een geplande run met dit schema ook werkelijk start. De eerste kans is
+dinsdag 17-11 om 06:45 uur.
+
+### Run 7 (na het samenvoegen van PR #6, 17:34 uur)
+
+| | Run 7 |
+|---|---|
+| Verzoeken totaal | 34 (repository.overheid.nl 33, Vlaanderen 1) |
+| Teksten: uit cache / opgehaald | 495 / 0 |
+| Perceelgroottes: uit cache / opgehaald | 40 / 0 |
+| Rechtbankpublicaties: uit cache / gelezen | 206 / 3 |
+| Mislukt in de eerste ronde (tekst, perceel, rechtbankpublicatie) | 0 / 0 / 0 |
+| Duur stap "Berichten ophalen" | 34 seconden |
+| Duur hele run | 1 minuut 29 |
+| Cache teruggezet in `main` | ja, commit `0e7cec1` (3 regels erbij; 209 rechtbankpublicaties) |
+| Berichten | 1.116 (ontwikkellocatie 81, onzeker 23, weggefilterd 1.012) |
+| Bronnen | alle drie bereikbaar |
+
+Reeks van vandaag: 1.056 verzoeken zonder cache (run 5), 98 (run 6), 34 (run 7).
+
+### De drie overgebleven rechtbankpublicaties
+
+| Publicatie | Rechtbank | Datum | Run 5 | Run 6 | Run 7 | Lokaal (17:35 uur) |
+|---|---|---|---|---|---|---|
+| stcrt-2026-38162 | Noord-Holland | 28-10-2026 | niet gelezen | niet gelezen | gelezen | gelezen, eerste poging |
+| stcrt-2026-38802 | Noord-Nederland | 02-11-2026 | niet gelezen | niet gelezen | gelezen | gelezen, eerste poging |
+| stcrt-2026-40679 | Den Haag | 16-11-2026 | niet gelezen | niet gelezen | gelezen | gelezen, eerste poging |
+
+Feiten:
+
+- Het zijn dezelfde drie in run 5 en run 6. Dat kan ook niet anders: run 6 vroeg alleen op wat run 5
+  niet had gelezen.
+- In run 7 zijn ze alle drie bij de eerste poging gelezen, zonder fout. Ze staan nu in de cache.
+- Aan de publicaties zelf is niets bijzonders: gewone omvang (8 tot 10 kB, 5 tot 12 vermeldingen),
+  drie verschillende rechtbanken en data, geen bedrijf binnen het postcodegebied.
+- Een foutmelding van run 5 en run 6 is er niet. De code op `main` telde en logde mislukte
+  rechtbankpublicaties toen nog niet; dat doet ze pas sinds PR #6, en run 7 had geen fouten.
+
+Vermoeden: in run 5 en 6 weigerde de bron ze met HTTP 429 (te veel verzoeken), net als de 43 teksten
+in run 5. Daarvoor pleit dat run 6 ongeveer 15 verzoeken meer deed dan nodig en dat het bij een
+rustige run (3 verzoeken in plaats van 49 of 209) meteen lukte.
+
+Sinds PR #6 staat een volgende keer de oorzaak in het log, in de gegevens en in de app.
+
+### Nog te doen (stand 17:40 uur)
+
+| Punt | Toelichting |
+|---|---|
+| Eerste geplande run afwachten | Dinsdag 17-11, 06:45 en 09:35 uur. Start er geen, dan werkt het schema bij GitHub niet en is een andere aanjager nodig (bijvoorbeeld een externe dienst die de workflow op tijd start). |
+| Volledige verversing op GitHub | Handmatig en wekelijks (zondag 04:30 uur) nog niet uitgevoerd. |
+| **Actions-versies (Node) bijwerken** | Ongewijzigd open. |
 
 ## Onvolledige dagen en inhalen (toegevoegd 16-11-2026, 15:00 uur)
 
