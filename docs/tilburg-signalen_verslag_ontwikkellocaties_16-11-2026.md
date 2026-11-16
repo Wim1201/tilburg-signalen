@@ -181,8 +181,8 @@ Toegevoegd naar aanleiding hiervan: de app toont een melding als de bron bij de 
 | Duur stap "Berichten ophalen" | ongeveer 85 seconden | 3 minuten 51 seconden |
 | Uitkomst workflow | n.v.t. | geslaagd, gepubliceerd |
 
-Waarneming: op GitHub mislukte het ophalen van de tekst bij 56 bekendmakingen, verspreid over acht
-gemeenten. Vermoeden: de bron begrenst of vertraagt gelijktijdige verzoeken vanaf GitHub; de
+Waarneming: op GitHub mislukte het ophalen van de tekst bij 56 bekendmakingen, verspreid over
+minstens acht gemeenten. Vermoeden: de bron begrenst of vertraagt gelijktijdige verzoeken vanaf GitHub; de
 langere looptijd past daarbij. Dat is niet bewezen, want de fout werd weggevangen zonder melding.
 
 Wat daarop is aangepast (werkbranch, nog niet samengevoegd):
