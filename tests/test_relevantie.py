@@ -2,7 +2,9 @@
 import unittest
 import xml.etree.ElementTree as ET
 
-from signalen import bekendmakingen, geo, insolventies, relevantie, tekst, update
+import concurrent.futures
+
+from signalen import bekendmakingen, geo, http, insolventies, relevantie, tekst, update
 
 CENTRE = (134458.696, 396511.411)
 O, U, W = relevantie.ONTWIKKELLOCATIE, relevantie.ONZEKER, relevantie.WEGGEFILTERD
@@ -257,7 +259,7 @@ class TekstEnVerrijkingTest(unittest.TestCase):
         self.assertEqual((items[0]["klasse"], items[0]["perceelM2"], items[0]["signalen"]), (O, 1200, ["sloop"]))
         self.assertEqual((items[1]["klasse"], items[1]["perceelM2"]), (W, None))
         self.assertEqual(calls, [(1.0, 2.0)])  # the parcel is only looked up where it decides the outcome
-        self.assertEqual(fouten, {"tekst": 0, "perceel": 0})
+        self.assertEqual((fouten["tekst"]["definitiefMislukt"], fouten["perceel"]["gevraagd"]), (0, 1))
         self.assertFalse([key for key in items[0] if key.startswith("_")])
 
     def test_enrichment_without_text_or_parcel_is_uncertain(self):
@@ -271,29 +273,58 @@ class TekstEnVerrijkingTest(unittest.TestCase):
         def flaky(url, titel, limiet):
             attempts.append(url)
             if len(attempts) == 1:
-                raise RuntimeError("429 te veel verzoeken")
+                raise http.OphaalFout(url, "HTTP 429", 2)
             return "het kappen van een boom"
 
-        items, fouten = update.verrijk([self.item()], 400, haal_tekst=flaky, perceel_m2=lambda x, y: None)
-        self.assertEqual((items[0]["klasse"], len(attempts), fouten["tekst"]), (W, 2, 0))
+        items, stats = update.verrijk([self.item()], 400, haal_tekst=flaky, perceel_m2=lambda x, y: None, slaap=lambda s: None)
+        self.assertEqual((items[0]["klasse"], len(attempts)), (W, 2))
+        self.assertEqual(stats["tekst"], {"gevraagd": 1, "eersteRondeMislukt": 1, "hersteld": 1, "definitiefMislukt": 0,
+                                          "redenen": {"HTTP 429": 1}})
 
     def test_text_that_cannot_be_fetched_is_uncertain_and_counted(self):
         def down(url, titel, limiet):
-            raise RuntimeError("geen verbinding")
+            raise http.OphaalFout(url, "tijdslimiet", 2)
 
-        items, fouten = update.verrijk([self.item(), self.item(id="2", type="plan", fase="Ontwerp", titel="Wijziging omgevingsplan Dorpsstraat 1")],
-                                       400, haal_tekst=down, perceel_m2=lambda x, y: None)
+        items, stats = update.verrijk([self.item(), self.item(id="2", type="plan", fase="Ontwerp", titel="Wijziging omgevingsplan Dorpsstraat 1")],
+                                      400, haal_tekst=down, perceel_m2=lambda x, y: None, slaap=lambda s: None)
         self.assertEqual([i["klasse"] for i in items], [U, U])
         self.assertTrue(all("kon niet worden opgehaald" in i["waarom"] for i in items))
-        self.assertEqual(fouten, {"tekst": 2, "perceel": 0})
+        self.assertEqual((stats["tekst"]["definitiefMislukt"], stats["tekst"]["redenen"]), (2, {"tijdslimiet": 2}))
 
     def test_parcel_service_that_fails_is_counted(self):
         def down(x, y):
             raise RuntimeError("geen verbinding")
 
-        items, fouten = update.verrijk([self.item(omschrijving="het slopen van een loods")], 400,
-                                       haal_tekst=lambda url, titel, limiet: None, perceel_m2=down)
-        self.assertEqual((items[0]["klasse"], fouten), (U, {"tekst": 0, "perceel": 1}))
+        items, stats = update.verrijk([self.item(omschrijving="het slopen van een loods")], 400,
+                                      haal_tekst=lambda url, titel, limiet: None, perceel_m2=down, slaap=lambda s: None)
+        self.assertEqual((items[0]["klasse"], stats["perceel"]["definitiefMislukt"], stats["perceel"]["redenen"]), (U, 1, {"RuntimeError": 1}))
+
+    def test_pause_before_retry_grows_to_a_maximum_and_resets_after_success(self):
+        pauses, calls = [], {}
+
+        def service(number):
+            calls[number] = calls.get(number, 0) + 1
+            if number == 8 and calls[number] == 2:
+                return "ok"  # the eighth request succeeds on its retry
+            raise RuntimeError("503")
+
+        with concurrent.futures.ThreadPoolExecutor(2) as pool:
+            results, stats = update._alle(service, [(n,) for n in range(10)], pool, slaap=pauses.append)
+        self.assertEqual(pauses, [1, 2, 4, 8, 16, 20, 20, 20, 20, 1])
+        self.assertEqual(max(pauses), update.MAX_RETRY_WACHT)
+        self.assertEqual((stats["eersteRondeMislukt"], stats["hersteld"], stats["definitiefMislukt"]), (10, 1, 9))
+        self.assertEqual([ok for _, ok in results].count(True), 1)
+
+    def test_http_wait_doubles_up_to_the_maximum(self):
+        self.assertEqual([http.wachttijd(n) for n in range(7)], [2, 4, 8, 16, 30, 30, 30])
+        self.assertEqual(http.wachttijd(20), http.MAX_WACHT)
+
+    def test_http_retries_with_growing_waits_and_reports_the_cause(self):
+        waits = []
+        with self.assertRaises(http.OphaalFout) as raised:
+            http.get("http://127.0.0.1:9/geen-dienst", timeout=2, attempts=4, slaap=waits.append)
+        self.assertEqual(waits, [2, 4, 8])  # no wait after the last attempt
+        self.assertTrue(raised.exception.reden.startswith("verbinding"))
 
     def test_sale_notice_takes_size_from_text(self):
         items, _ = update.verrijk([self.item(type="verkoop", titel="Voornemen verkoop gemeentegrond", _rd=None, fase="Voornemen tot verkoop")], 400,

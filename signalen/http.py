@@ -1,31 +1,66 @@
 """Small HTTP helper with retries (standard library only)."""
 import json
+import socket
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 USER_AGENT = "tilburg-signalen/1.0 (open data reader)"
+MAX_WACHT = 30  # seconds; the wait between attempts never grows beyond this
 
 
-def get(url, params=None, timeout=90, attempts=4):
-    """GET a URL and return the response body as bytes; retries on network and 5xx errors."""
+class OphaalFout(RuntimeError):
+    """A request that failed for good. `reden` is a short cause such as 'HTTP 429' or 'tijdslimiet'."""
+
+    def __init__(self, url, reden, pogingen):
+        super().__init__(f"{reden} na {pogingen} poging(en): {url[:150]}")
+        self.reden = reden
+
+
+def wachttijd(poging, basis=2, maximum=MAX_WACHT):
+    """Seconds to wait after failed attempt number `poging` (0-based): 2, 4, 8, 16, 30, 30, ..."""
+    return min(maximum, basis * 2 ** poging)
+
+
+def reden(error):
+    """Short, groupable description of what went wrong."""
+    if isinstance(error, urllib.error.HTTPError):
+        return f"HTTP {error.code}"
+    if isinstance(error, (TimeoutError, socket.timeout)) or "timed out" in str(error).lower():
+        return "tijdslimiet"
+    if isinstance(error, urllib.error.URLError):
+        return f"verbinding ({str(error.reason)[:60]})"
+    return f"{type(error).__name__}"
+
+
+def get(url, params=None, timeout=90, attempts=4, slaap=time.sleep):
+    """GET a URL and return the response body as bytes.
+
+    Network errors, 5xx and 429 are tried again; the wait doubles each time up to MAX_WACHT,
+    and a Retry-After header from the server is respected (also up to MAX_WACHT).
+    """
     if params:
         url = url + ("&" if "?" in url else "?") + urllib.parse.urlencode(params, doseq=True)
-    last_error = None
+    last = None
     for attempt in range(attempts):
+        wait = wachttijd(attempt)
         try:
             request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return response.read()
         except urllib.error.HTTPError as error:
             if error.code < 500 and error.code != 429:
-                raise
-            last_error = error
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
-            last_error = error
-        time.sleep(2 ** attempt * 2)
-    raise RuntimeError(f"Ophalen mislukt na {attempts} pogingen: {url} ({last_error})")
+                raise OphaalFout(url, reden(error), attempt + 1) from error
+            last = error
+            asked = (error.headers.get("Retry-After") or "") if error.headers else ""
+            if asked.isdigit():
+                wait = min(MAX_WACHT, max(wait, int(asked)))
+        except (urllib.error.URLError, TimeoutError, ConnectionError, socket.timeout) as error:
+            last = error
+        if attempt < attempts - 1:
+            slaap(wait)
+    raise OphaalFout(url, reden(last), attempts) from last
 
 
 def get_json(url, params=None, **kwargs):

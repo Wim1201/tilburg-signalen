@@ -5,7 +5,7 @@ Every update fetches the whole window again, so a missed day is picked up by a l
 any bookkeeping; this module only makes the gap visible.
 
 Method: count the Gemeenteblad publications the service knows per working day, and compare each
-recent day with the median of the other working days.
+recent day with the median of the working days that are themselves complete.
 """
 import datetime
 import re
@@ -67,6 +67,26 @@ def tel_gemeenteblad(dag):
     return int(found.group(1))
 
 
+def gebruikelijk(aantallen, drempel=DREMPEL):
+    """The normal number of publications per working day, not dragged down by outage days.
+
+    Starts from the fullest day, keeps the days that reach at least `drempel` of the reference, takes
+    their median as the new reference and repeats until the set of normal days no longer changes.
+    A plain median over all days would sink when the source was down on many of them.
+    Returns None when fewer than three normal days remain.
+    """
+    if not aantallen or max(aantallen) <= 0:
+        return None
+    referentie, normaal = max(aantallen), None
+    for _ in range(10):
+        volgende = [aantal for aantal in aantallen if aantal >= drempel * referentie]
+        if volgende == normaal:
+            break
+        normaal = volgende
+        referentie = statistics.median(normaal)
+    return referentie if len(normaal) >= 3 else None
+
+
 def onvolledige_dagen(telling, nu, controle_dagen=CONTROLE_DAGEN, drempel=DREMPEL):
     """Days in the check period with far fewer publications than normal.
 
@@ -75,12 +95,9 @@ def onvolledige_dagen(telling, nu, controle_dagen=CONTROLE_DAGEN, drempel=DREMPE
     """
     vandaag = nu.date()
     werkdagen = {dag: aantal for dag, aantal in telling.items() if is_publicatiedag(dag)}
-    eerdere = [aantal for dag, aantal in werkdagen.items() if dag != vandaag]
-    if len(eerdere) < 3:
+    verwacht = gebruikelijk([aantal for dag, aantal in werkdagen.items() if dag != vandaag], drempel)
+    if verwacht is None:
         return []  # too little to say what is normal
-    verwacht = statistics.median(eerdere)
-    if verwacht <= 0:
-        return []
     start = vandaag - datetime.timedelta(days=controle_dagen)
     gaten = []
     for dag in sorted(werkdagen):

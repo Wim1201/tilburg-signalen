@@ -49,6 +49,26 @@ class OnvolledigeDagTest(unittest.TestCase):
         self.assertEqual(volledigheid.onvolledige_dagen(counts, at(14)), [])
         self.assertEqual(volledigheid.onvolledige_dagen({MONDAY: 0, D(2026, 11, 13): 2000}, at(14)), [])
 
+    def test_normal_level_does_not_drop_through_outage_days(self):
+        normal = [2070, 2036, 2716, 2618, 1951, 1886, 1893, 2622, 2654, 2090]
+        self.assertEqual(volledigheid.gebruikelijk(normal), 2080)
+        # Five outage days among them: a plain median would fall to 1951, the normal level stays.
+        self.assertEqual(volledigheid.gebruikelijk(normal + [0, 4, 0, 12, 300]), 2080)
+        # Even when the source was down on most days, the complete days still set the level.
+        self.assertEqual(volledigheid.gebruikelijk([2070, 2036, 2716] + [0] * 9), 2070)
+        self.assertIsNone(volledigheid.gebruikelijk([2070, 0, 0, 0]))  # too few complete days to judge
+        self.assertIsNone(volledigheid.gebruikelijk([0, 0, 0]))
+
+    def test_long_outage_flags_every_affected_day_with_the_normal_level(self):
+        days = volledigheid.publicatiedagen(MONDAY, 28)
+        counts = {day: 2100 for day in days}
+        outage = [day for day in days if day >= D(2026, 11, 4)]  # nine working days in a row
+        for day in outage:
+            counts[day] = 3
+        gaps = volledigheid.onvolledige_dagen(counts, at(14))
+        self.assertEqual([gap["datum"] for gap in gaps], [day.isoformat() for day in outage])
+        self.assertTrue(all(gap["verwacht"] == 2100 for gap in gaps))
+
     def test_check_counts_every_working_day_once(self):
         asked = []
         gaps = volledigheid.controleer(at(14), tel=lambda day: asked.append(day) or (0 if day == MONDAY else 2000))
@@ -70,7 +90,7 @@ class InhalenTest(unittest.TestCase):
 
     def run_once(self, available, gaps):
         return update.run(CONFIG, {"gemeenten": []}, at(14), fetchers={"officielebekendmakingen": lambda: list(available)},
-                          verrijker=lambda found: (found, {"tekst": 0, "perceel": 0}), dagcontrole=lambda now: gaps)
+                          verrijker=lambda found: (found, {}), dagcontrole=lambda now: gaps)
 
     def test_missed_day_is_caught_up_and_flag_disappears(self):
         friday = item("gmb-1", "2026-11-13")
@@ -87,14 +107,14 @@ class InhalenTest(unittest.TestCase):
         def broken(now):
             raise RuntimeError("zoekdienst antwoordt niet")
         document = update.run(CONFIG, {"gemeenten": []}, at(14), fetchers={"officielebekendmakingen": lambda: [item("gmb-1", "2026-11-13")]},
-                              verrijker=lambda found: (found, {"tekst": 0, "perceel": 0}), dagcontrole=broken)
+                              verrijker=lambda found: (found, {}), dagcontrole=broken)
         self.assertEqual((len(document["berichten"]), document["onvolledigeDagen"]), (1, []))
 
     def test_failing_source_is_reported_not_hidden(self):
         def down():
             raise RuntimeError("503")
         document = update.run(CONFIG, {"gemeenten": []}, at(14), fetchers={"officielebekendmakingen": down},
-                              verrijker=lambda found: (found, {"tekst": 0, "perceel": 0}), dagcontrole=lambda now: [])
+                              verrijker=lambda found: (found, {}), dagcontrole=lambda now: [])
         status = next(s for s in document["bronnen"] if s["id"] == "officielebekendmakingen")
         self.assertEqual((status["status"], document["berichten"]), ("fout", []))
 
