@@ -8,10 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-import threading
 import unittest
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import sys
 
@@ -23,7 +20,7 @@ import geluid  # noqa: E402
 
 NODE = shutil.which("node")
 FFMPEG = shutil.which("ffmpeg") and shutil.which("ffprobe")
-FILM = os.path.join(ROOT, "docs", "video", "tilburg-signalen_ochtendronde.mp4")
+FILM = os.environ.get("TILBURG_FILM") or os.path.join(VIDEO, "uit", "tilburg-signalen_ochtendronde.mp4")  # not in git
 
 
 def tijdlijn(*calls):
@@ -140,18 +137,33 @@ class Geluid(unittest.TestCase):
 [silencedetect @ 0x1] silence_end: 16.3 | silence_duration: 0.4
 """
 
-    def test_scene_starts_just_before_the_voice_resumes_after_the_long_pauses(self):
+    def test_scene_starts_just_before_the_voice_resumes_after_the_pause_near_the_expected_place(self):
         found = geluid.stiltes(self.FFMPEG_OUT)
         self.assertEqual(found[0], (0.0, 0.21))
         self.assertEqual(len(found), 5)
-        self.assertEqual(geluid.grenzen(found, 2, 16.3), [7.3, 13.2])
+        self.assertEqual(geluid.grenzen(found, [6.5, 12.5], 16.3), [7.3, 13.2])
 
-    def test_too_few_or_unclear_pauses_are_refused(self):
+    def test_expected_places_follow_the_length_of_the_texts(self):
+        scenes = [{"tekst": "x" * 30}, {"tekst": "x" * 50}, {"tekst": "x" * 20}]
+        self.assertEqual(geluid.verwachte_grenzen(scenes, 20.0), [6.0, 16.0])
+
+    def test_a_calm_voice_with_long_pauses_between_sentences(self):
+        # The pauses of the recording used for the film: between sentences up to 1.27 s, between scenes 1.43 s and more.
+        found = [(0.69, 1.96), (6.64, 7.75), (9.51, 9.86), (11.39, 12.32), (14.21, 15.17), (15.95, 16.23), (17.38, 18.81), (19.84, 20.55),
+                 (22.18, 23.22), (25.03, 25.51), (27.58, 28.64), (29.19, 29.65), (32.19, 33.10), (35.43, 36.63), (37.20, 37.55), (38.64, 40.19),
+                 (41.05, 41.46), (42.58, 43.71), (44.77, 45.12), (45.54, 46.42), (48.35, 48.72), (49.35, 50.94), (53.21, 53.53), (54.97, 55.19),
+                 (55.28, 56.15), (58.46, 60.01), (60.95, 61.38), (62.98, 63.43), (64.00, 64.41)]
+        starts = geluid.grenzen(found, geluid.verwachte_grenzen(geluid.scenario()["scenes"], 64.444), 64.444)
+        self.assertEqual(starts, [18.51, 39.89, 50.64, 59.71])
+
+    def test_missing_or_unclear_pauses_are_refused(self):
         found = geluid.stiltes(self.FFMPEG_OUT)
-        with self.assertRaisesRegex(ValueError, "2 pauzes gevonden, 3 nodig"):
-            geluid.grenzen([s for s in found if s[1] - s[0] > 1], 3, 16.3)
-        with self.assertRaisesRegex(ValueError, "niet te onderscheiden"):
-            geluid.grenzen(found + [(9.0, 10.3)], 2, 16.3)
+        with self.assertRaisesRegex(ValueError, "geen pauze gevonden rond 9.5 s"):
+            geluid.grenzen(found, [6.5, 9.5], 16.3, venster=1.0)
+        with self.assertRaisesRegex(ValueError, "twee pauzes even lang"):
+            geluid.grenzen(found + [(4.6, 6.0)], [6.5, 12.5], 16.3)
+        with self.assertRaisesRegex(ValueError, "niet in volgorde"):
+            geluid.grenzen(found, [6.5, 6.6], 16.3)
 
     def test_scene_lengths_add_up_to_the_film(self):
         plan = geluid.timing(self.SCENES, [7.3, 13.2], 16.3)
@@ -165,7 +177,8 @@ class Geluid(unittest.TestCase):
 
     def test_mix_puts_every_sound_at_its_moment_and_leaves_the_picture_alone(self):
         moments = [(0.25, "signaal"), (5.35, "klik"), (7.0, "klik"), (20.2, "signaal")]
-        command = geluid.mix_opdracht("film.mp4", "stem.mp3", {"klik": "tik.mp3", "scroll": "veeg.mp3", "signaal": "s.mp3"}, moments, 1.2, "uit.mp4")
+        command = geluid.mix_opdracht("film.mp4", "stem.mp3", {"klik": "tik.mp3", "scroll": "veeg.mp3", "signaal": "s.mp3"}, moments, 1.2, "uit.mp4",
+                                      {"klik": 4.467, "signaal": 0.5})
         graph = command[command.index("-filter_complex") + 1]
         self.assertEqual(command.count("-i"), 4, "de veeg komt niet voor en hoort er dan niet in")
         self.assertNotIn("veeg.mp3", command)
@@ -173,7 +186,14 @@ class Geluid(unittest.TestCase):
             self.assertIn(delay, graph)
         self.assertIn("amix=inputs=5:normalize=0", graph)
         self.assertEqual(command[command.index("-c:v") + 1], "copy")
-        self.assertLess(geluid.VOLUME["klik"], geluid.VOLUME["stem"])
+        self.assertTrue(graph.endswith(",apad[uit]") and "-shortest" in command, "de film moet tot het eind van het beeld doorlopen, niet tot het eind van de stem")
+        self.assertEqual(graph.count("volume=4.467"), 2)
+        self.assertEqual(graph.count("volume=0.500"), 2)
+
+    def test_small_sounds_are_brought_to_a_soft_level_below_the_voice(self):
+        self.assertEqual(geluid.versterking(-28.2, -15.0), 4.571)
+        self.assertEqual(geluid.versterking(-2.8, -24.0), 0.087)
+        self.assertTrue(all(peak <= -12 for peak in geluid.PIEK.values()))
 
     @unittest.skipUnless(FFMPEG, "ffmpeg is niet geïnstalleerd")
     def test_pauses_are_found_in_a_real_sound_file(self):
@@ -187,15 +207,10 @@ class Geluid(unittest.TestCase):
             path = os.path.join(folder, "stem.mp3")
             subprocess.run(["ffmpeg", "-y", "-loglevel", "error"] + inputs + ["-filter_complex", labels + "concat=n=%d:v=0:a=1" % len(pattern), path], check=True)
             total = geluid.duur_van(path)
-            starts = geluid.grenzen(geluid.meet_stiltes(path), 2, total)
+            starts = geluid.grenzen(geluid.meet_stiltes(path), [5.0, 9.5], total)
         self.assertAlmostEqual(total, sum(seconds for _, seconds in pattern), delta=0.15)
         self.assertAlmostEqual(starts[0], 2.0 + 0.4 + 1.5 + 1.3 - geluid.VOOR_STEM, delta=0.12)
         self.assertAlmostEqual(starts[1], 2.0 + 0.4 + 1.5 + 1.3 + 2.5 + 0.35 + 1.0 + 1.3 - geluid.VOOR_STEM, delta=0.12)
-
-
-class _Quiet(SimpleHTTPRequestHandler):
-    def log_message(self, *args):
-        pass
 
 
 @unittest.skipUnless(playwright_available(), "Playwright is niet geïnstalleerd")
@@ -204,14 +219,7 @@ class Droogloop(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Quiet, directory=SITE))
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        try:
-            done = subprocess.run([NODE, os.path.join(VIDEO, "opname.js"), "--base", "http://127.0.0.1:%d" % server.server_address[1], "--droog"],
-                                  capture_output=True, text=True, encoding="utf-8", timeout=180)
-        finally:
-            server.shutdown()
-            server.server_close()
+        done = subprocess.run([NODE, os.path.join(VIDEO, "opname.js"), "--droog"], capture_output=True, text=True, encoding="utf-8", timeout=180)
         if done.returncode:
             raise AssertionError(done.stderr)
         cls.run_ = json.loads(done.stdout)
@@ -222,6 +230,12 @@ class Droogloop(unittest.TestCase):
         taps = [event["doel"] for event in self.run_["gebeurtenissen"] if event["soort"] == "klik"]
         self.assertEqual(taps, ["#tile-nieuw", "#tile-ranglijst", "#list .card:nth-of-type(1) .toggle", "#tile-onzeker", "#brand h1"])
 
+    def test_an_app_that_cannot_be_reached_is_said_plainly(self):
+        done = subprocess.run([NODE, os.path.join(VIDEO, "opname.js"), "--droog", "--base", "http://127.0.0.1:9"], capture_output=True, text=True,
+                              encoding="utf-8", timeout=120)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("De app is niet bereikbaar op http://127.0.0.1:9", done.stderr)
+
     def test_it_is_a_morning_with_something_new_and_ends_on_the_ranking(self):
         end = self.run_["eind"]
         self.assertTrue(end["ochtend"].startswith("Goedemorgen"), end["ochtend"])
@@ -230,7 +244,7 @@ class Droogloop(unittest.TestCase):
         self.assertEqual(end["kaarten"], 10)
 
 
-@unittest.skipUnless(FFMPEG and os.path.isfile(FILM), "de film staat nog niet in docs/video of ffprobe ontbreekt")
+@unittest.skipUnless(FFMPEG and os.path.isfile(FILM), "de film is hier niet gemaakt (tools/video/uit) of ffprobe ontbreekt")
 class Film(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -241,12 +255,17 @@ class Film(unittest.TestCase):
     def test_between_sixty_and_ninety_seconds(self):
         self.assertTrue(60 <= float(self.info["format"]["duration"]) <= 90, self.info["format"]["duration"])
 
+    def test_runs_until_the_end_of_the_closing_card(self):
+        plan = json.loads(read(VIDEO, "timing.json"))
+        self.assertAlmostEqual(float(self.info["format"]["duration"]), plan["totaal"], delta=0.2)
+        self.assertEqual(list(plan["scenes"]), [scene["id"] for scene in geluid.scenario()["scenes"]])
+
     def test_picture_and_sound(self):
         streams = {stream["codec_type"]: stream for stream in self.info["streams"]}
         self.assertEqual((streams["video"]["codec_name"], streams["video"]["width"], streams["video"]["height"]), ("h264", 1920, 1080))
         self.assertEqual(streams["audio"]["codec_name"], "aac")
 
-    def test_small_enough_for_the_repository(self):
+    def test_small_enough_to_send(self):
         self.assertLess(os.path.getsize(FILM), 15_000_000)
 
 

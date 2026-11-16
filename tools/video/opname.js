@@ -1,7 +1,9 @@
 /* Records the screen video by using the app: opens it in a phone on the stage (podium.html), moves
    a pointer, taps and scrolls along the scenario, and writes every frame to ffmpeg.
 
-   node opname.js --base http://127.0.0.1:8765 --uit stil.mp4 --gebeurtenissen gebeurtenissen.json [--timing timing.json] [--droog]
+   node opname.js --uit stil.mp4 --gebeurtenissen gebeurtenissen.json [--timing timing.json] [--droog] [--base http://...]
+
+   Without --base the script serves the folder site/ itself for as long as it runs.
 
    Without --timing the length of each scene is estimated from its text (trial run without sound).
    With --droog nothing is filmed: the scenario is walked through quickly to see that every step
@@ -9,7 +11,7 @@
    Needs Playwright and ffmpeg. The app is used as it is; only the clock and "what this device has
    seen before" are set, so that the recording shows a morning with something new. */
 "use strict";
-var fs = require("fs"), path = require("path"), spawn = require("child_process").spawn;
+var fs = require("fs"), path = require("path"), http = require("http"), spawn = require("child_process").spawn;
 var chromium = require("playwright").chromium;
 var tijdlijn = require("./tijdlijn.js");
 
@@ -30,8 +32,26 @@ function podium() {
   return fs.readFileSync(path.join(__dirname, "podium.html"), "utf8").split("<!--MARK-->").join(svg);
 }
 
+/* Serves site/ on a free port; only what the app itself needs. */
+function serveerSite() {
+  var map = path.join(__dirname, "..", "..", "site");
+  var soorten = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
+    ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json" };
+  var server = http.createServer(function (vraag, antwoord) {
+    var pad = path.normalize(path.join(map, decodeURIComponent(vraag.url.split("?")[0])));
+    if (pad.indexOf(map) !== 0) { antwoord.writeHead(403); antwoord.end(); return; }
+    fs.readFile(pad, function (fout, inhoud) {
+      if (fout) { antwoord.writeHead(404); antwoord.end(); return; }
+      antwoord.writeHead(200, { "Content-Type": soorten[path.extname(pad)] || "application/octet-stream" });
+      antwoord.end(inhoud);
+    });
+  });
+  return new Promise(function (resolve) { server.listen(0, "127.0.0.1", function () { resolve(server); }); });
+}
+
 (async function () {
-  var base = optie("base", "http://127.0.0.1:8765"), uit = optie("uit", "stil.mp4"), gebeurtenissenPad = optie("gebeurtenissen", "gebeurtenissen.json");
+  var eigen = optie("base") ? null : await serveerSite();
+  var base = optie("base") || "http://127.0.0.1:" + eigen.address().port, uit = optie("uit", "stil.mp4"), gebeurtenissenPad = optie("gebeurtenissen", "gebeurtenissen.json");
   var scenario = JSON.parse(fs.readFileSync(optie("scenario", path.join(__dirname, "scenario.json")), "utf8"));
   var fouten = tijdlijn.controleer(scenario);
   if (fouten.length) throw new Error("Scenario klopt niet:\n" + fouten.join("\n"));
@@ -53,6 +73,7 @@ function podium() {
       frame = page.frames().filter(function (f) { return f.url().indexOf(base) === 0; })[0] || null;
       if (!frame) await page.waitForTimeout(50);
     }
+    if (!frame) throw new Error("De app is niet bereikbaar op " + base);
     await frame.waitForSelector("#list .card");
     return frame;
   }
@@ -165,8 +186,9 @@ function podium() {
     };
   });
   await browser.close();
+  if (eigen) eigen.close();
   var verslag = { fps: FPS, duur: plan.totaal, frames: beelden, scenes: plan.scenes, gebeurtenissen: gebeurtenissen, nietUitgevoerd: wachtrij.length, fouten: meldingen, eind: staat };
   if (DROOG) process.stdout.write(JSON.stringify(verslag));
   else fs.writeFileSync(gebeurtenissenPad, JSON.stringify(verslag, null, 1));
   process.stderr.write("klaar: " + plan.totaal.toFixed(1) + " s, " + meldingen.length + " fouten in de console\n");
-})().catch(function (fout) { console.error(fout); process.exit(1); });
+})().catch(function (fout) { console.error(String(fout && fout.message || fout)); process.exit(1); });
