@@ -20,7 +20,7 @@
   }
   function daysAgoIso(days, today) { var d = new Date(today.getTime()); d.setDate(d.getDate() - days); return isoDay(d); }
   function shortDate(iso) { var p = iso.split("-"); return p[2] + "-" + p[1] + "-" + p[0]; }
-  function km(value) { return value.toFixed(1).replace(".", ","); }
+  function km(value) { return (value || 0).toFixed(1).replace(".", ","); }
   function capitalise(text) { return text ? text.charAt(0).toUpperCase() + text.slice(1) : text; }
   function safeUrl(url) { return typeof url === "string" && /^https:\/\//.test(url) ? url : null; }
   function hasPoint(item) { return item.lat !== null && item.lat !== undefined; }
@@ -84,7 +84,8 @@
   }
 
   /* The lists for one view: "ranglijst" (all development locations), "nieuw" (the same, only what
-     is new on this device) or "onzeker". `removed` is filled only when the switch is on. */
+     is new on this device) or "onzeker". `alsoNew` holds the new unsure notices in the view
+     "nieuw", so that nothing new stays out of sight. `removed` is filled only when the switch is on. */
   function select(items, state, context) {
     var klasse = VIEW_KLASSE[state.view] || "ontwikkellocatie";
     var filters = Object.assign({}, state, { alleenNieuw: state.view === "nieuw" });
@@ -92,7 +93,11 @@
     function pick(wanted, which) {
       return sorted(items.filter(function (item) { return item.klasse === wanted && matches(item, which, context); }), state.sort);
     }
-    return { klasse: klasse, main: pick(klasse, filters), removed: state.toonWeg ? pick("weggefilterd", removedFilters) : [] };
+    return {
+      klasse: klasse, main: pick(klasse, filters),
+      alsoNew: state.view === "nieuw" ? pick("onzeker", filters) : [],
+      removed: state.toonWeg ? pick("weggefilterd", removedFilters) : [],
+    };
   }
 
   function counts(items, nieuw) {
@@ -106,6 +111,12 @@
   }
 
   function greeting(hour) { return hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond"; }
+
+  /* Under the morning line: new notices that are not (yet) a development location. */
+  function alsoNewLine(count) {
+    if (!count) return "";
+    return count === 1 ? "Ook 1 nieuw bericht onder Onzeker." : "Ook " + count + " nieuwe berichten onder Onzeker.";
+  }
 
   /* The one line at the top of the morning: how many locations are new. */
   function briefing(count, firstVisit) {
@@ -178,7 +189,7 @@
     NEW_HOURS: NEW_HOURS, TOP: TOP, TYPE_LABEL: TYPE_LABEL,
     isoDay: isoDay, daysAgoIso: daysAgoIso, shortDate: shortDate, km: km, safeUrl: safeUrl, hasPoint: hasPoint,
     latestDay: latestDay, byRelevance: byRelevance, sorted: sorted, rankMap: rankMap, markNew: markNew,
-    matches: matches, select: select, counts: counts, greeting: greeting, briefing: briefing,
+    matches: matches, select: select, counts: counts, greeting: greeting, briefing: briefing, alsoNewLine: alsoNewLine,
     offsetKm: offsetKm, compass: compass, cardModel: cardModel,
   };
 });

@@ -77,11 +77,14 @@ class Rangorde(unittest.TestCase):
         result, = logic(["sorted", items, "relevantie"])
         self.assertEqual(ids(result), ["hoog", "nieuw", "oud", "dichtbij", "ver", "laag"])
 
-    def test_sorting_leaves_the_data_as_it_is(self):
-        items = [item("a", 40), item("b", 100)]
-        result, = logic(["sorted", items, "relevantie"])
-        self.assertEqual(ids(result), ["b", "a"])
-        self.assertEqual(ids(items), ["a", "b"])
+    def test_sorting_and_ranking_leave_the_data_as_it_is(self):
+        script = ("var L = require(process.argv[1]); var items = JSON.parse(process.argv[2]); var before = JSON.stringify(items);"
+                  "L.sorted(items, 'relevantie'); L.sorted(items, 'afstand'); L.rankMap(items);"
+                  "L.select(items, {view: 'ranglijst', sort: 'relevantie', maxKm: 15}, {nieuw: {}, today: new Date()});"
+                  "console.log(JSON.stringify(items) === before ? 'gelijk' : 'gewijzigd');")
+        items = [item("a", 40, km=9.0), item("b", 100, km=1.0), item("c", 70, klasse="onzeker")]
+        done = subprocess.run([NODE, "-e", script, os.path.join(SITE, "logic.js"), json.dumps(items)], capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.stdout.strip(), "gelijk", done.stderr)
 
     def test_other_orders(self):
         items = [item("a", 40, "2026-11-12", km=3.0), item("b", 100, "2026-11-10", km=8.0), item("c", 70, "2026-11-01", km=1.0)]
@@ -126,6 +129,15 @@ class Lijsten(unittest.TestCase):
         chosen, = logic(["select", self.items, state(view="nieuw"), context({"l2": True})])
         self.assertEqual(ids(chosen["main"]), ["l2"])
 
+    def test_new_also_lists_new_unsure_notices_below(self):
+        chosen, plain = logic(["select", self.items, state(view="nieuw"), context({"o1": True})],
+                              ["select", self.items, state(), context({"o1": True})])
+        self.assertEqual(chosen["main"], [])
+        self.assertEqual(ids(chosen["alsoNew"]), ["o1"])
+        self.assertEqual(plain["alsoNew"], [])
+        lines = logic(["alsoNewLine", 0], ["alsoNewLine", 1], ["alsoNewLine", 4])
+        self.assertEqual(lines, ["", "Ook 1 nieuw bericht onder Onzeker.", "Ook 4 nieuwe berichten onder Onzeker."])
+
     def test_unsure_is_a_list_of_its_own(self):
         chosen, = logic(["select", self.items, state(view="onzeker"), context()])
         self.assertEqual(ids(chosen["main"]), ["o1"])
@@ -145,6 +157,17 @@ class Lijsten(unittest.TestCase):
             ["select", items, state(dagen=7), context()], ["select", items, state(dagen=3), context()])
         self.assertEqual([ids(r["main"]) for r in results],
                          [["a"], ["a"], ["b"], ["a", "c"], ["c"], ["c"], ["a", "b", "c"], ["c"]])
+
+    def test_filtered_out_follows_search_and_filters(self):
+        chosen, = logic(["select", self.items, state(toonWeg=True, dagen=1), context()])
+        self.assertEqual(ids(chosen["removed"]), ["w2"])
+        chosen, = logic(["select", self.items, state(toonWeg=True, zoek="bestaat niet"), context()])
+        self.assertEqual(chosen["removed"], [])
+
+    def test_period_includes_the_first_day_of_the_window(self):
+        items = [item("op de grens", datum="2026-11-09"), item("dag te oud", datum="2026-11-08")]
+        chosen, = logic(["select", items, state(dagen=7), context()])
+        self.assertEqual(ids(chosen["main"]), ["op de grens"])
 
     def test_counts_for_the_three_tiles(self):
         counts, = logic(["counts", self.items, {"l2": True, "o1": True, "w2": True}])
@@ -171,6 +194,14 @@ class NieuwSindsVorigBezoek(unittest.TestCase):
         self.assertEqual(result["nieuw"], {"gisteravond": True, "onbekend": True})
         self.assertEqual(result["next"]["gezien"], seen["gezien"])
         self.assertEqual(result["next"]["onbekend"], self.NOW)
+
+    def test_new_lasts_fourteen_hours(self):
+        hours, = logic(["NEW_HOURS"])
+        self.assertEqual(hours, 14)
+        items = [item("net binnen"), item("net voorbij")]
+        seen = {"net binnen": self.NOW - 14 * self.HOUR + 1, "net voorbij": self.NOW - 14 * self.HOUR}
+        result, = logic(["markNew", items, seen, self.NOW])
+        self.assertEqual(result["nieuw"], {"net binnen": True})
 
     def test_morning_line(self):
         lines = logic(["briefing", 0, False], ["briefing", 1, False], ["briefing", 3, False], ["briefing", 2, True],
@@ -263,7 +294,7 @@ class EchteGegevens(unittest.TestCase):
         self.assertEqual([self.ranks[entry["id"]] for entry in main], list(range(1, len(main) + 1)))
         scores = [entry["score"] for entry in main]
         self.assertEqual(scores, sorted(scores, reverse=True))
-        self.assertEqual(main[0]["score"], max(entry["score"] for entry in self.items))
+        self.assertEqual(main[0]["score"], max(entry["score"] for entry in self.items if entry["klasse"] == "ontwikkellocatie"))
 
     def test_every_notice_in_a_list_has_a_rank_and_one_sentence_why(self):
         shown = self.chosen["main"] + self.unsure["main"]
@@ -347,7 +378,10 @@ class Beeldmerk(unittest.TestCase):
         light = colour_tokens()[0]
         fills = set(re.findall(r'fill="(#[0-9a-f]{6})"', read("icons", "beeldmerk.svg")))
         self.assertEqual(fills, {light["--bar-bg"], light["--signal"]})
-        self.assertIn('fill="%s"' % light["--bar-bg"], read("icons", "icon.svg"))
+        # The app icon is the masthead in small: paper mark and the bar's orange on the bar colour.
+        icon = set(re.findall(r'fill="(#[0-9a-f]{6})"', read("icons", "icon.svg")))
+        self.assertEqual(icon, {light["--bar-bg"], light["--bg"], light["--bar-signal"]})
+        self.assertIn(".mark-signal { fill: var(--bar-signal); }", read("styles.css"))
 
     def test_mark_in_the_masthead_is_the_same_drawing(self):
         def shapes(text):
@@ -412,6 +446,27 @@ class Pagina(unittest.TestCase):
         self.assertGreaterEqual(len(needed), 6)
         self.assertEqual(needed - shell, set())
 
+    RULES = [
+        "Hoogste rang: een wijziging van een omgevingsplan of bestemmingsplan die ontwikkeling mogelijk maakt, bijvoorbeeld naar wonen of met meer bouwhoogte.",
+        "Daarna: twee of meer nieuwe woningen. Hoe meer woningen, hoe hoger.",
+        "Daarna: een perceel van minstens 400 m² met een ontwikkelsignaal: sloop, functiewijziging, kavelsplitsing, bestemmingswijziging of een leegstaand of vrijkomend bedrijfspand.",
+        "Ook: een overheid die grond of vastgoed van minstens 400 m² wil verkopen, en een failliet bedrijf met een bedrijfspand op zo'n perceel.",
+        "Onzeker: er is een signaal, maar het aantal woningen of de perceelgrootte is niet te bepalen. Deze berichten worden niet verborgen.",
+        "Weggefilterd: al het andere, zoals dakkapellen, kappen, reclame en één losse woning. Met de schakelaar op het tabblad Berichten kun je ze bekijken; bij elk bericht staat de reden.",
+        "Ingetrokken en geweigerde aanvragen blijven zichtbaar, maar zakken in de rangorde.",
+    ]
+
+    def test_rules_on_the_sources_tab_are_word_for_word_those_of_version_1(self):
+        block = re.search(r'fill\("regels", \[(.*?)\]\);', self.app, flags=re.S).group(1)
+        lines = [json.loads(line.replace('" + limit + "', "400")) for line in re.findall(r'^\s*("(?:[^"\\]|\\.|" \+ limit \+ ")*"),$', block, flags=re.M)]
+        self.assertEqual(lines, self.RULES)
+
+    def test_switch_for_filtered_out_is_on_the_tab_itself_not_inside_the_filter_panel(self):
+        panel = re.search(r'<form id="filters".*?</form>', self.html, flags=re.S).group(0)
+        self.assertNotIn('id="toon-weg"', panel)
+        section = re.search(r'<section id="view-berichten".*?</section>', self.html, flags=re.S).group(0)
+        self.assertIn('id="toon-weg"', section)
+
     def test_one_minute_view_has_no_more_than_three_lists(self):
         tiles = re.findall(r'class="tile[^"]*" id="tile-(\w+)" data-view="(\w+)"', self.html)
         self.assertEqual(tiles, [("ranglijst", "ranglijst"), ("nieuw", "nieuw"), ("onzeker", "onzeker")])
@@ -452,7 +507,58 @@ class InDeBrowser(unittest.TestCase):
     def test_no_errors_and_nothing_wider_than_the_phone(self):
         self.assertEqual(self.seen["errors"], [])
         self.assertLessEqual(self.seen["overflow"], 0)
+        self.assertLessEqual(self.seen["narrowOverflow"], 0)
         self.assertEqual(self.seen["mark"], 2)
+
+    def test_on_the_narrowest_phone_no_date_breaks_and_no_label_covers_the_details_button(self):
+        self.assertEqual(self.seen["brokenDates"], 0)
+        self.assertEqual(self.seen["chipsOverToggle"], 0)
+
+    def test_first_visit_counts_the_latest_publication_day_as_new(self):
+        latest = max(entry["datum"] for entry in self.items)
+        new = [entry for entry in self.locations if entry["datum"] == latest]
+        self.assertEqual(self.seen["tiles"]["nieuw"], str(len(new)))
+        self.assertEqual(self.seen["newCards"], len(new))
+        expected = {0: "Geen ontwikkellocaties", 1: "1 ontwikkellocatie"}.get(len(new), "%d ontwikkellocaties" % len(new))
+        self.assertEqual(self.seen["brief"], expected + " op de laatste publicatiedag.")
+
+    def test_details_stay_open_and_are_large_enough_to_tap(self):
+        self.assertEqual(self.seen["openAfterShowAll"], 1)
+        self.assertGreaterEqual(self.seen["toggleHeight"], 40)
+        self.assertGreaterEqual(self.seen["linkHeight"], 40)
+
+    def test_name_in_the_masthead_goes_back_to_the_ranking(self):
+        self.assertEqual(self.seen["afterBrand"], "tile-ranglijst")
+
+    def test_order_by_date_shows_day_headings_that_count_what_is_shown(self):
+        heads = self.seen["dayHeads"]
+        self.assertTrue(heads)
+        shown = 0
+        for head in heads:
+            count = re.search(r"(\d+)( van \d+)?$", head)
+            self.assertIsNotNone(count, head)
+            shown += int(count.group(1))
+        self.assertEqual(shown, self.seen["dayCards"])
+
+    def test_tapping_a_municipality_shows_its_notices(self):
+        name = self.seen["gemeente"]
+        own = [entry for entry in self.locations if entry["gemeente"] == name]
+        self.assertEqual(self.seen["gemeenteHash"], "#berichten")
+        self.assertEqual(self.seen["gemeenteFilter"], name)
+        self.assertEqual(len(self.seen["gemeenteRanks"]), len(own))
+        self.assertEqual(self.seen["gemeenteRanks"], sorted(self.seen["gemeenteRanks"], key=int))
+
+    def test_rules_are_shown_as_in_version_1(self):
+        limit = str(json.loads(read("data", "berichten.json"))["drempelPerceelM2"])
+        self.assertEqual(self.seen["rules"], [rule.replace("400", limit) for rule in Pagina.RULES])
+
+    def test_gaps_in_the_data_are_reported(self):
+        notices = " ".join(self.seen["notices"])
+        self.assertEqual(len(self.seen["notices"]), 4)
+        for part in ("zijn onvolledig: de bron gaf 4 van de gebruikelijke circa 2.097", "was bij de laatste verversing niet bereikbaar",
+                     "konden 3 bekendmakingen niet volledig worden gelezen", "konden 3 rechtbankpublicaties"):
+            self.assertIn(part, notices)
+        self.assertTrue(self.seen["gapHead"].endswith("· onvolledig"), self.seen["gapHead"])
 
     def test_first_screen_is_the_top_ten_with_the_highest_rank_on_top(self):
         first = self.seen["first"]
@@ -475,11 +581,21 @@ class InDeBrowser(unittest.TestCase):
 
     def test_filtered_out_is_behind_the_switch_and_has_no_rank(self):
         removed = [entry for entry in self.items if entry["klasse"] == "weggefilterd"]
+        self.assertTrue(self.seen["switchVisible"], "de schakelaar is niet zichtbaar zonder het filterpaneel te openen")
         self.assertEqual(self.seen["removed"], min(60, len(removed)))
         self.assertEqual(self.seen["removedRank"], "–")
+        self.assertEqual(self.seen["removedWhileSearching"], 0)
+        self.assertTrue(self.seen["switchAfterReset"], "Filters wissen zet de schakelaar uit")
+
+    def test_a_new_unsure_notice_is_announced_and_listed_under_new(self):
+        if not self.seen["hasUnsure"]:
+            self.skipTest("geen onzekere berichten in de gegevens")
+        self.assertEqual(self.seen["briefLater"], "Geen nieuwe ontwikkellocaties sinds je vorige bezoek.")
+        self.assertTrue(self.seen["briefSubLater"].startswith("Ook 1 nieuw bericht onder Onzeker."))
+        self.assertEqual([(card["klasse"], card["isNew"]) for card in self.seen["newUnsure"]], [("onzeker", True)])
+        self.assertEqual(self.seen["newUnsureHead"], ["Nieuw onder Onzeker1"])
 
     def test_nothing_new_shows_the_illustration(self):
-        self.assertEqual(self.seen["briefLater"], "Geen nieuwe ontwikkellocaties sinds je vorige bezoek.")
         self.assertEqual(self.seen["emptyTitle"], "Niets nieuws sinds je vorige bezoek.")
         self.assertEqual(self.seen["emptyArt"], 1)
 

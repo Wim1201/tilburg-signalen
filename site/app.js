@@ -71,8 +71,8 @@
     var now = new Date(), counts = L.counts(state.data.berichten, state.nieuw);
     $("brief-day").textContent = L.greeting(now.getHours()) + " · " + dayFormat.format(now);
     $("brief-title").textContent = L.briefing(counts.nieuw, state.firstVisit);
-    $("brief-sub").textContent = "Laatste publicatiedag: " +
-      (state.latestDay ? dayLabel(state.latestDay).toLowerCase() : "nog geen berichten") + ".";
+    $("brief-sub").textContent = (L.alsoNewLine(counts.onzekerNieuw) + " Laatste publicatiedag: " +
+      (state.latestDay ? dayLabel(state.latestDay).toLowerCase() : "nog geen berichten") + ".").trim();
     $("tile-ranglijst").querySelector("b").textContent = counts.locaties;
     $("tile-nieuw").querySelector("b").textContent = counts.nieuw;
     $("tile-onzeker").querySelector("b").textContent = counts.onzeker;
@@ -119,6 +119,7 @@
   function card(item, ctx) {
     var model = L.cardModel(item, { centre: ctx.centre, nieuw: ctx.nieuw, ranks: ctx.ranks, today: L.isoDay(ctx.today) });
     var node = el("article", "card is-" + model.klasse + (model.isNew ? " is-new" : ""));
+    node.setAttribute("data-id", model.id);
 
     var rank = el("div", "rank");
     if (model.rank) {
@@ -137,8 +138,10 @@
 
     var meta = el("p", "meta");
     meta.appendChild(el("span", "place", model.place));
+    meta.appendChild(document.createTextNode(" "));
     meta.appendChild(el("span", "dist", model.distance));
-    meta.appendChild(el("span", null, model.date));
+    meta.appendChild(document.createTextNode(" "));
+    meta.appendChild(el("span", "date", model.date));
     main.appendChild(meta);
 
     var more = el("details", "details"), summary = el("summary"), tags = el("span", "tags"), body = el("div", "details-body");
@@ -172,13 +175,16 @@
   };
   var ORDER = { relevantie: "hoogste rang eerst", datum: "nieuwste eerst", afstand: "dichtstbij eerst" };
 
+  /* How many settings in the filter panel differ from the default; the search box is separate. */
   function filtersActive() {
-    return ["zoek", "type", "gemeente", "fase", "signaal", "dagen"].filter(function (key) { return state[key]; }).length +
-      (state.maxKm < state.data.straalKm ? 1 : 0) + (state.sort !== "relevantie" ? 1 : 0) + (state.toonWeg ? 1 : 0);
+    return ["type", "gemeente", "fase", "signaal", "dagen"].filter(function (key) { return state[key]; }).length +
+      (state.maxKm < state.data.straalKm ? 1 : 0) + (state.sort !== "relevantie" ? 1 : 0);
   }
+  /* Whether search or a filter leaves notices out (the order alone does not). */
+  function narrowed() { return !!state.zoek || filtersActive() - (state.sort !== "relevantie" ? 1 : 0) > 0; }
 
   function emptyState() {
-    var box = el("div", "empty"), filtered = filtersActive() > (state.toonWeg ? 1 : 0);
+    var box = el("div", "empty"), filtered = narrowed();
     if (state.view === "nieuw" && !filtered) {
       var art = el("div", "empty-art");
       ["ochtend.svg", "ochtend-donker.svg"].forEach(function (file, index) {
@@ -188,24 +194,29 @@
       });
       box.appendChild(art);
       box.appendChild(el("p", "empty-title", state.firstVisit ? "Geen ontwikkellocaties op de laatste publicatiedag." : "Niets nieuws sinds je vorige bezoek."));
-      box.appendChild(el("p", null, "De ranglijst is ongewijzigd."));
+      if (!state.firstVisit) box.appendChild(el("p", null, "De ranglijst is ongewijzigd."));
       var back = el("button", "ghost", "Bekijk de ranglijst");
       back.type = "button";
       back.addEventListener("click", function () { setView("ranglijst"); });
       box.appendChild(back);
       return box;
     }
-    box.appendChild(el("p", null, {
+    box.appendChild(el("p", null, filtered ? {
       ranglijst: "Geen ontwikkellocaties met deze filters. Kijk ook onder Onzeker, of wis de filters.",
       nieuw: "Geen nieuwe ontwikkellocaties met deze filters.",
       onzeker: "Geen onzekere berichten met deze filters.",
+    }[state.view] : {
+      ranglijst: "Er zijn op dit moment geen ontwikkellocaties. Kijk ook onder Onzeker.",
+      onzeker: "Er zijn op dit moment geen onzekere berichten.",
     }[state.view]));
     return box;
   }
 
   function renderList() {
     var ctx = context(), selection = L.select(state.data.berichten, state, ctx);
-    var main = selection.main, removed = selection.removed;
+    var main = selection.main, removed = selection.removed, alsoNew = selection.alsoNew;
+    var open = {};
+    [].forEach.call(document.querySelectorAll("#view-berichten .card:has(details[open])"), function (node) { open[node.getAttribute("data-id")] = true; });
     var shown = state.expanded ? main : main.slice(0, L.TOP);
     var noun = NOUNS[state.view][main.length === 1 ? 0 : 1];
     var list = $("list");
@@ -216,18 +227,25 @@
       ? (state.sort === "relevantie" ? "Top " : "") + shown.length + " van " + main.length + " " + noun
       : main.length + " " + noun) + ", " + ORDER[state.sort];
 
-    if (!main.length) list.appendChild(emptyState());
-    var perDay = countBy(main, "datum"), lastDay = null;
+    if (!main.length && !alsoNew.length) list.appendChild(emptyState());
+    var perDay = countBy(main, "datum"), perDayShown = countBy(shown, "datum"), lastDay = null;
     shown.forEach(function (item) {
       if (state.sort === "datum" && item.datum !== lastDay) {
         lastDay = item.datum;
         var head = el("p", "day", dayLabel(item.datum));
         var gap = (state.data.onvolledigeDagen || []).some(function (g) { return g.datum === item.datum; });
-        head.appendChild(el("span", null, perDay[item.datum] + (gap ? " · onvolledig" : "")));
+        var total = perDay[item.datum], visible = perDayShown[item.datum];
+        head.appendChild(el("span", null, (visible < total ? visible + " van " + total : total) + (gap ? " · onvolledig" : "")));
         list.appendChild(head);
       }
       list.appendChild(card(item, ctx));
     });
+    if (alsoNew.length && shown.length === main.length) {
+      var also = el("p", "day", "Nieuw onder Onzeker");
+      also.appendChild(el("span", null, String(alsoNew.length)));
+      list.appendChild(also);
+      alsoNew.forEach(function (item) { list.appendChild(card(item, ctx)); });
+    }
     $("more").hidden = shown.length === main.length;
     $("more").textContent = "Toon alle " + main.length + " " + noun;
 
@@ -243,8 +261,11 @@
     }
     $("more-removed").hidden = !state.toonWeg || removed.length <= state.removedLimit;
 
+    [].forEach.call(document.querySelectorAll("#view-berichten .card"), function (node) {
+      if (open[node.getAttribute("data-id")]) node.querySelector("details").open = true;
+    });
     LISTS.forEach(function (view) { $("tile-" + view).setAttribute("aria-pressed", String(state.view === view)); });
-    var active = filtersActive() - (state.zoek ? 1 : 0);
+    var active = filtersActive();
     $("filter-toggle").textContent = "Filters" + (active ? " · " + active : "");
   }
 
@@ -382,10 +403,10 @@
 
   function resetFilters() {
     state.zoek = ""; state.type = ""; state.gemeente = ""; state.fase = ""; state.signaal = ""; state.dagen = 0;
-    state.sort = "relevantie"; state.maxKm = state.data.straalKm; state.toonWeg = false;
+    state.sort = "relevantie"; state.maxKm = state.data.straalKm;
     state.expanded = false; state.removedLimit = REMOVED_PAGE;
     $("zoek").value = ""; $("f-type").value = ""; $("f-gemeente").value = ""; $("f-fase").value = ""; $("f-signaal").value = "";
-    $("f-dagen").value = "0"; $("f-sort").value = "relevantie"; $("toon-weg").checked = false;
+    $("f-dagen").value = "0"; $("f-sort").value = "relevantie";
     $("f-km").value = state.maxKm; $("f-km-out").textContent = state.maxKm + " km";
   }
 
@@ -410,6 +431,7 @@
     LISTS.forEach(function (view) {
       $("tile-" + view).addEventListener("click", function () { setView(view); });
     });
+    $("brand").addEventListener("click", function () { setView("ranglijst"); });
     $("filter-toggle").addEventListener("click", function () { showFilters($("filters").hidden); });
     $("filter-reset").addEventListener("click", function () { resetFilters(); renderList(); });
     $("filters").addEventListener("submit", function (event) { event.preventDefault(); });
