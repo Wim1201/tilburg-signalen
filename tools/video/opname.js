@@ -92,7 +92,9 @@ function serveerSite() {
   await app.evaluate(function () { return document.fonts.ready; });
 
   var ffmpeg = DROOG ? null : spawn("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(FPS), "-c:v", "mjpeg", "-i", "-",
-    "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", uit], { stdio: ["pipe", "inherit", "inherit"] });
+    // High profile at level 4.0 with at most 4 reference frames: within what phones state they play (the preset alone gave level 5.0).
+    "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-profile:v", "high", "-level:v", "4.0", "-refs", "4",
+    "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-movflags", "+faststart", uit], { stdio: ["pipe", "inherit", "inherit"] });
   var klaar = DROOG ? Promise.resolve() : new Promise(function (resolve, reject) { ffmpeg.on("close", function (code) { code ? reject(new Error("ffmpeg " + code)) : resolve(); }); });
 
   var wijzer = { x: W - 120, y: H + 80 }, beweging = null, rol = null, tik = null, slotVanaf = null, scene = null;

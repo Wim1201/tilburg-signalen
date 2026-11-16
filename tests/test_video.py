@@ -40,6 +40,15 @@ def playwright_available():
     return bool(NODE) and subprocess.run([NODE, "-e", "require('playwright')"], capture_output=True).returncode == 0
 
 
+class Opnamescript(unittest.TestCase):
+    def test_film_is_encoded_within_what_phones_state_they_play(self):
+        script = read(VIDEO, "opname.js")
+        for part in ('"-c:v", "libx264"', '"-pix_fmt", "yuv420p"', '"-profile:v", "high"', '"-level:v", "4.0"', '"-refs", "4"', '"+faststart"'):
+            self.assertIn(part, script)
+        mix = geluid.mix_opdracht("film.mp4", "stem.mp3", {"klik": "t.mp3", "scroll": "v.mp3", "signaal": "s.mp3"}, [(0.25, "signaal")], 1.2, "uit.mp4")
+        self.assertEqual([mix[mix.index(flag) + 1] for flag in ("-c:v", "-c:a", "-ar", "-ac")], ["copy", "aac", "48000", "2"])
+
+
 class Scenario(unittest.TestCase):
     def setUp(self):
         self.scenario = geluid.scenario()
@@ -248,7 +257,8 @@ class Droogloop(unittest.TestCase):
 class Film(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,width,height", "-of", "json", FILM],
+        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                              "format=duration:stream=codec_type,codec_name,profile,level,pix_fmt,width,height,sample_rate,channels,duration", "-of", "json", FILM],
                              capture_output=True, text=True, check=True).stdout
         cls.info = json.loads(out)
 
@@ -264,6 +274,32 @@ class Film(unittest.TestCase):
         streams = {stream["codec_type"]: stream for stream in self.info["streams"]}
         self.assertEqual((streams["video"]["codec_name"], streams["video"]["width"], streams["video"]["height"]), ("h264", 1920, 1080))
         self.assertEqual(streams["audio"]["codec_name"], "aac")
+
+    def test_plays_on_a_phone(self):
+        # What Apple states for the iPhone: H.264 up to High profile level 4.2, AAC-LC up to 48 kHz stereo.
+        streams = {stream["codec_type"]: stream for stream in self.info["streams"]}
+        video, audio = streams["video"], streams["audio"]
+        self.assertIn(video["profile"], ("High", "Main", "Constrained Baseline"))
+        self.assertLessEqual(video["level"], 42)
+        self.assertEqual(video["pix_fmt"], "yuv420p")
+        self.assertEqual((audio["profile"], audio["channels"]), ("LC", 2))
+        self.assertIn(audio["sample_rate"], ("44100", "48000"))
+
+    def test_sound_runs_the_whole_film_and_is_not_silent(self):
+        streams = {stream["codec_type"]: stream for stream in self.info["streams"]}
+        self.assertAlmostEqual(float(streams["audio"]["duration"]), float(streams["video"]["duration"]), delta=0.1)
+        heard = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", FILM, "-map", "0:a:0", "-af", "volumedetect", "-f", "null", "-"],
+                               capture_output=True, text=True, check=True).stderr
+        mean = float(re.search(r"mean_volume: (-?[\d.]+) dB", heard).group(1))
+        peak = float(re.search(r"max_volume: (-?[\d.]+) dB", heard).group(1))
+        self.assertGreater(mean, -30, "het geluidsspoor is (bijna) stil")
+        self.assertTrue(-10 < peak <= 0, peak)
+        # the voice: no silence longer than three seconds before the closing card
+        quiet = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", FILM, "-map", "0:a:0", "-af", "silencedetect=noise=-45dB:d=3", "-f", "null", "-"],
+                               capture_output=True, text=True, check=True).stderr
+        starts = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", quiet)]
+        plan = json.loads(read(VIDEO, "timing.json"))
+        self.assertTrue(all(start > plan["aanloop"] + plan["stem"] - 1 for start in starts), starts)
 
     def test_small_enough_to_send(self):
         self.assertLess(os.path.getsize(FILM), 15_000_000)

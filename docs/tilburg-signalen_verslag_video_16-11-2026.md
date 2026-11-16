@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 16-11-2026, 20:00 – 21:10 uur |
+| Datum | 16-11-2026, 20:00 – 21:35 uur |
 | Versie | versie 2 van de app, branch `claude/awesome-brown-i18j4o` |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | `site/data/berichten.json` zoals het in de repo staat (bijgewerkt 16-11-2026, 15:37 uur); vergeleken met de nieuwste run op de live app (17:38 uur) |
@@ -22,6 +22,7 @@ beeld en stem zijn gemeten. Uitspraak en klank zijn niet beoordeeld; dat moet Wi
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 21:34 uur | **De film is opnieuw gemaakt met een lager videoniveau; de film van 20:51 uur is daarmee vervangen.** Wim vroeg het geluidsspoor te controleren. Het geluid was in orde, maar het beeld stond op H.264-niveau 5.0, boven wat Apple voor de iPhone opgeeft (High Profile niveau 4.2). Zie "Controle van het geluidsspoor". De grootte is nu 5.239.918 bytes; overal waar dit verslag 5.167.073 bytes of 5,2 MB voor de film noemt, gaat het om de eerste versie. |
 | 16-11-2026, 21:00 uur | **De film is uit de repository gehaald; "De video staat in `docs/video/`" in de versie van 20:52 uur van dit verslag geldt niet meer.** Ik had de film (5,2 MB) en een stilstaand beeld (0,1 MB) in git gezet en gepusht zonder de grootte te noemen of te vragen of dat de bedoeling was. Wim wees erop dat zo'n bestand in een openbare repo voorgoed in de geschiedenis blijft. Zie "Film uit de repository". |
 | 16-11-2026, 21:00 uur | **De geschiedenis van de branch is herschreven.** De commit `4626889` (20:51 uur) is vervangen door `7523af7`, met dezelfde inhoud zonder de film en het stilstaande beeld. Wie `4626889` al had opgehaald, moet de branch opnieuw ophalen. Er was geen pull request en niets is samengevoegd met `main`. |
 | 16-11-2026, 21:00 uur | **Aanvulling op wat ik over "Bijgewerkt ma 16 nov, 15:37" schreef.** Dat is het tijdstip van de laatste geslaagde verversing van het gegevensbestand dat de film gebruikte, niet van de laatste wijziging van de berichten. Het bestand in de repo is een momentopname van 15:37 uur; de live app stond op dat moment op 17:38 uur. Zie "Wat Bijgewerkt betekent". |
@@ -201,6 +202,37 @@ nodig.
 | `tools/video/timing.json` | De gemeten lengte van elke scène voor deze opname van de stem |
 | `tools/video/geluid/` | De stem en de drie geluidjes van ElevenLabs, ongewijzigd |
 
+## Controle van het geluidsspoor (21:25 – 21:34 uur)
+
+Gemeten op de film zoals hij om 20:51 uur is geleverd (5.167.073 bytes):
+
+| Meting | Uitkomst |
+|---|---|
+| Geluidsspoor aanwezig | Ja, één spoor, als standaardspoor gemarkeerd |
+| Codec | AAC-LC, 48 kHz, stereo, 149 kbit/s |
+| Duur | 70,02 seconden (beeld: 70,03) |
+| Gemiddeld / maximaal volume | −22,7 dB / −2,8 dB |
+| Luidheid | −18,2 LUFS |
+| Per kanaal | Links −22,7 / −2,8 dB, rechts −22,7 / −3,7 dB; opgeteld tot mono −22,7 / −3,5 dB (de kanalen heffen elkaar niet op) |
+| Stiltes langer dan 2 seconden | Alleen het slotbeeld na de laatste woorden, van 65,4 tot 70,0 seconden |
+
+Het spoor was er dus en was niet stil. De voorwaarde voor herstel ("geen of een stil audiospoor")
+gold niet. Wat ik bij deze controle wel vond:
+
+| Bevinding | Toelichting | Gedaan |
+|---|---|---|
+| Beeld op H.264 High Profile **niveau 5.0** | De instelling "slow" van de encoder gebruikt vijf referentiebeelden en komt daardoor bij 1920 × 1080 op niveau 5.0 uit. Apple geeft voor de iPhone niveau 4.2 als bovengrens op. Veel toestellen spelen 5.0 toch af; dat is een vermoeden, niet getest | Opnamescript aangepast: niveau 4.0, hoogstens vier referentiebeelden. Film opnieuw opgenomen en gemengd (geen credits). Tests toegevoegd |
+
+De nieuwe film: H.264 High Profile niveau 4.0, 1920 × 1080, 30 beelden per seconde, yuv420p; AAC-LC,
+48 kHz, stereo; 70,03 seconden; 5.239.918 bytes. Het geluid is hetzelfde spoor uit dezelfde bron
+(−22,7 / −2,8 dB). De opname verliep gelijk: dezelfde 34 gebeurtenissen op dezelfde momenten, geen
+fouten in de console.
+
+**Of de eerste film op de iPhone van Wim zonder geluid speelde, en zo ja waardoor, weet ik niet.**
+Ik kan niets afspelen. Een te hoog videoniveau geeft doorgaans geen beeld, niet alleen geen geluid.
+Andere mogelijke oorzaken liggen buiten het bestand: de stilteschakelaar van de iPhone, of een
+voorvertoning in de app die gedempt begint.
+
 ## Film uit de repository (21:00 uur)
 
 | Vraag | Antwoord |
@@ -291,7 +323,7 @@ in de app. De twee punten in de app (1 en 2) zijn opmaak.
 | Grootte | Film 5,2 MB; stem 1,0 MB; geluidjes samen 86 kB |
 | Tikken / scrollbewegingen | 5 / 3 |
 | Opnemen | 2.101 beelden, enkele minuten rekentijd (niet precies gemeten) |
-| Unittests | 175, alle geslaagd (was 139; 167 om 20:51 uur, daarna 8 erbij voor Bijgewerkt en de bewaker tegen films in git) |
+| Unittests | 178, alle geslaagd (was 139; 167 om 20:51 uur, 175 om 21:00 uur, daarna 3 erbij voor het formaat en het geluid van de film) |
 
 ## Getest
 
