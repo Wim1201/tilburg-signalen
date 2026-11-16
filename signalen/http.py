@@ -1,4 +1,5 @@
 """Small HTTP helper with retries (standard library only)."""
+import collections
 import json
 import socket
 import time
@@ -8,6 +9,7 @@ import urllib.request
 
 USER_AGENT = "tilburg-signalen/1.0 (open data reader)"
 MAX_WACHT = 30  # seconds; the wait between attempts never grows beyond this
+VERZOEKEN = collections.Counter()  # requests sent in this process, per host (every attempt counts)
 
 
 class OphaalFout(RuntimeError):
@@ -43,8 +45,10 @@ def get(url, params=None, timeout=90, attempts=4, slaap=time.sleep):
     if params:
         url = url + ("&" if "?" in url else "?") + urllib.parse.urlencode(params, doseq=True)
     last = None
+    host = urllib.parse.urlsplit(url).netloc
     for attempt in range(attempts):
         wait = wachttijd(attempt)
+        VERZOEKEN[host] += 1
         try:
             request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             with urllib.request.urlopen(request, timeout=timeout) as response:

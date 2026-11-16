@@ -69,11 +69,16 @@ def in_postcode_range(postcode, ranges):
     return any(low <= int(postcode[:4]) <= high for low, high in ranges)
 
 
-def locate(address, lookup=perceel.bag_adres):
-    """Find the building at an address. Returns (uses, floor_area, town, rd) or None for homes and unknowns."""
+def locate(address, lookup=perceel.bag_adres, fouten=None):
+    """Find the building at an address. Returns (uses, floor_area, town, rd) or None for homes and unknowns.
+
+    A lookup that fails is appended to `fouten`, so the caller can tell "no premises" from "no answer".
+    """
     try:
         objects = lookup(address["postcode"], address["huisnummer"])
-    except Exception:
+    except Exception as error:
+        if fouten is not None:
+            fouten.append(error)
         return None
     exact = [o for o in objects if o["huisletter"].lower() == address["toevoeging"].lower().replace(" ", "")]
     objects = exact or objects
@@ -85,12 +90,12 @@ def locate(address, lookup=perceel.bag_adres):
     return sorted(uses - _RESIDENTIAL), area, first["woonplaats"], first["rd"]
 
 
-def to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges, lookup=perceel.bag_adres):
+def to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges, lookup=perceel.bag_adres, fouten=None):
     """Turn a parsed case into an app item when one of its premises lies inside the radius."""
     for address in case["adressen"]:
         if not in_postcode_range(address["postcode"], ranges):
             continue
-        found = locate(address, lookup)
+        found = locate(address, lookup, fouten)
         if not found:
             continue
         uses, floor_area, town, rd = found
@@ -127,8 +132,12 @@ def to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges, lookup=
     return None
 
 
-def fetch(config, area, since):
-    """Fetch new bankruptcies and moratoria of legal entities with premises inside the radius."""
+def fetch(config, area, since, cache=None, lookup=perceel.bag_adres):
+    """Fetch new bankruptcies and moratoria of legal entities with premises inside the radius.
+
+    With a cache, a court publication that was read before and had no company inside the radius is
+    not downloaded again. Only that verdict is cached, never the content.
+    """
     centre_rd = tuple(config["centrum"]["rd"])
     radius_m = config["straal_km"] * 1000
     ranges = config["postcode_bereik"]
@@ -137,7 +146,8 @@ def fetch(config, area, since):
     records = []
     for record in bekendmakingen.search(query):
         urls = {c.get("manifestation"): c.text for c in bekendmakingen._children(record, "itemUrl")}
-        records.append({"overheid": bekendmakingen._text(record, "creator"), "datum": bekendmakingen._text(record, "date"),
+        records.append({"id": bekendmakingen._text(record, "identifier"),
+                        "overheid": bekendmakingen._text(record, "creator"), "datum": bekendmakingen._text(record, "date"),
                         "url": bekendmakingen._text(record, "preferredUrl"), "urlTekst": urls.get("html"), "xml": urls.get("xml")})
 
     def load(record):
@@ -149,16 +159,21 @@ def fetch(config, area, since):
     # After about a month the publisher withdraws the readable text of these publications (only a PDF
     # stays); those records are skipped on purpose, in line with that privacy measure.
     readable = [r for r in records if r["xml"]]
+    todo = [r for r in readable if not (cache and r["id"] and cache.haal("insolventie", r["id"])[0])]
     items, failed = {}, 0
     with concurrent.futures.ThreadPoolExecutor(6) as pool:
-        for record, text in pool.map(load, readable):
+        for record, text in pool.map(load, todo):
             failed += not text
+            found, fouten = 0, []
             for entry in entries(text):
                 case = parse_entry(entry)
                 if case and any(in_postcode_range(a["postcode"], ranges) for a in case["adressen"]):
-                    item = to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges)
+                    item = to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges, lookup, fouten)
                     if item:
+                        found += 1
                         items.setdefault(item["id"], item)
-    if readable and failed > len(readable) / 2:
-        raise RuntimeError(f"{failed} van {len(readable)} publicaties niet te lezen")
+            if cache and record["id"] and text and not found and not fouten:
+                cache.zet("insolventie", record["id"], 0)
+    if todo and failed > len(todo) / 2:
+        raise RuntimeError(f"{failed} van {len(todo)} publicaties niet te lezen")
     return list(items.values())

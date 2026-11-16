@@ -2,6 +2,7 @@
 
 Run: python -m signalen.update
 """
+import argparse
 import collections
 import concurrent.futures
 import datetime
@@ -11,7 +12,7 @@ import sys
 import time
 import zoneinfo
 
-from . import bekendmakingen, gebied, insolventies, perceel, relevantie, tekst, vlaanderen, volledigheid
+from . import bekendmakingen, cache as cachemodule, gebied, http, insolventies, perceel, relevantie, tekst, vlaanderen, volledigheid
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "site" / "data" / "berichten.json"
@@ -61,7 +62,7 @@ def _alle(functie, argumenten, pool, slaap=time.sleep):
     return [(value if ok else None, ok) for value, ok in results], statistiek
 
 
-def verrijk(items, drempel, haal_tekst=tekst.haal_op, perceel_m2=perceel.kadaster_m2, slaap=time.sleep):
+def verrijk(items, drempel, haal_tekst=tekst.haal_op, perceel_m2=perceel.kadaster_m2, slaap=time.sleep, cache=None):
     """Add klasse, score, waarom, signalen, woningen and perceelM2 to every item (in place).
 
     Returns (items, statistiek); statistiek holds, for 'tekst' and 'perceel', how many downloads were
@@ -69,6 +70,9 @@ def verrijk(items, drempel, haal_tekst=tekst.haal_op, perceel_m2=perceel.kadaste
     not be fetched is marked 'onzeker' with that reason, and the next run tries again.
     """
     statistiek = {}
+    if cache:
+        haal_tekst = cache.omwikkel("tekst", haal_tekst, cachemodule.tekst_sleutel)
+        perceel_m2 = cache.omwikkel("perceel", perceel_m2, cachemodule.perceel_sleutel)
     with concurrent.futures.ThreadPoolExecutor(WORKERS) as pool:
         # 1. Notices without a description in their metadata: read the opening lines of the publication.
         need_text = [i for i in items if i.get("_urlXml") and (i["type"] in ("plan", "verkoop") or not i["omschrijving"])]
@@ -110,17 +114,17 @@ def verrijk(items, drempel, haal_tekst=tekst.haal_op, perceel_m2=perceel.kadaste
     return items, statistiek
 
 
-def bron_ophalers(config, area, since):
+def bron_ophalers(config, area, since, cache=None):
     """The connected sources: source id -> function that returns its items for the whole window."""
     return {
-        "officielebekendmakingen": lambda: (bekendmakingen.fetch(config, area, since)
-                                            + bekendmakingen.fetch_sales(config, area, since["verkoop"])),
-        "staatscourant-insolventies": lambda: insolventies.fetch(config, area, since["faillissement"]),
+        "officielebekendmakingen": lambda: (bekendmakingen.fetch(config, area, since, cache)
+                                            + bekendmakingen.fetch_sales(config, area, since["verkoop"], cache)),
+        "staatscourant-insolventies": lambda: insolventies.fetch(config, area, since["faillissement"], cache),
         "omgevingsloket-vlaanderen": lambda: vlaanderen.fetch(config, area, since["vergunning"]),
     }
 
 
-def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledigheid.controleer):
+def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledigheid.controleer, cache=None):
     """Fetch every connected source and judge the result. Returns the complete output document.
 
     Each run fetches the complete window again and keeps no state. A day the source missed
@@ -128,8 +132,8 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
     """
     today = now.date()
     since = {kind: _since(today, days) for kind, days in config["venster_dagen"].items()}
-    fetchers = fetchers or bron_ophalers(config, area, since)
-    verrijker = verrijker or (lambda found: verrijk(found, config["drempel_perceel_m2"]))
+    fetchers = fetchers or bron_ophalers(config, area, since, cache)
+    verrijker = verrijker or (lambda found: verrijk(found, config["drempel_perceel_m2"], cache=cache))
 
     items, statuses = {}, {}
     for source_id, fetcher in fetchers.items():
@@ -162,21 +166,36 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
         "onvolledigeDagen": incomplete,
         "ophaalfouten": {kind: stats["definitiefMislukt"] for kind, stats in statistiek.items()},
         "ophaalstatistiek": statistiek,
+        "cache": cache.statistiek() if cache else None,
         "bronnen": sources,
         "berichten": items,
     }
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Berichten ophalen en beoordelen")
+    parser.add_argument("--volledig", action="store_true",
+                        help="volledige verversing: de cache niet lezen en alles opnieuw ophalen")
+    args = parser.parse_args(argv)
+
     config = json.loads(gebied.CONFIG.read_text(encoding="utf-8"))
     area = gebied.load()
     now = datetime.datetime.now(zoneinfo.ZoneInfo(config["tijdzone"]))
-    document = run(config, area, now)
+    cache = cachemodule.Cache(lezen=not args.volledig, sleutel=cachemodule.insolventie_sleutel(config))
+    http.VERZOEKEN.clear()
+    started = time.monotonic()
+    document = run(config, area, now, cache=cache)
+    document["volledigeVerversing"] = args.volledig
+    document["verzoeken"] = {"totaal": sum(http.VERZOEKEN.values()), "perDienst": dict(http.VERZOEKEN)}
 
     main_source = next(s for s in document["bronnen"] if s["id"] == "officielebekendmakingen")
     if main_source.get("status") != "ok":
         # Keep yesterday's data online rather than publishing an almost empty list.
         sys.exit("Hoofdbron niet bereikbaar; bestaande gegevens blijven staan.")
+
+    # A kind is only pruned when its stage ran: otherwise a failing source would empty its cache.
+    insolvency_ok = next(s for s in document["bronnen"] if s["id"] == "staatscourant-insolventies").get("status") == "ok"
+    cache.bewaar(snoei=("tekst", "perceel", "locatie", "gemeente") + (("insolventie",) if insolvency_ok else ()))
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
@@ -196,6 +215,10 @@ def main():
         # "::warning::" makes the line stand out in the GitHub Actions log.
         print(f'::warning::Niet op te halen: {fouten.get("tekst", 0)} teksten en {fouten.get("perceel", 0)} perceelgroottes; '
               "die berichten staan tot de volgende verversing onder Onzeker")
+    kind_of_run = "volledige verversing (cache niet gelezen)" if args.volledig else "gewone run"
+    print(f'  {kind_of_run}: {document["verzoeken"]["totaal"]} verzoeken in {time.monotonic() - started:.0f} seconden')
+    for soort, stats in document["cache"].items():
+        print(f'  cache {soort}: {stats["uitCache"]} uit cache, {stats["opgehaald"]} opgehaald')
     for gap in document["onvolledigeDagen"]:
         print(f'  ONVOLLEDIG {gap["datum"]}: {gap["aantal"]} van gebruikelijk {gap["verwacht"]} Gemeenteblad-publicaties')
     for source in document["bronnen"]:

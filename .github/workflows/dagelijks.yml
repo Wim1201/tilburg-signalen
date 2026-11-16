@@ -8,17 +8,27 @@ on:
     - cron: "40 8 * * 1-5"   # 09:40 wintertijd (10:40 zomertijd)
     - cron: "10 11 * * *"    # vangnet rond het middaguur, ook in het weekend
     - cron: "10 15 * * 1-5"  # tweede vangnet voor publicaties die later op de dag verschijnen
+    - cron: "30 3 * * 0"     # wekelijkse volledige verversing (zondagnacht): cache negeren, alles opnieuw
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      volledig:
+        description: "Volledige verversing: cache negeren en alles opnieuw ophalen"
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write   # nodig om de cache terug te zetten in het repository
   pages: write
   id-token: write
 
+# Eén run tegelijk. Geplande, handmatige en door een merge gestarte runs wachten op elkaar in plaats
+# van elkaar te kruisen, zodat elke run de cache leest die de vorige heeft teruggezet. Een lopende
+# run wordt nooit afgebroken. Let op: GitHub houdt per groep één wachtende run vast; komt er nog een
+# bij, dan vervalt de oudste wachtende.
 concurrency:
-  group: pages
+  group: dagelijkse-verversing
   cancel-in-progress: false
 
 jobs:
@@ -26,6 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # De actuele stand van de branch, niet de commit van het moment waarop de run werd aangevraagd:
+          # een run die heeft staan wachten, krijgt zo de cache van de run ervoor.
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -34,7 +48,26 @@ jobs:
       - name: Gebied bijwerken (gemeenten en plaatsen binnen de straal)
         run: python -m signalen.gebied || echo "::warning::Gebied niet bijgewerkt; bestaande lijst wordt gebruikt"
       - name: Berichten ophalen
-        run: python -m signalen.update
+        # Gewone run: alleen nieuwe publicaties ophalen, de rest komt uit cache/ophaalcache.json.
+        # Wekelijks en op verzoek: alles opnieuw, zodat wijzigingen en intrekkingen binnenkomen.
+        run: |
+          if [ "${{ github.event.schedule }}" = "30 3 * * 0" ] || [ "${{ inputs.volledig }}" = "true" ]; then
+            python -m signalen.update --volledig
+          else
+            python -m signalen.update
+          fi
+      - name: Cache bewaren in het repository
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cache/ophaalcache.json
+          if git diff --cached --quiet; then
+            echo "Cache ongewijzigd"
+          else
+            git commit -m "Cache bijgewerkt [skip ci]"
+            git push origin HEAD:main || echo "::warning::Cache niet opgeslagen; de volgende run haalt het ontbrekende opnieuw op"
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

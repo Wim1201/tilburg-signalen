@@ -13,6 +13,8 @@
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 15:40 uur | **"Elke verversing haalt het hele venster opnieuw op en onthoudt niets" (onder "Onvolledige dagen en inhalen") geldt niet meer letterlijk.** De lijst met publicaties wordt nog steeds elke run volledig opgevraagd, dus gemiste dagen komen nog steeds vanzelf binnen. Maar de tekst, perceelgrootte en adreslocatie per publicatie komen nu uit een cache; alleen nieuwe publicaties worden opgehaald. Zie "Cache". |
+| 16-11-2026, 15:40 uur | PR #4 (dit verslag tot en met "Run na PR #3") is samengevoegd met `main`. De storing bij de bron is voorbij: om 15:35 uur meldde de dagcontrole 16-11 niet meer als onvolledig. |
 | 16-11-2026, 15:20 uur | **Oorzaak van de mislukte verzoeken op GitHub vastgesteld; "oorzaak niet vastgesteld" en het vermoeden onder "Na de eerste run op GitHub" zijn daarmee vervangen door een waarneming.** De bron antwoordde met HTTP 429 (te veel verzoeken). In de run na PR #3 zijn alle 11 geweigerde verzoeken bij opnieuw proberen alsnog gelukt. Zie "Run na PR #3". |
 | 16-11-2026, 15:20 uur | De zoekindex van de bron loopt de achterstand van 16-11 in: 0 publicaties om 15:01 uur, 266 om 15:08 uur, 744 om 15:11 uur, van gebruikelijk 2.097. De app heeft de eerste berichten van 16-11 al binnen en meldt de dag nog als onvolledig. |
 | 16-11-2026, 15:00 uur | **De eerste run op GitHub (14:53 uur) leverde slechtere gegevens dan de lokale runs; de zin "Lokaal draait alles" onder "Bekende beperkingen" gaf dus een te gunstig beeld.** De run slaagde en de app is live, maar 56 teksten en 3 perceelgroottes konden vanaf GitHub niet worden opgehaald. Die berichten kwamen onterecht onder "Onzeker" (80 in plaats van 22). Oorzaak van het mislukken is niet vastgesteld: de fout werd niet gelogd. Zie "Na de eerste run op GitHub". |
@@ -258,6 +260,88 @@ vergelijken en volgt er geen melding over onvolledige dagen. De melding "niet ve
 foutstatus van de bron dekt dat geval.
 
 Tests: 66 in totaal (5 nieuw voor dit onderdeel).
+
+## Cache (toegevoegd 16-11-2026, 15:40 uur; werkbranch, nog niet samengevoegd)
+
+### Wat er in de cache staat
+
+Bestand: `cache/ophaalcache.json`, in het repository. De workflow zet het na elke run terug met een
+eigen commit ("Cache bijgewerkt [skip ci]").
+
+| Soort | Sleutel | Waarde | Aantal nu |
+|---|---|---|---|
+| tekst | publicatienummer | de eerste regels van de bekendmaking | 495 |
+| perceel | coördinaat | perceelgrootte in m², of "geen perceel" | 39 |
+| locatie | gemeente en titel van een bericht zonder locatie | gevonden adres, of "niet gevonden" | 54 |
+| gemeente | coördinaat | gemeente op die plek | 31 |
+| insolventie | nummer van de rechtbankpublicatie | alleen het oordeel "gelezen, geen bedrijf binnen de straal" | 209 |
+
+Wat er bewust niet in staat: de inhoud van faillissementspublicaties. Die bevatten persoonsgegevens
+en de geschiedenis van een repository is blijvend. Een publicatie mét een treffer wordt daarom elke
+run opnieuw gelezen. Verandert de straal of het postcodegebied, dan vervallen de bewaarde oordelen.
+
+Niet in de cache: de lijst met publicaties zelf en de dagtelling. Die worden elke run opgevraagd
+(30 verzoeken), zodat nieuwe, gemiste en ingetrokken publicaties elke run meekomen.
+
+Mislukte verzoeken worden niet bewaard; de volgende run probeert ze opnieuw. Wat een run niet
+gebruikt (publicaties die uit het venster zijn gevallen) verdwijnt bij het opslaan. Het bestand is
+284 kB en heeft één regel per vermelding, zodat een dagelijkse commit maar enkele regels wijzigt.
+
+### Meting vóór en na (lokaal, 16-11-2026, 15:35 en 15:37 uur, zelfde stand van de bron)
+
+| Meting | Zonder cache | Met volle cache |
+|---|---|---|
+| Verzoeken totaal | 849 | 31 |
+| waarvan repository.overheid.nl | 734 | 30 |
+| waarvan PDOK (percelen, adressen, BAG) | 114 | 0 |
+| waarvan Vlaanderen | 1 | 1 |
+| Duur | 121 seconden | 24 seconden |
+| Berichten | 1.116 | 1.116 |
+| Berichten met een verschil | n.v.t. | 0 |
+| Volgorde gelijk | n.v.t. | ja |
+| Ontwikkellocatie / onzeker / weggefilterd | 81 / 23 / 1.012 | 81 / 23 / 1.012 |
+
+Een eerdere meting om 15:30 en 15:32 uur, vóór de adreslocaties in de cache zaten, gaf 856 tegenover
+102 verzoeken en 132 tegenover 69 seconden, ook met 0 verschillen.
+
+Op een gewone dag komen er nieuwe publicaties bij; dan haalt de run alleen die op. Het aantal
+verzoeken ligt dan tussen 31 en enkele tientallen meer. Op GitHub is dit nog niet gemeten.
+
+### Volledige verversing
+
+| Wanneer | Hoe |
+|---|---|
+| Wekelijks | Zondag 03:30 UTC (04:30 of 05:30 uur Nederlandse tijd), in de workflow |
+| Handmatig | Tabblad Actions → Dagelijkse verversing → Run workflow → vinkje "Volledige verversing" |
+| Lokaal | `python -m signalen.update --volledig` |
+
+Een volledige verversing leest de cache niet, haalt alles opnieuw op en schrijft een verse cache.
+Daarmee komen gecorrigeerde teksten binnen. Ingetrokken publicaties verdwijnen al bij elke gewone
+run, omdat de lijst met publicaties altijd opnieuw wordt opgevraagd.
+
+### Tests
+
+12 nieuwe tests (78 in totaal). De belangrijkste: dezelfde invoer zonder cache, met lege cache en met
+volle cache geeft exact dezelfde uitkomst, en met volle cache wordt er niets opgehaald. Verder: alleen
+een nieuwe publicatie wordt opgehaald; een mislukt verzoek komt niet in de cache; een volledige
+verversing vervangt een gecorrigeerde tekst; ongebruikte vermeldingen verdwijnen; het bestand is bij
+gelijke invoer byte voor byte gelijk; van een faillissementspublicatie staat geen naam, KvK-nummer of
+curator in het bestand; een mislukte adrescontrole wordt niet bewaard als "geen treffer".
+
+### Punten om te wegen
+
+| Punt | Toelichting |
+|---|---|
+| Teksten staan blijvend in de geschiedenis van een openbaar repository | Het gaat om de eerste regels van officiële bekendmakingen (vergunningen, plannen), die de overheid met licentie CC-0 aanbiedt. Geen faillissementsgegevens. Wil Wim dit niet, dan kan de cache in plaats daarvan in de tijdelijke opslag van GitHub Actions; dan staat hij niet in het repository. |
+| De workflow schrijft nu naar `main` | Daarvoor is het recht `contents: write` toegevoegd. Lukt het terugzetten niet (bijvoorbeeld omdat er net is samengevoegd), dan geeft de run een waarschuwing en haalt de volgende run het ontbrekende opnieuw op. |
+| Bijvangst | De dagelijkse commit telt als activiteit, waardoor GitHub de geplande runs niet na 60 dagen stilte uitzet. |
+
+### Nog te doen
+
+| Punt | Toelichting |
+|---|---|
+| **Actions-versies (Node) bijwerken** | GitHub waarschuwt in het log dat `actions/checkout@v4`, `actions/setup-python@v5`, `actions/configure-pages@v5` en `actions/upload-pages-artifact@v3` (met daarin `upload-artifact@v4`) op Node.js 20 zijn gebouwd en gedwongen op Node.js 24 draaien. Het werkt nu, maar de versienummers in `.github/workflows/dagelijks.yml` moeten omhoog naar uitgaven die Node.js 24 ondersteunen. Nog niet gedaan. |
+| Cache op GitHub controleren | Na samenvoegen: slaagt het terugzetten van de cache, hoeveel verzoeken doet een gewone run, en werkt de handmatige volledige verversing. |
 
 ## Onvolledige dagen en inhalen (toegevoegd 16-11-2026, 15:00 uur)
 
