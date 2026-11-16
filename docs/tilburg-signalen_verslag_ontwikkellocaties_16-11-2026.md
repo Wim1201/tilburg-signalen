@@ -13,6 +13,8 @@
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 15:20 uur | **Oorzaak van de mislukte verzoeken op GitHub vastgesteld; "oorzaak niet vastgesteld" en het vermoeden onder "Na de eerste run op GitHub" zijn daarmee vervangen door een waarneming.** De bron antwoordde met HTTP 429 (te veel verzoeken). In de run na PR #3 zijn alle 11 geweigerde verzoeken bij opnieuw proberen alsnog gelukt. Zie "Run na PR #3". |
+| 16-11-2026, 15:20 uur | De zoekindex van de bron loopt de achterstand van 16-11 in: 0 publicaties om 15:01 uur, 266 om 15:08 uur, 744 om 15:11 uur, van gebruikelijk 2.097. De app heeft de eerste berichten van 16-11 al binnen en meldt de dag nog als onvolledig. |
 | 16-11-2026, 15:00 uur | **De eerste run op GitHub (14:53 uur) leverde slechtere gegevens dan de lokale runs; de zin "Lokaal draait alles" onder "Bekende beperkingen" gaf dus een te gunstig beeld.** De run slaagde en de app is live, maar 56 teksten en 3 perceelgroottes konden vanaf GitHub niet worden opgehaald. Die berichten kwamen onterecht onder "Onzeker" (80 in plaats van 22). Oorzaak van het mislukken is niet vastgesteld: de fout werd niet gelogd. Zie "Na de eerste run op GitHub". |
 | 16-11-2026, 15:00 uur | PR #2 is samengevoegd; "Samenvoegen met `main` is niet gedaan" onder "Buiten dit verslag" is achterhaald. Wat daarna is gebouwd (onvolledige dagen, robuuster ophalen) staat op de werkbranch en is nog niet samengevoegd. |
 | 16-11-2026, ca. 12:35 uur | Het vorige verslag noemt de livegang als open punt. Dat is achterhaald: PR #1 is samengevoegd, Wim heeft GitHub Pages aangezet en `https://wim1201.github.io/tilburg-signalen/` geeft de app. Die draait nog op de eerste versie tot deze branch is samengevoegd. |
@@ -197,6 +199,65 @@ Wat daarop is aangepast (werkbranch, nog niet samengevoegd):
 
 Lokaal geeft de aangepaste versie 0 ophaalfouten in ruim 2 minuten. Of het op GitHub nu goed gaat,
 blijkt pas na samenvoegen; het log laat dan in elk geval de oorzaak zien.
+
+## Run na PR #3 (16-11-2026, 15:10 – 15:17 uur)
+
+PR #3 is samengevoegd; de run die daardoor startte is geslaagd en gepubliceerd.
+
+| Meting | Run na PR #2 (14:53 uur) | Run na PR #3 (15:11 uur) | Lokaal (15:08 uur) |
+|---|---|---|---|
+| Duur hele run | 4 min 41 s | 6 min 3 s | n.v.t. |
+| Duur stap "Berichten ophalen" | 3 min 51 s | 5 min 8 s | 2 min 11 s |
+| Teksten gevraagd | niet gemeten | 485 | 483 |
+| Teksten mislukt in de eerste ronde | niet gemeten | 11, alle met reden HTTP 429 | 0 |
+| Teksten hersteld bij opnieuw proberen | geen herhaling | 11 | 0 |
+| Teksten die ontbreken | 56 | 0 | 0 |
+| Perceelgroottes gevraagd / mislukt / ontbreken | niet gemeten / niet gemeten / 3 | 38 / 0 / 0 | 38 / 0 / 0 |
+| Ontwikkellocatie / onzeker / weggefilterd | 75 / 80 / 922 | 80 / 23 / 980 | 80 / 23 / 977 |
+| Berichten met perceelgrootte | 102 | 106 | n.v.t. |
+| Onvolledige dag gemeld | n.v.t. | 16-11: 744 van 2.097 | 16-11: 266 van 2.097 |
+
+Herkomst van de cijfers: de tijden komen uit de stappen van de run op GitHub. De aantallen en de
+reden komen uit `ophaalstatistiek` in het gegevensbestand dat deze run publiceerde; dat is dezelfde
+telling als de regel die de stap in het log schrijft. De logregel zelf heb ik niet gelezen: het
+opgevraagde deel van het log (de laatste 100 van 320 regels) bevatte die stap niet. Er stond geen
+waarschuwing over definitief mislukte verzoeken in, wat past bij 0 ontbrekende teksten.
+
+Conclusie: de bron begrenst het aantal verzoeken vanaf GitHub (HTTP 429). Met minder gelijktijdige
+verzoeken en opnieuw proberen met oplopende wachttijd komt alles binnen. De prijs is een langere
+run: ruim 5 minuten ophalen in plaats van bijna 4.
+
+Opgemerkt in het log, niet aangepast: GitHub meldt dat `actions/checkout@v4`, `configure-pages@v5`,
+`setup-python@v5` en `upload-artifact@v4` op Node.js 20 zijn gebouwd en nu op Node.js 24 worden
+gedraaid. Het werkt, maar de versies in de workflow moeten op termijn omhoog.
+
+### Opnieuw proberen: oplopende wachttijd met een maximum
+
+| Niveau | Wachttijd | Maximum |
+|---|---|---|
+| Binnen één verzoek (`signalen/http.py`) | 2, 4, 8, 16 seconden, telkens verdubbeld; een Retry-After van de bron wordt gevolgd | 30 seconden |
+| Tussen herhaalde verzoeken na de eerste ronde (`signalen/update.py`) | 1, 2, 4, 8, 16 seconden zolang het blijft mislukken; terug naar 1 na een geslaagd verzoek | 20 seconden per pauze, 3 minuten in totaal |
+
+### Gebruikelijk aantal publicaties, bestand tegen storingsdagen
+
+Het gebruikelijke aantal was de mediaan over alle werkdagen. Bij een storing van meerdere dagen
+zakt die mee. Nu: begin bij de volste dag, houd de dagen over die minstens de helft daarvan halen,
+neem daarvan de mediaan, en herhaal tot de groep niet meer verandert. Storingsdagen tellen zo niet
+mee in wat "gebruikelijk" is.
+
+| Geval (test) | Gewone mediaan | Nieuwe methode |
+|---|---|---|
+| 10 gewone werkdagen | 2.080 | 2.080 |
+| Dezelfde 10 plus 5 storingsdagen (0, 4, 0, 12, 300) | 1.951 | 2.080 |
+| 3 gewone dagen en 9 storingsdagen | 0 | 2.070 |
+| Storing van 9 werkdagen op rij in een venster van 28 dagen | n.v.t. | alle 9 gemeld, gebruikelijk 2.100 |
+| Minder dan 3 volledige dagen | n.v.t. | geen oordeel, geen melding |
+
+Beperking: is de bron het hele venster van 28 dagen gestoord, dan is er geen volledige dag om mee te
+vergelijken en volgt er geen melding over onvolledige dagen. De melding "niet ververst" of de
+foutstatus van de bron dekt dat geval.
+
+Tests: 66 in totaal (5 nieuw voor dit onderdeel).
 
 ## Onvolledige dagen en inhalen (toegevoegd 16-11-2026, 15:00 uur)
 
