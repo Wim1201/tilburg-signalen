@@ -11,7 +11,9 @@
 
 ## Correcties
 
-Geen. Dit is het eerste verslag.
+| Tijdstip | Correctie |
+|---|---|
+| 16-11-2026, 10:15 uur | Onder "Buiten dit verslag" staat dat er naar de werkbranch is gepusht. Dat is niet gelukt: GitHub weigerde de push (403, de Claude GitHub-app heeft geen schrijftoegang tot de repo). Het werk is lokaal gecommit en als zip aan Wim overgedragen. De oorspronkelijke zin is blijven staan, met deze correctie erboven. |
 
 ## Wat er is gebouwd
 
