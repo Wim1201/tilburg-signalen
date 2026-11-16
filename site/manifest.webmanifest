@@ -1,13 +1,13 @@
 {
   "name": "Tilburg Signalen",
   "short_name": "Signalen",
-  "description": "Nieuwe omgevingsvergunningen en planwijzigingen binnen 15 km van Tilburg-centrum.",
+  "description": "Ontwikkellocaties binnen 15 km van Tilburg-centrum, elke ochtend gerangschikt: de hoogste rang bovenaan, per bericht één zin waarom.",
   "lang": "nl",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f1f4f1",
-  "theme_color": "#0b5f47",
+  "background_color": "#f6f2e9",
+  "theme_color": "#0c1049",
   "icons": [
     {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
     {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},

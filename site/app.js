@@ -1,14 +1,17 @@
-/* Tilburg Signalen: reads data/berichten.json and data/gebied.json and renders three views. */
+/* Tilburg Signalen: reads data/berichten.json and data/gebied.json and renders three views.
+   What to show is decided in logic.js; this file only builds the page from it. */
 (function () {
   "use strict";
 
-  var PAGE = 60;
-  var NEW_HOURS = 14; // an item counts as "new" for this long after this device first saw it
+  var L = window.TilburgSignalen;
+  var REMOVED_PAGE = 60;
   var STORE_KEY = "tilburg-signalen.gezien";
   var VIEWS = ["berichten", "gebied", "bronnen"];
+  var LISTS = ["ranglijst", "nieuw", "onzeker"];
   var state = {
-    data: null, area: null, klasse: "ontwikkellocatie", toonWeg: false, zoek: "", type: "", gemeente: "",
-    fase: "", signaal: "", dagen: 0, sort: "relevantie", maxKm: 15, alleenNieuw: false, limit: PAGE, nieuw: {},
+    data: null, area: null, view: "ranglijst", expanded: false, toonWeg: false, removedLimit: REMOVED_PAGE,
+    zoek: "", type: "", gemeente: "", fase: "", signaal: "", dagen: 0, sort: "relevantie", maxKm: 15,
+    nieuw: {}, ranks: {}, firstVisit: false, latestDay: "",
   };
 
   function $(id) { return document.getElementById(id); }
@@ -20,10 +23,6 @@
     return node;
   }
 
-  function safeUrl(url) {
-    return typeof url === "string" && /^https:\/\//.test(url) ? url : null;
-  }
-
   function link(url, text) {
     var a = el("a", null, text);
     a.href = url; a.target = "_blank"; a.rel = "noopener";
@@ -32,79 +31,19 @@
 
   var nf = new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   var dayFormat = new Intl.DateTimeFormat("nl-NL", { weekday: "long", day: "numeric", month: "long" });
-  var shortDate = new Intl.DateTimeFormat("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric" });
   var stampFormat = new Intl.DateTimeFormat("nl-NL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   function parseDay(iso) { var p = iso.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  function isoDay(date) {
-    return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
-  }
-  function daysAgoIso(days) { var d = new Date(); d.setDate(d.getDate() - days); return isoDay(d); }
   function dayLabel(iso) {
-    var label = dayFormat.format(parseDay(iso));
-    if (iso === isoDay(new Date())) return "Vandaag, " + label;
-    if (iso === daysAgoIso(1)) return "Gisteren, " + label;
+    var label = dayFormat.format(parseDay(iso)), today = new Date();
+    if (iso === L.isoDay(today)) return "Vandaag, " + label;
+    if (iso === L.daysAgoIso(1, today)) return "Gisteren, " + label;
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
-  /* Compass direction from the centre to a point (Dutch abbreviations). */
-  function offsetKm(item, centre) {
-    return {
-      x: (item.lon - centre.lon) * 111.2 * Math.cos(centre.lat * Math.PI / 180),
-      y: (item.lat - centre.lat) * 111.2,
-    };
-  }
-  function compass(item, centre) {
-    if (item.lat === null || item.lat === undefined || item.afstandKm < 0.3) return "";
-    var o = offsetKm(item, centre);
-    var angle = (Math.atan2(o.x, o.y) * 180 / Math.PI + 360) % 360;
-    return ["N", "NO", "O", "ZO", "Z", "ZW", "W", "NW"][Math.round(angle / 45) % 8];
-  }
-
-  /* "New since my last visit": remember per device when each item was first seen. */
-  function markNew(items) {
-    var seen = null, now = Date.now(), next = {}, result = {};
-    try { seen = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { seen = null; }
-    var firstVisit = !seen || typeof seen !== "object";
-    var latestDay = items.length ? items.reduce(function (a, b) { return a.datum > b.datum ? a : b; }).datum : "";
-    items.forEach(function (item) {
-      var first = firstVisit ? (item.datum === latestDay ? now : 0) : (seen[item.id] !== undefined ? seen[item.id] : now);
-      next[item.id] = first;
-      if (now - first < NEW_HOURS * 3600 * 1000) result[item.id] = true;
-    });
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(next)); } catch (e) { /* storage is optional */ }
-    return result;
-  }
-
-  var TYPE_LABEL = { vergunning: "Vergunning", plan: "Plan", faillissement: "Faillissement", verkoop: "Verkoop overheid" };
-  var KLASSE_LABEL = { ontwikkellocatie: "Ontwikkellocaties", onzeker: "Onzeker", weggefilterd: "Weggefilterd" };
-
-  /* Filters that apply to every list; the class (ontwikkellocatie, onzeker, weggefilterd) is chosen separately. */
-  function matches(item) {
-    if (state.type && item.type !== state.type) return false;
-    if (state.gemeente && item.gemeente !== state.gemeente) return false;
-    if (state.fase && item.fase !== state.fase) return false;
-    if (state.signaal && item.signalen.indexOf(state.signaal) === -1) return false;
-    if (item.afstandKm > state.maxKm) return false;
-    if (state.alleenNieuw && !state.nieuw[item.id]) return false;
-    if (state.dagen === 1 && item.datum !== state.latestDay) return false;
-    if (state.dagen > 1 && item.datum < daysAgoIso(state.dagen)) return false;
-    if (state.zoek) {
-      var hay = [item.titel, item.omschrijving, item.waarom, item.plaats, item.gemeente, item.overheid, item.fase].join(" ").toLowerCase();
-      var words = state.zoek.toLowerCase().split(/\s+/).filter(Boolean);
-      for (var i = 0; i < words.length; i++) if (hay.indexOf(words[i]) === -1) return false;
-    }
-    return true;
-  }
-
-  function sorted(items) {
-    var list = items.slice();
-    if (state.sort === "afstand") {
-      list.sort(function (a, b) { return a.afstandKm - b.afstandKm || (a.datum < b.datum ? 1 : -1); });
-    } else if (state.sort === "relevantie") {
-      list.sort(function (a, b) { return b.score - a.score || (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : a.afstandKm - b.afstandKm); });
-    }
-    return list; // "datum": the data file is already newest first
+  function context() {
+    var today = new Date();
+    return { centre: state.data.centrum, nieuw: state.nieuw, ranks: state.ranks, latestDay: state.latestDay, today: today };
   }
 
   function ofClass(klasse) {
@@ -127,27 +66,24 @@
     });
   }
 
-  function figure(value, label, className) {
-    var box = el("div", "figure " + className);
-    box.appendChild(el("b", null, String(value)));
-    box.appendChild(el("span", null, label));
-    return box;
-  }
+  /* The morning line: greeting and date, how many locations are new, and the three lists. */
+  function renderBrief() {
+    var now = new Date(), counts = L.counts(state.data.berichten, state.nieuw);
+    $("brief-day").textContent = L.greeting(now.getHours()) + " · " + dayFormat.format(now);
+    $("brief-title").textContent = L.briefing(counts.nieuw, state.firstVisit);
+    $("brief-sub").textContent = (L.alsoNewLine(counts.onzekerNieuw) + " Laatste publicatiedag: " +
+      (state.latestDay ? dayLabel(state.latestDay).toLowerCase() : "nog geen berichten") + ".").trim();
+    $("tile-ranglijst").querySelector("b").textContent = counts.locaties;
+    $("tile-nieuw").querySelector("b").textContent = counts.nieuw;
+    $("tile-onzeker").querySelector("b").textContent = counts.onzeker;
+    var badge = $("onzeker-nieuw");
+    badge.hidden = !counts.onzekerNieuw;
+    badge.textContent = "+" + counts.onzekerNieuw;
+    badge.appendChild(el("span", "sr", " nieuw"));
+    $("weg-aantal").textContent = "(" + counts.weggefilterd + ")";
 
-  function renderSummary() {
-    var relevant = ofClass("ontwikkellocatie"), unsure = ofClass("onzeker"), box = $("summary");
+    var box = $("notices");
     box.textContent = "";
-    var line = el("p", "summary-day");
-    line.appendChild(document.createTextNode("Laatste publicatiedag: "));
-    line.appendChild(el("strong", null, state.latestDay ? dayLabel(state.latestDay).toLowerCase() : "nog geen berichten"));
-    box.appendChild(line);
-    var isNew = function (item) { return state.nieuw[item.id]; };
-    var figures = el("div", "summary-figures");
-    figures.appendChild(figure(relevant.length, "ontwikkellocaties", "is-permit"));
-    figures.appendChild(figure(unsure.length, "onzeker", "is-plan"));
-    figures.appendChild(figure(relevant.filter(isNew).length + unsure.filter(isNew).length, "nieuw sinds vorig bezoek", "is-new"));
-    box.appendChild(figures);
-
     notices().forEach(function (text) { box.appendChild(el("p", "stale", text)); });
   }
 
@@ -182,98 +118,163 @@
     return lines;
   }
 
-  function card(item) {
-    var centre = state.data.centrum;
-    var node = el("article", "card is-" + item.klasse + (state.nieuw[item.id] ? " is-new" : ""));
+  /* One notice. Reading order: place in the ranking, the sentence why, then what and where. */
+  function card(item, ctx) {
+    var model = L.cardModel(item, { centre: ctx.centre, nieuw: ctx.nieuw, ranks: ctx.ranks, today: L.isoDay(ctx.today) });
+    var node = el("article", "card is-" + model.klasse + (model.isNew ? " is-new" : ""));
+    node.setAttribute("data-id", model.id);
 
-    var chips = el("div", "chips");
-    chips.appendChild(el("span", "chip is-" + item.type, item.type === "plan" ? (item.soort || "Plan") : TYPE_LABEL[item.type]));
-    chips.appendChild(el("span", "chip", item.fase));
-    if (item.klasse === "ontwikkellocatie") chips.appendChild(el("span", "chip is-score", "relevantie " + item.score));
-    if (state.nieuw[item.id]) chips.appendChild(el("span", "chip is-new", "Nieuw"));
-    node.appendChild(chips);
-
-    var plate = el("div", "plate");
-    plate.appendChild(el("b", null, nf.format(item.afstandKm)));
-    plate.appendChild(el("span", null, ("km " + compass(item, centre)).trim()));
-    plate.title = "Afstand tot " + centre.naam;
-    node.appendChild(plate);
-
-    node.appendChild(el("p", "why", item.waarom));
-    node.appendChild(el("h4", null, item.titel));
-    if (item.omschrijving) node.appendChild(el("p", "desc", item.omschrijving));
-
-    var where = el("p", "where");
-    var place = item.plaats || (item.gemeente ? "Gemeente " + item.gemeente : item.overheid);
-    if (item.locatieSoort === "gemeente") place = "Geen exacte locatie; afstand geldt voor gemeente " + item.gemeente;
-    if (item.locatieSoort === "benaderd") place += " (locatie bij benadering, afgeleid uit de titel)";
-    where.appendChild(el("span", null, place));
-    if (item.activiteiten.length) where.appendChild(el("span", null, item.activiteiten.join(", ")));
-    if (item.reactieTot && item.reactieTot >= isoDay(new Date())) {
-      where.appendChild(el("span", "deadline", "Reageren tot " + shortDate.format(parseDay(item.reactieTot))));
+    var rank = el("div", "rank");
+    if (model.rank) {
+      rank.appendChild(el("b", null, String(model.rank)));
+      rank.title = "Plaats " + model.rank + " in de rangorde" + (model.score !== null ? ", relevantie " + model.score : "");
+      rank.setAttribute("aria-label", "Rang " + model.rank);
+    } else {
+      rank.appendChild(el("b", null, "–"));
+      rank.setAttribute("aria-label", "Weggefilterd");
     }
-    node.appendChild(where);
+    node.appendChild(rank);
 
-    var source = el("p", "source");
-    var name = item.publicatie + (item.bron === "omgevingsloket-vlaanderen" ? "" : " " + item.overheid);
-    source.appendChild(el("span", null, "Bron: " + name + " · " + shortDate.format(parseDay(item.datum))));
-    var links = el("span"), parts = [];
-    var url = safeUrl(item.url);
-    if (url) parts.push(link(url, "Open bij de bron"));
-    if (safeUrl(item.urlTekst)) parts.push(link(item.urlTekst, "Alleen tekst"));
-    if (item.lat !== null && item.lat !== undefined) {
-      parts.push(link("https://www.openstreetmap.org/?mlat=" + item.lat + "&mlon=" + item.lon + "#map=17/" + item.lat + "/" + item.lon, "Kaart"));
-    }
-    parts.forEach(function (part, index) {
-      if (index) links.appendChild(document.createTextNode(" · "));
-      links.appendChild(part);
-    });
-    source.appendChild(links);
-    node.appendChild(source);
+    var main = el("div", "card-main");
+    main.appendChild(el("p", "why", model.why));
+    main.appendChild(el("h3", "card-title", model.title));
+
+    var meta = el("p", "meta");
+    meta.appendChild(el("span", "place", model.place));
+    meta.appendChild(document.createTextNode(" "));
+    meta.appendChild(el("span", "dist", model.distance));
+    meta.appendChild(document.createTextNode(" "));
+    meta.appendChild(el("span", "date", model.date));
+    main.appendChild(meta);
+
+    var more = el("details", "details"), summary = el("summary"), tags = el("span", "tags"), body = el("div", "details-body");
+    if (model.isNew) tags.appendChild(el("span", "chip is-new", "Nieuw"));
+    tags.appendChild(el("span", "chip is-" + model.type, model.kind));
+    tags.appendChild(el("span", "chip", model.fase));
+    if (model.deadline) tags.appendChild(el("span", "chip is-deadline", model.deadline));
+    summary.appendChild(tags);
+    summary.appendChild(el("span", "toggle", "Details"));
+    more.appendChild(summary);
+    if (model.description) body.appendChild(el("p", "desc", model.description));
+    if (model.activities) body.appendChild(el("p", null, "Activiteiten: " + model.activities));
+    if (model.locationNote) body.appendChild(el("p", null, model.locationNote));
+    if (model.score !== null) body.appendChild(el("p", "data", "Relevantie " + model.score + " · rang " + model.rank));
+    body.appendChild(el("p", "source", model.source + " · " + model.date));
+    var links = el("p", "links");
+    model.links.forEach(function (entry) { links.appendChild(link(entry.url, entry.label)); });
+    body.appendChild(links);
+    more.appendChild(body);
+    main.appendChild(more);
+
+    node.appendChild(main);
     return node;
   }
 
-  var EMPTY = {
-    ontwikkellocatie: "Geen ontwikkellocaties met deze filters. Kijk ook onder Onzeker, of wis de filters.",
-    onzeker: "Geen onzekere berichten met deze filters.",
+  var TITLES = { ranglijst: "Ranglijst", nieuw: "Nieuw", onzeker: "Onzeker" };
+  var NOUNS = {
+    ranglijst: ["ontwikkellocatie", "ontwikkellocaties"],
+    nieuw: ["nieuwe ontwikkellocatie", "nieuwe ontwikkellocaties"],
+    onzeker: ["onzeker bericht", "onzekere berichten"],
   };
+  var ORDER = { relevantie: "hoogste rang eerst", datum: "nieuwste eerst", afstand: "dichtstbij eerst" };
+
+  /* How many settings in the filter panel differ from the default; the search box is separate. */
+  function filtersActive() {
+    return ["type", "gemeente", "fase", "signaal", "dagen"].filter(function (key) { return state[key]; }).length +
+      (state.maxKm < state.data.straalKm ? 1 : 0) + (state.sort !== "relevantie" ? 1 : 0);
+  }
+  /* Whether search or a filter leaves notices out (the order alone does not). */
+  function narrowed() { return !!state.zoek || filtersActive() - (state.sort !== "relevantie" ? 1 : 0) > 0; }
+
+  function emptyState() {
+    var box = el("div", "empty"), filtered = narrowed();
+    if (state.view === "nieuw" && !filtered) {
+      var art = el("div", "empty-art");
+      ["ochtend.svg", "ochtend-donker.svg"].forEach(function (file, index) {
+        var img = el("img", index ? "only-dark" : "only-light");
+        img.src = "img/" + file; img.alt = ""; img.width = 512; img.height = 190;
+        art.appendChild(img);
+      });
+      box.appendChild(art);
+      box.appendChild(el("p", "empty-title", state.firstVisit ? "Geen ontwikkellocaties op de laatste publicatiedag." : "Niets nieuws sinds je vorige bezoek."));
+      if (!state.firstVisit) box.appendChild(el("p", null, "De ranglijst is ongewijzigd."));
+      var back = el("button", "ghost", "Bekijk de ranglijst");
+      back.type = "button";
+      back.addEventListener("click", function () { setView("ranglijst"); });
+      box.appendChild(back);
+      return box;
+    }
+    box.appendChild(el("p", null, filtered ? {
+      ranglijst: "Geen ontwikkellocaties met deze filters. Kijk ook onder Onzeker, of wis de filters.",
+      nieuw: "Geen nieuwe ontwikkellocaties met deze filters.",
+      onzeker: "Geen onzekere berichten met deze filters.",
+    }[state.view] : {
+      ranglijst: "Er zijn op dit moment geen ontwikkellocaties. Kijk ook onder Onzeker.",
+      onzeker: "Er zijn op dit moment geen onzekere berichten.",
+    }[state.view]));
+    return box;
+  }
 
   function renderList() {
+    var ctx = context(), selection = L.select(state.data.berichten, state, ctx);
+    var main = selection.main, removed = selection.removed, alsoNew = selection.alsoNew;
+    var open = {};
+    [].forEach.call(document.querySelectorAll("#view-berichten .card:has(details[open])"), function (node) { open[node.getAttribute("data-id")] = true; });
+    var shown = state.expanded ? main : main.slice(0, L.TOP);
+    var noun = NOUNS[state.view][main.length === 1 ? 0 : 1];
     var list = $("list");
-    var main = sorted(ofClass(state.klasse).filter(matches));
-    var removed = state.toonWeg ? sorted(ofClass("weggefilterd").filter(matches)) : [];
     list.textContent = "";
-    $("result-count").textContent = main.length + " " + KLASSE_LABEL[state.klasse].toLowerCase() +
-      (state.toonWeg ? " en " + removed.length + " weggefilterd" : "") + ", " +
-      { relevantie: "meest relevant eerst", datum: "nieuwste eerst", afstand: "dichtstbij eerst" }[state.sort];
 
-    if (!main.length) list.appendChild(el("p", "empty", EMPTY[state.klasse]));
-    var shown = 0, perDay = countBy(main, "datum"), lastDay = null;
-    main.slice(0, state.limit).forEach(function (item) {
+    $("list-title").textContent = TITLES[state.view];
+    $("result-count").textContent = (shown.length < main.length
+      ? (state.sort === "relevantie" ? "Top " : "") + shown.length + " van " + main.length + " " + noun
+      : main.length + " " + noun) + ", " + ORDER[state.sort];
+
+    if (!main.length && !alsoNew.length) list.appendChild(emptyState());
+    var perDay = countBy(main, "datum"), perDayShown = countBy(shown, "datum"), lastDay = null;
+    shown.forEach(function (item) {
       if (state.sort === "datum" && item.datum !== lastDay) {
         lastDay = item.datum;
-        var head = el("h3", "day", dayLabel(item.datum));
+        var head = el("p", "day", dayLabel(item.datum));
         var gap = (state.data.onvolledigeDagen || []).some(function (g) { return g.datum === item.datum; });
-        head.appendChild(el("span", null, perDay[item.datum] + (gap ? " · onvolledig" : "")));
+        var total = perDay[item.datum], visible = perDayShown[item.datum];
+        head.appendChild(el("span", null, (visible < total ? visible + " van " + total : total) + (gap ? " · onvolledig" : "")));
         list.appendChild(head);
       }
-      list.appendChild(card(item));
-      shown++;
+      list.appendChild(card(item, ctx));
     });
-    if (state.toonWeg && shown === main.length) {
-      var divider = el("h3", "day is-removed", "Weggefilterd");
-      divider.appendChild(el("span", null, String(removed.length)));
-      list.appendChild(divider);
-      list.appendChild(el("p", "hint", "Deze berichten voldoen niet aan de regels voor een ontwikkellocatie. Bij elk bericht staat waarom."));
-      removed.slice(0, state.limit - shown).forEach(function (item) { list.appendChild(card(item)); });
+    if (alsoNew.length && shown.length === main.length) {
+      var also = el("p", "day", "Nieuw onder Onzeker");
+      also.appendChild(el("span", null, String(alsoNew.length)));
+      list.appendChild(also);
+      alsoNew.forEach(function (item) { list.appendChild(card(item, ctx)); });
     }
-    $("more").hidden = main.length + removed.length <= state.limit;
+    $("more").hidden = shown.length === main.length;
+    $("more").textContent = "Toon alle " + main.length + " " + noun;
 
-    ["ontwikkellocatie", "onzeker"].forEach(function (klasse) {
-      $("klasse-" + klasse).querySelector("span").textContent = ofClass(klasse).length;
-      $("klasse-" + klasse).setAttribute("aria-pressed", String(state.klasse === klasse));
+    var box = $("removed");
+    box.textContent = "";
+    box.hidden = !state.toonWeg;
+    if (state.toonWeg) {
+      var divider = el("p", "day is-removed", "Weggefilterd");
+      divider.appendChild(el("span", null, String(removed.length)));
+      box.appendChild(divider);
+      box.appendChild(el("p", "hint", "Deze berichten voldoen niet aan de regels voor een ontwikkellocatie. Bij elk bericht staat waarom."));
+      removed.slice(0, state.removedLimit).forEach(function (item) { box.appendChild(card(item, ctx)); });
+    }
+    $("more-removed").hidden = !state.toonWeg || removed.length <= state.removedLimit;
+
+    [].forEach.call(document.querySelectorAll("#view-berichten .card"), function (node) {
+      if (open[node.getAttribute("data-id")]) node.querySelector("details").open = true;
     });
-    $("weg-aantal").textContent = "(" + ofClass("weggefilterd").length + ")";
+    LISTS.forEach(function (view) { $("tile-" + view).setAttribute("aria-pressed", String(state.view === view)); });
+    var active = filtersActive();
+    $("filter-toggle").textContent = "Filters" + (active ? " · " + active : "");
+  }
+
+  function setView(view) {
+    state.view = view; state.expanded = false; state.removedLimit = REMOVED_PAGE;
+    renderList();
   }
 
   /* Small overview map: rings at 5, 10 and 15 km, one dot per development location. */
@@ -292,22 +293,20 @@
       add("text", { x: 0.3, y: -km + 1.2 }, km + " km");
     });
     add("text", { x: 0, y: -16.6, "text-anchor": "middle" }, "N");
-    var located = state.data.berichten.filter(function (i) {
-      return i.klasse !== "weggefilterd" && i.lat !== null && i.lat !== undefined;
-    });
+    var located = state.data.berichten.filter(function (i) { return i.klasse !== "weggefilterd" && L.hasPoint(i); });
     located.sort(function (a, b) { return (a.klasse === "ontwikkellocatie") - (b.klasse === "ontwikkellocatie"); });
     located.forEach(function (item) {
-      var o = offsetKm(item, centre);
+      var o = L.offsetKm(item, centre);
       add("circle", { cx: o.x.toFixed(2), cy: (-o.y).toFixed(2), r: item.klasse === "onzeker" ? 0.32 : 0.42, "class": "p-" + item.klasse });
     });
     add("circle", { cx: 0, cy: 0, r: 0.35, "class": "centre" });
     state.area.gemeenten.forEach(function (gemeente) {
       var town = gemeente.woonplaatsen.filter(function (w) {
-        var o = offsetKm(w, centre);
+        var o = L.offsetKm(w, centre);
         return Math.hypot(o.x, o.y) <= state.data.straalKm - 1.5;
       })[0];
       if (!town) return;
-      var o = offsetKm(town, centre);
+      var o = L.offsetKm(town, centre);
       add("text", { x: o.x.toFixed(2), y: (-o.y).toFixed(2), "text-anchor": "middle", "class": "town" }, town.naam);
     });
   }
@@ -338,6 +337,7 @@
         state.gemeente = key;
         $("f-gemeente").value = key;
         showFilters(true);
+        state.view = "ranglijst"; state.expanded = true;
         renderList();
         location.hash = "#berichten";
       });
@@ -359,7 +359,7 @@
       box.appendChild(el("p", null, source.levert));
       box.appendChild(el("p", "access", source.toegang));
       if (source.status === "fout") box.appendChild(el("p", "access", "Bij de laatste verversing lukte het ophalen niet; berichten uit deze bron ontbreken tijdelijk."));
-      var url = safeUrl(source.url);
+      var url = L.safeUrl(source.url);
       if (url) { var p = el("p"); p.appendChild(link(url, url.replace(/^https:\/\/(www\.)?/, "").replace(/\/$/, ""))); box.appendChild(p); }
       (source.aangesloten ? on : off).appendChild(box);
     });
@@ -406,9 +406,10 @@
 
   function resetFilters() {
     state.zoek = ""; state.type = ""; state.gemeente = ""; state.fase = ""; state.signaal = ""; state.dagen = 0;
-    state.sort = "relevantie"; state.maxKm = state.data.straalKm; state.alleenNieuw = false; state.limit = PAGE;
+    state.sort = "relevantie"; state.maxKm = state.data.straalKm;
+    state.expanded = false; state.removedLimit = REMOVED_PAGE;
     $("zoek").value = ""; $("f-type").value = ""; $("f-gemeente").value = ""; $("f-fase").value = ""; $("f-signaal").value = "";
-    $("f-dagen").value = "0"; $("f-sort").value = "relevantie"; $("f-nieuw").checked = false;
+    $("f-dagen").value = "0"; $("f-sort").value = "relevantie";
     $("f-km").value = state.maxKm; $("f-km-out").textContent = state.maxKm + " km";
   }
 
@@ -417,7 +418,7 @@
       $(id).addEventListener("input", function (event) {
         var target = event.target;
         state[key] = convert ? convert(target) : target.value;
-        state.limit = PAGE;
+        state.expanded = false; state.removedLimit = REMOVED_PAGE;
         renderList();
       });
     }
@@ -428,35 +429,47 @@
     onChange("f-signaal", "signaal");
     onChange("f-sort", "sort");
     onChange("f-dagen", "dagen", function (t) { return +t.value; });
-    onChange("f-nieuw", "alleenNieuw", function (t) { return t.checked; });
     onChange("toon-weg", "toonWeg", function (t) { return t.checked; });
     onChange("f-km", "maxKm", function (t) { $("f-km-out").textContent = t.value + " km"; return +t.value; });
-    ["ontwikkellocatie", "onzeker"].forEach(function (klasse) {
-      $("klasse-" + klasse).addEventListener("click", function () { state.klasse = klasse; state.limit = PAGE; renderList(); });
+    LISTS.forEach(function (view) {
+      $("tile-" + view).addEventListener("click", function () { setView(view); });
     });
+    $("brand").addEventListener("click", function () { setView("ranglijst"); });
     $("filter-toggle").addEventListener("click", function () { showFilters($("filters").hidden); });
     $("filter-reset").addEventListener("click", function () { resetFilters(); renderList(); });
     $("filters").addEventListener("submit", function (event) { event.preventDefault(); });
-    $("more").addEventListener("click", function () { state.limit += PAGE; renderList(); });
+    $("more").addEventListener("click", function () { state.expanded = true; renderList(); });
+    $("more-removed").addEventListener("click", function () { state.removedLimit += REMOVED_PAGE; renderList(); });
     window.addEventListener("hashchange", showView);
+  }
+
+  /* Remember per device when each item was first seen; storage is optional. */
+  function rememberSeen(items) {
+    var seen = null;
+    try { seen = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { seen = null; }
+    var result = L.markNew(items, seen, Date.now());
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(result.next)); } catch (e) { /* storage is optional */ }
+    return result;
   }
 
   function start(data, area) {
     state.data = data; state.area = area;
     state.maxKm = data.straalKm;
-    state.latestDay = data.berichten.length ? data.berichten.reduce(function (a, b) { return a.datum > b.datum ? a : b; }).datum : "";
-    state.nieuw = markNew(data.berichten);
+    state.latestDay = L.latestDay(data.berichten);
+    state.ranks = L.rankMap(data.berichten);
+    var seen = rememberSeen(data.berichten);
+    state.nieuw = seen.nieuw; state.firstVisit = seen.firstVisit;
     state.toonWeg = $("toon-weg").checked;
-    $("scope").textContent = "Ontwikkellocaties binnen " + data.straalKm + " km van " + data.centrum.naam;
+    $("scope").textContent = "Binnen " + data.straalKm + " km van " + data.centrum.naam;
     $("updated").textContent = "Bijgewerkt " + stampFormat.format(new Date(data.bijgewerkt));
     $("f-km").max = data.straalKm; $("f-km").value = data.straalKm; $("f-km-out").textContent = data.straalKm + " km";
     var relevant = data.berichten.filter(function (item) { return item.klasse !== "weggefilterd"; });
-    fillSelect($("f-type"), countBy(relevant, "type"), TYPE_LABEL);
+    fillSelect($("f-type"), countBy(relevant, "type"), L.TYPE_LABEL);
     fillSelect($("f-gemeente"), countBy(relevant, "gemeente"));
     fillSelect($("f-fase"), countBy(relevant, "fase"));
     fillSelect($("f-signaal"), countBy(relevant, "signalen"));
     bind();
-    renderSummary(); renderList(); renderGebied(); renderBronnen(); showView();
+    renderBrief(); renderList(); renderGebied(); renderBronnen(); showView();
   }
 
   function fetchJson(path) {
