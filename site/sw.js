@@ -1,7 +1,8 @@
 /* Service worker: makes the app installable and usable without a connection.
    Data is fetched fresh first; the last successful copy is the fallback. */
-var CACHE = "tilburg-signalen-v6";
-var SHELL = ["./", "index.html", "styles.css", "app.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png"];
+var CACHE = "tilburg-signalen-v7";
+var SHELL = ["./", "index.html", "styles.css", "logic.js", "app.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png",
+  "img/ochtend.svg", "img/ochtend-donker.svg"];
 
 self.addEventListener("install", function (event) {
   event.waitUntil(caches.open(CACHE).then(function (cache) { return cache.addAll(SHELL); }));

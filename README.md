@@ -1,10 +1,13 @@
+<img src="site/icons/beeldmerk.svg" alt="Beeldmerk Tilburg Signalen" width="72">
+
 # Tilburg Signalen
 
 Mobiele webapp die elke ochtend laat zien waar binnen 15 km van Tilburg-centrum (de Heuvel)
 ontwikkellocaties ontstaan. De app leest omgevingsvergunningen, wijzigingen in omgevingsplannen en
 bestemmingsplannen, verkoopvoornemens van overheden en faillissementen van bedrijven, houdt alleen
-de ontwikkellocaties over en rangschikt die op relevantie. Bij elk bericht staan de reden, de bron
-en de afstand tot Tilburg.
+de ontwikkellocaties over en rangschikt die op relevantie. Het eerste scherm is de top 10: de
+hoogste rang bovenaan, per bericht eerst de zin waarom het relevant is, dan de locatie, de afstand
+tot Tilburg en de bron.
 
 De app gebruikt alleen openbare gegevens van overheden en heeft geen server of database nodig.
 
@@ -24,6 +27,8 @@ De app gebruikt alleen openbare gegevens van overheden en heeft geen server of d
 | `signalen/tekst.py` | Leest de eerste regels van een bekendmaking als de omschrijving ontbreekt |
 | `signalen/bronnen.json` | De bronnenlijst die de app toont (aangesloten en niet aangesloten) |
 | `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
+| `site/logic.js` | Wat de app toont, zonder de pagina: rangorde, filters, "nieuw sinds vorig bezoek" en de inhoud van een kaart. `site/app.js` bouwt daar de pagina van |
+| `site/styles.css` | De huisstijl: kleuren, lettertypen en opmaak, licht en donker |
 | `.github/workflows/dagelijks.yml` | Ververst de gegevens op vaste tijden (werkdagen 06:45, 09:35, 10:20, 12:10 en 16:10 uur Nederlandse tijd) en publiceert de app op GitHub Pages |
 | `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
 
@@ -56,6 +61,9 @@ Open daarna `http://localhost:8000`. Tests draaien met:
 python -m unittest discover tests
 ```
 
+De tests voor de app zelf (`tests/test_site.py`) draaien `site/logic.js` onder Node en worden
+overgeslagen als Node ontbreekt. De test in een echte browser heeft daarnaast Playwright nodig.
+
 ## Online zetten
 
 1. Zet de code op de `main`-branch.
@@ -69,5 +77,24 @@ pagina en kies "Zet op beginscherm" om hem als app te installeren.
 
 In `config.json` staan het middelpunt, de straal (`straal_km`), de bewaartermijnen
 (`venster_dagen`) en de drempel voor de perceelgrootte (`drempel_perceel_m2`). Draai na een wijziging van middelpunt of straal eerst `signalen.gebied`.
+
+## Huisstijl
+
+Het beeldmerk is een bouwkavel van bovenaf met een signaal erin. Het is gemaakt met ElevenLabs
+Image Gen; de ongewijzigde originelen staan in `docs/huisstijl/`.
+
+| Onderdeel | Waarde | Waar |
+|---|---|---|
+| Nachtblauw | `#0c1049` | Kopbalk, rangnummer, app-icoon |
+| Signaaloranje | `#f23d0c` (vlakken), `#bf3208` (tekst op licht) | Nieuw, het signaal in het beeldmerk, actieve tab |
+| Papier | `#f6f2e9` (achtergrond), `#fffdf8` (kaarten) | Pagina |
+| Inkt | `#12163b`, gedempt `#5a5d78` | Tekst |
+| Koppen en cijfers | Bricolage Grotesque | Naam, ochtendregel, rangnummer, de zin waarom |
+| Lopende tekst | Instrument Sans | Alles daaronder |
+| Gegevens | IBM Plex Mono | Tijdstip, tellingen |
+
+Alle kleuren staan als variabelen bovenaan `site/styles.css`, met een donkere variant. Het
+beeldmerk staat in `site/icons/beeldmerk.svg` (los), `site/icons/icon.svg` (app-icoon) en in de
+kopbalk van `site/index.html`; een test bewaakt dat het drie keer dezelfde tekening is.
 
 Meer achtergrond over de bronnen en de gemaakte keuzes staat in `docs/`.
