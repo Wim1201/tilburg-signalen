@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 16-11-2026, 20:00 – 21:35 uur |
+| Datum | 16-11-2026, 20:00 – 22:05 uur |
 | Versie | versie 2 van de app, branch `claude/awesome-brown-i18j4o` |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | `site/data/berichten.json` zoals het in de repo staat (bijgewerkt 16-11-2026, 15:37 uur); vergeleken met de nieuwste run op de live app (17:38 uur) |
@@ -22,6 +22,7 @@ beeld en stem zijn gemeten. Uitspraak en klank zijn niet beoordeeld; dat moet Wi
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 22:03 uur | **Versie 2 is samengevoegd met `main` en staat live; "Samenvoegen met `main` is niet gedaan en er is geen pull request" onder "Buiten dit verslag" geldt niet meer.** Wim keurde de film goed en vroeg om de pull request en het samenvoegen. Zie "Samengevoegd en live". |
 | 16-11-2026, 21:34 uur | **De film is opnieuw gemaakt met een lager videoniveau; de film van 20:51 uur is daarmee vervangen.** Wim vroeg het geluidsspoor te controleren. Het geluid was in orde, maar het beeld stond op H.264-niveau 5.0, boven wat Apple voor de iPhone opgeeft (High Profile niveau 4.2). Zie "Controle van het geluidsspoor". De grootte is nu 5.239.918 bytes; overal waar dit verslag 5.167.073 bytes of 5,2 MB voor de film noemt, gaat het om de eerste versie. |
 | 16-11-2026, 21:00 uur | **De film is uit de repository gehaald; "De video staat in `docs/video/`" in de versie van 20:52 uur van dit verslag geldt niet meer.** Ik had de film (5,2 MB) en een stilstaand beeld (0,1 MB) in git gezet en gepusht zonder de grootte te noemen of te vragen of dat de bedoeling was. Wim wees erop dat zo'n bestand in een openbare repo voorgoed in de geschiedenis blijft. Zie "Film uit de repository". |
 | 16-11-2026, 21:00 uur | **De geschiedenis van de branch is herschreven.** De commit `4626889` (20:51 uur) is vervangen door `7523af7`, met dezelfde inhoud zonder de film en het stilstaande beeld. Wie `4626889` al had opgehaald, moet de branch opnieuw ophalen. Er was geen pull request en niets is samengevoegd met `main`. |
@@ -202,6 +203,44 @@ nodig.
 | `tools/video/timing.json` | De gemeten lengte van elke scène voor deze opname van de stem |
 | `tools/video/geluid/` | De stem en de drie geluidjes van ElevenLabs, ongewijzigd |
 
+## Samengevoegd en live (21:58 – 22:03 uur)
+
+| Tijdstip | Handeling | Uitkomst |
+|---|---|---|
+| 21:58 uur | Paginatest geschikt gemaakt om tegen de live site te draaien (`TILBURG_SITE_URL`); tegen de toen nog live versie 1 gedraaid | Faalde, zoals verwacht: versie 1 heeft de tegels en het rangnummer niet. De test onderscheidt de twee versies dus |
+| 21:59 uur | Pull request [Wim1201/tilburg-signalen#8](https://github.com/Wim1201/tilburg-signalen/pull/8) gemaakt en samengevoegd (gewone merge, geen wijziging van de geschiedenis) | Merge-commit `cd614ea` op `main` |
+| 22:00 uur | Run 9 "Dagelijkse verversing" gestart door het samenvoegen | Geslaagd: bouwen 52 seconden, publiceren 12 seconden |
+| 22:01:37 uur | Live site serveert de nieuwe kopbalkkleur | Ongeveer 80 seconden na het begin van het wachten |
+| 22:02 uur | Live site gecontroleerd | Zie hieronder |
+
+### Run 9 op GitHub
+
+| Stap | Uitkomst |
+|---|---|
+| Tests | `Ran 179 tests in 2.570s`, `OK (skipped=31)` |
+| Gebied bijwerken | Geslaagd, 17 gemeenten |
+| Berichten ophalen | 1.116 berichten: 81 ontwikkellocaties, 23 onzeker, 1.012 weggefilterd. 31 verzoeken in 33 seconden, alles uit de cache, geen mislukte verzoeken |
+| Cache bewaren | Cache ongewijzigd, geen commit |
+| Publiceren op GitHub Pages | Geslaagd |
+
+De 31 overgeslagen tests op GitHub: de 21 tests van de pagina in een echte browser en de 3 van de
+droogloop (Playwright staat niet op de runner), de 6 tests van de film zelf (de film staat niet in
+de repo) en 1 test die ffmpeg nodig heeft. Daarmee is ook bekend wat in dit verslag nog open stond:
+**ffmpeg staat niet op de GitHub-runner.** De 148 andere tests draaiden en slaagden, waaronder de 8
+tests van de pagina die geen browser nodig hebben (verwijzingen, elementen, service worker, de
+regelteksten) en alle tests van de logica onder Node.
+
+### De live site (22:02 uur)
+
+| Controle | Hoe | Uitkomst |
+|---|---|---|
+| Nachtblauwe huisstijl | `theme-color` in de pagina en de berekende achtergrondkleur van de kopbalk in Chromium | `#0c1049`, gelijk aan de huisstijl in `main` |
+| Bestanden | `styles.css`, `logic.js`, `app.js`, `sw.js` en `icons/icon.svg` van de live site byte voor byte vergeleken met `main` | Alle vijf gelijk |
+| Paginatest in een echte browser tegen de live site | `TILBURG_SITE_URL=https://wim1201.github.io/tilburg-signalen python -m unittest tests.test_site.InDeBrowser`, vanuit deze sessie | 21 tests, alle geslaagd |
+| Gegevens | `bijgewerkt` in het live gegevensbestand | 16-11-2026, 22:00:28 uur: het moment van run 9 |
+
+Niet gecontroleerd: een echte telefoon, en een toestel waarop versie 1 al als app was geïnstalleerd.
+
 ## Controle van het geluidsspoor (21:25 – 21:34 uur)
 
 Gemeten op de film zoals hij om 20:51 uur is geleverd (5.167.073 bytes):
@@ -358,7 +397,8 @@ zonder ffmpeg worden de vijf tests die het nodig hebben overgeslagen. Dat is nie
 - **De film gaat via de sessie naar Wim, niet via de repository.**
 
 - **Pushnotificatie.** Verstuurd toen de video klaar was en gepusht.
-- **Samenvoegen met `main` is niet gedaan en er is geen pull request.** Wim beoordeelt eerst de film.
+- **Samengevoegd met `main` om 21:59 uur** (zie "Samengevoegd en live"). Dit stuk van het verslag is daarna op de werkbranch bijgeschreven en staat nog niet in `main`; een push naar `main` start een nieuwe run.
+- **Morgen te zien, niet door mij te controleren:** of GitHub de geplande run van 06:45 uur start. Het tijdstip bovenaan de live app moet dan dinsdag 06:45 uur of later zijn.
 - **ElevenLabs opruimen** kan alleen Wim zelf, in de app (zie "Opruimen").
 - **Stem uit de bibliotheek.** "Daan" is een stem uit de openbare bibliotheek van ElevenLabs. De teller van stemplekken staat na afloop nog op 0 van 30. Onder welke voorwaarden zo'n stem in eigen materiaal gebruikt mag worden heb ik niet uitgezocht.
 - **Geen subsessie** deze ronde: het werk hing aan één stem en één opname en liet zich niet verdelen.
