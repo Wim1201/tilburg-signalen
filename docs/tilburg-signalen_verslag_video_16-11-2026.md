@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 16-11-2026, 20:00 – 22:05 uur |
+| Datum | 16-11-2026, 20:00 – 22:20 uur |
 | Versie | versie 2 van de app, branch `claude/awesome-brown-i18j4o` |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | `site/data/berichten.json` zoals het in de repo staat (bijgewerkt 16-11-2026, 15:37 uur); vergeleken met de nieuwste run op de live app (17:38 uur) |
@@ -22,6 +22,8 @@ beeld en stem zijn gemeten. Uitspraak en klank zijn niet beoordeeld; dat moet Wi
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 22:12 uur | **Een push die alleen `docs/` raakt, start geen run meer; "een push naar `main` start een nieuwe run" onder "Buiten dit verslag" geldt daarvoor niet meer.** Op verzoek van Wim in de workflow gezet. Zie "Workflow: verslagen starten geen run". Of het op GitHub werkelijk zo werkt, blijkt pas bij de eerstvolgende push die alleen `docs/` raakt. |
+| 16-11-2026, 22:12 uur | **Het stuk "Samengevoegd en live" stond op de werkbranch en nog niet in `main`.** Wim vroeg het samen te voegen; dat gebeurt in dezelfde pull request als de wijziging van de workflow. |
 | 16-11-2026, 22:03 uur | **Versie 2 is samengevoegd met `main` en staat live; "Samenvoegen met `main` is niet gedaan en er is geen pull request" onder "Buiten dit verslag" geldt niet meer.** Wim keurde de film goed en vroeg om de pull request en het samenvoegen. Zie "Samengevoegd en live". |
 | 16-11-2026, 21:34 uur | **De film is opnieuw gemaakt met een lager videoniveau; de film van 20:51 uur is daarmee vervangen.** Wim vroeg het geluidsspoor te controleren. Het geluid was in orde, maar het beeld stond op H.264-niveau 5.0, boven wat Apple voor de iPhone opgeeft (High Profile niveau 4.2). Zie "Controle van het geluidsspoor". De grootte is nu 5.239.918 bytes; overal waar dit verslag 5.167.073 bytes of 5,2 MB voor de film noemt, gaat het om de eerste versie. |
 | 16-11-2026, 21:00 uur | **De film is uit de repository gehaald; "De video staat in `docs/video/`" in de versie van 20:52 uur van dit verslag geldt niet meer.** Ik had de film (5,2 MB) en een stilstaand beeld (0,1 MB) in git gezet en gepusht zonder de grootte te noemen of te vragen of dat de bedoeling was. Wim wees erop dat zo'n bestand in een openbare repo voorgoed in de geschiedenis blijft. Zie "Film uit de repository". |
@@ -203,6 +205,50 @@ nodig.
 | `tools/video/timing.json` | De gemeten lengte van elke scène voor deze opname van de stem |
 | `tools/video/geluid/` | De stem en de drie geluidjes van ElevenLabs, ongewijzigd |
 
+## Workflow: verslagen starten geen run (22:12 uur)
+
+| | |
+|---|---|
+| Wat | In `.github/workflows/dagelijks.yml` staat onder `push` nu `paths-ignore: "docs/**"` |
+| Gevolg | Een push naar `main` waarin alleen bestanden onder `docs/` veranderen, start geen run en publiceert niets. Dat is juist: verslagen veranderen de app en de gegevens niet |
+| Wat gelijk blijft | Raakt een push ook iets buiten `docs/` (ook `README.md` of `tests/`), dan start de run gewoon. De zes geplande runs en de handmatige run staan hier los van |
+| Test | `tests/test_workflow.py`, 5 tests: push naar `main` start een run; alleen `docs/**` is uitgezonderd; niets anders is uitgezonderd; geplande en handmatige runs ongemoeid; de run test nog steeds vóór het publiceren |
+| Niet getest | Of GitHub de run werkelijk overslaat. De pull request met deze wijziging raakt ook de workflow zelf en start dus wel een run; dat laat alleen zien dat het bestand geldig is. De eerste push die alleen `docs/` raakt, is de proef |
+
+## Plan voor later: de browsertests ook op GitHub
+
+Nu worden op GitHub 24 tests overgeslagen omdat Playwright daar ontbreekt: de 21 tests van de
+pagina in een echte browser en de 3 van de droogloop. Ze draaien alleen in een cloudsessie. Dit
+plan is niet uitgevoerd; Wim vroeg het voor later vast te leggen.
+
+| Stap | Wat | Toelichting |
+|---|---|---|
+| 1 | Playwright vastleggen | `package.json` met `playwright` op één vaste versie (hier draait 1.63.0) en `package-lock.json`; `node_modules/` in `.gitignore`. De tests vinden Playwright dan vanzelf |
+| 2 | Workflow: Node en de browser | `actions/setup-node` met een vaste Node-versie, `npm ci`, en `npx playwright install --with-deps chromium`. Alleen Chromium |
+| 3 | Workflow: de browser bewaren tussen runs | `actions/cache` op de map met de browser, met de Playwright-versie als sleutel, zodat het downloaden niet elke run terugkomt |
+| 4 | Waar de tests draaien | Zie de keuze hieronder |
+| 5 | Controleren | Een run waarvan het logboek `OK (skipped=7)` toont in plaats van `skipped=31`: dan blijven alleen de 6 tests van de film en de ene test met ffmpeg over |
+
+**Keuze die Wim moet maken (stap 4).** De stap Tests staat nu vóór het ophalen en publiceren: een
+falende test houdt de verversing tegen. Voor de snelle tests is dat goed. Een browsertest kan ook
+falen door iets buiten de app (een trage runner, een hapering). Drie mogelijkheden:
+
+| Mogelijkheid | Voordeel | Nadeel |
+|---|---|---|
+| A. Browsertests in de bestaande stap Tests, bij elke run | Eenvoudig; niets komt live zonder dat de pagina is getest | Een hapering houdt de verversing van 06:45 uur tegen; elke run duurt langer |
+| B. Browsertests alleen bij een push en bij een handmatige run, in een eigen stap vóór het publiceren | De pagina verandert alleen door een push; de geplande verversingen blijven zo snel en zo robuust als nu | Een geplande run test de pagina niet |
+| C. Als B, en daarnaast na elk publiceren de paginatest tegen de live site (`TILBURG_SITE_URL`), in een eigen job die het publiceren niet tegenhoudt | Elke run laat zien of de live pagina met de verse gegevens werkt; een rood kruis bij Actions als dat niet zo is | Meer onderhoud; een rood kruis moet iemand ook zien |
+
+Mijn advies is C, te beginnen met B. De test tegen de live site heeft vanavond in deze sessie al
+gedraaid en onderscheidde versie 1 van versie 2.
+
+Wat ik niet weet en bij het uitvoeren gemeten moet worden: hoeveel langer een run duurt. Nu duurt
+"bouwen" 52 seconden. Mijn schatting is 30 tot 60 seconden erbij zonder bewaarde browser en 15 tot
+25 seconden met; dat is een schatting, geen meting.
+
+Niet in dit plan: ffmpeg op de runner zetten (één test), en de tests van de film (de film staat
+niet in de repo).
+
 ## Samengevoegd en live (21:58 – 22:03 uur)
 
 | Tijdstip | Handeling | Uitkomst |
@@ -362,7 +408,7 @@ in de app. De twee punten in de app (1 en 2) zijn opmaak.
 | Grootte | Film 5,2 MB; stem 1,0 MB; geluidjes samen 86 kB |
 | Tikken / scrollbewegingen | 5 / 3 |
 | Opnemen | 2.101 beelden, enkele minuten rekentijd (niet precies gemeten) |
-| Unittests | 178, alle geslaagd (was 139; 167 om 20:51 uur, 175 om 21:00 uur, daarna 3 erbij voor het formaat en het geluid van de film) |
+| Unittests | 184, alle geslaagd (was 139; 167 om 20:51 uur, 175 om 21:00 uur, 178 om 21:34 uur, 179 om 21:58 uur, daarna 5 erbij voor de workflow) |
 
 ## Getest
 

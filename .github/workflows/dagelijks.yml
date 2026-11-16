@@ -22,6 +22,10 @@ on:
       timezone: "Europe/Amsterdam"
   push:
     branches: [main]
+    # Een push die alleen docs/ raakt (verslagen) verandert de app en de gegevens niet en start geen run.
+    # Raakt een push ook iets buiten docs/, dan start de run gewoon. Geplande en handmatige runs staan hier los van.
+    paths-ignore:
+      - "docs/**"
   workflow_dispatch:
     inputs:
       volledig:
