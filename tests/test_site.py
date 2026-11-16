@@ -522,6 +522,28 @@ class InDeBrowser(unittest.TestCase):
         expected = {0: "Geen ontwikkellocaties", 1: "1 ontwikkellocatie"}.get(len(new), "%d ontwikkellocaties" % len(new))
         self.assertEqual(self.seen["brief"], expected + " op de laatste publicatiedag.")
 
+    def test_tiles_keep_their_label_on_one_line_and_the_same_height(self):
+        for name in ("tileShapes", "narrowTileShapes"):
+            shapes = self.seen[name]
+            with self.subTest(breedte=name):
+                self.assertEqual([shape["label"] for shape in shapes], ["Ranglijst", "Nieuw", "Onzeker"])
+                self.assertEqual([shape["lines"] for shape in shapes], [1, 1, 1])
+                self.assertEqual(len({shape["height"] for shape in shapes}), 1)
+                self.assertFalse(any(shape["badgeOverNumber"] for shape in shapes), "het bolletje staat over het getal")
+
+    def test_new_unsure_notices_show_as_a_count_on_the_tile(self):
+        latest = max(entry["datum"] for entry in self.items)
+        new = len([entry for entry in self.items if entry["klasse"] == "onzeker" and entry["datum"] == latest])
+        self.assertEqual(self.seen["badgeFirst"], "+%d nieuw" % new if new else None)
+        if self.seen["hasUnsure"]:
+            self.assertEqual(self.seen["badgeLater"], "+1 nieuw")
+        self.assertIsNone(self.seen["badgeNone"])
+
+    def test_count_line_does_not_leave_one_word_on_its_own_line(self):
+        count = self.seen["countLines"]
+        if count["lines"] > 1:
+            self.assertGreater(count["lastShare"], 0.25, count["text"])
+
     def test_details_stay_open_and_are_large_enough_to_tap(self):
         self.assertEqual(self.seen["openAfterShowAll"], 1)
         self.assertGreaterEqual(self.seen["toggleHeight"], 40)

@@ -76,7 +76,10 @@
     $("tile-ranglijst").querySelector("b").textContent = counts.locaties;
     $("tile-nieuw").querySelector("b").textContent = counts.nieuw;
     $("tile-onzeker").querySelector("b").textContent = counts.onzeker;
-    $("tile-onzeker").querySelector("span").textContent = "Onzeker" + (counts.onzekerNieuw ? " · " + counts.onzekerNieuw + " nieuw" : "");
+    var badge = $("onzeker-nieuw");
+    badge.hidden = !counts.onzekerNieuw;
+    badge.textContent = "+" + counts.onzekerNieuw;
+    badge.appendChild(el("span", "sr", " nieuw"));
     $("weg-aantal").textContent = "(" + counts.weggefilterd + ")";
 
     var box = $("notices");

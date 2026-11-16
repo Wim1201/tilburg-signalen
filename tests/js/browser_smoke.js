@@ -41,6 +41,18 @@ var SEEN = "tilburg-signalen.gezien";
     });
   }
   function overflow(page) { return page.evaluate(function () { return document.documentElement.scrollWidth - window.innerWidth; }); }
+  function badge(page) { return page.$eval("#onzeker-nieuw", function (node) { return node.hidden ? null : node.textContent; }); }
+  function tiles(page) {
+    return page.$$eval(".tile", function (nodes) {
+      return nodes.map(function (node) {
+        var label = node.querySelector("span"), tops = Array.from(label.getClientRects()).map(function (box) { return Math.round(box.top); });
+        var number = node.querySelector("b").getBoundingClientRect(), mark = node.querySelector(".badge");
+        var box = mark && !mark.hidden ? mark.getBoundingClientRect() : null;
+        return { label: label.textContent, lines: tops.filter(function (top, i) { return tops.indexOf(top) === i; }).length,
+          height: Math.round(node.getBoundingClientRect().height), badgeOverNumber: !!box && box.left < number.right && box.bottom > number.top };
+      });
+    });
+  }
   function pressed(page) { return page.$eval('.tile[aria-pressed="true"]', function (node) { return node.id; }); }
 
   // --- First visit at 390 px
@@ -50,6 +62,8 @@ var SEEN = "tilburg-signalen.gezien";
   result.brief = await page.textContent("#brief-title");
   for (var name of ["ranglijst", "nieuw", "onzeker"]) result.tiles[name] = await page.textContent("#tile-" + name + " b");
   result.overflow = await overflow(page);
+  result.tileShapes = await tiles(page);
+  result.badgeFirst = await badge(page);
   result.mark = await page.$$eval(".masthead svg.mark path", function (paths) { return paths.length; });
   result.switchVisible = await page.isVisible("#toon-weg") && !(await page.isVisible("#filters"));
   await page.click("#list .card summary");
@@ -109,6 +123,7 @@ var SEEN = "tilburg-signalen.gezien";
   result.hasUnsure = unsureId !== null;
   result.briefLater = await page.textContent("#brief-title");
   result.briefSubLater = await page.textContent("#brief-sub");
+  result.badgeLater = await badge(page);
   await page.click("#tile-nieuw");
   result.newUnsure = await cards(page, "#list");
   result.newUnsureHead = await page.$$eval("#list .day", function (nodes) { return nodes.map(function (node) { return node.textContent; }); });
@@ -123,6 +138,7 @@ var SEEN = "tilburg-signalen.gezien";
   await page.waitForSelector("#list .card");
   await page.click("#tile-nieuw");
   result.emptyTitle = await page.textContent("#list .empty-title");
+  result.badgeNone = await badge(page);
   await page.waitForFunction(function () {
     var images = Array.from(document.querySelectorAll("#list .empty-art img"));
     return images.length > 0 && images.every(function (image) { return image.complete; });
@@ -137,6 +153,14 @@ var SEEN = "tilburg-signalen.gezien";
   await page.click("#more");
   await page.click("#toon-weg");
   result.narrowOverflow = await overflow(page);
+  result.narrowTileShapes = await tiles(page);
+  result.countLines = await page.$eval("#result-count", function (node) {
+    var range = document.createRange(); range.selectNodeContents(node);
+    var tops = Array.from(range.getClientRects()).map(function (box) { return Math.round(box.top); });
+    var last = tops[tops.length - 1], text = node.textContent, width = node.getBoundingClientRect().width;
+    var lastLine = Array.from(range.getClientRects()).filter(function (box) { return Math.round(box.top) === last; }).reduce(function (sum, box) { return sum + box.width; }, 0);
+    return { lines: tops.filter(function (top, i) { return tops.indexOf(top) === i; }).length, lastShare: lastLine / width, text: text };
+  });
   result.brokenDates = await page.$$eval(".card .meta .date, .card .meta .dist", function (nodes) {
     return nodes.filter(function (node) {
       // on more than one line: boxes at different heights (the separator after it is a box of its own)

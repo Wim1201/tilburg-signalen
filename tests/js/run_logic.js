@@ -1,7 +1,8 @@
-/* Runs functions of site/logic.js for the Python tests. Reads a JSON list of calls [name, arg, ...]
-   from stdin and writes the list of results. {"$date": "..."} becomes a Date. */
+/* Runs functions of site/logic.js (or of the module given as argument) for the Python tests. Reads a
+   JSON list of calls [name, arg, ...] from stdin and writes the list of results. {"$date": "..."}
+   becomes a Date. */
 "use strict";
-var logic = require("../../site/logic.js");
+var logic = require(process.argv[2] ? require("path").resolve(process.argv[2]) : "../../site/logic.js");
 
 function revive(value) {
   if (Array.isArray(value)) return value.map(revive);
