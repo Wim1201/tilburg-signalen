@@ -23,8 +23,12 @@ permissions:
   pages: write
   id-token: write
 
+# Eén run tegelijk. Geplande, handmatige en door een merge gestarte runs wachten op elkaar in plaats
+# van elkaar te kruisen, zodat elke run de cache leest die de vorige heeft teruggezet. Een lopende
+# run wordt nooit afgebroken. Let op: GitHub houdt per groep één wachtende run vast; komt er nog een
+# bij, dan vervalt de oudste wachtende.
 concurrency:
-  group: pages
+  group: dagelijkse-verversing
   cancel-in-progress: false
 
 jobs:
@@ -32,6 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # De actuele stand van de branch, niet de commit van het moment waarop de run werd aangevraagd:
+          # een run die heeft staan wachten, krijgt zo de cache van de run ervoor.
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -49,6 +57,7 @@ jobs:
             python -m signalen.update
           fi
       - name: Cache bewaren in het repository
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
