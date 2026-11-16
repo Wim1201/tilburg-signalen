@@ -13,6 +13,7 @@
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 17:45 uur | PR #7 (schema in Nederlandse tijd en het verslag tot 17:40 uur) is samengevoegd. GitHub accepteert het workflowbestand met `timezone`: run 8 startte er direct mee en slaagde. Run 8 deed 31 verzoeken. Zie "Run 8". Of een geplande run werkelijk start, is daarmee nog niet bewezen. |
 | 16-11-2026, 17:40 uur | **Het schema van de geplande runs is gewijzigd en staat nu in Nederlandse tijd.** De tijden "Zondag 03:30 UTC (04:30 of 05:30 uur Nederlandse tijd)" onder "Volledige verversing" en "08:40 of 09:40 uur" onder "Nog te doen (stand 17:25 uur)" gelden niet meer. Zie "Schema van de geplande runs". |
 | 16-11-2026, 17:40 uur | **Het vermoeden "een derde run op GitHub komt rond de 34 verzoeken uit" is bevestigd.** Run 7 deed 34 verzoeken. PR #6 (herstel van de twee gebreken en het verslag tot 17:25 uur) is samengevoegd; de regels "Herstel van de twee gebreken samenvoegen" en "Derde run op GitHub" onder "Nog te doen (stand 17:25 uur)" zijn daarmee afgehandeld. |
 | 16-11-2026, 17:40 uur | **De drie "ongelezen" rechtbankpublicaties waren geen blijvende fout.** Run 7 las ze alle drie bij de eerste poging. Zie "De drie overgebleven rechtbankpublicaties". |
@@ -533,6 +534,21 @@ dinsdag 17-11 om 06:45 uur.
 | Bronnen | alle drie bereikbaar |
 
 Reeks van vandaag: 1.056 verzoeken zonder cache (run 5), 98 (run 6), 34 (run 7).
+
+### Run 8 (na het samenvoegen van PR #7, 17:38 uur; toegevoegd 17:45 uur)
+
+| | Run 8 |
+|---|---|
+| Verzoeken totaal | 31 (repository.overheid.nl 30, Vlaanderen 1) |
+| Teksten, perceelgroottes, rechtbankpublicaties opgehaald | 0 / 0 / 0 (alles uit de cache: 495, 40 en 209) |
+| Mislukte verzoeken | 0 |
+| Duur stap "Berichten ophalen" | 24 seconden |
+| Duur hele run | 52 seconden |
+| Cache teruggezet in `main` | niet nodig: de cache was ongewijzigd, dus geen commit |
+| Berichten | 1.116 (ontwikkellocatie 81, onzeker 23, weggefilterd 1.012) |
+
+Reeks van vandaag: 1.056 verzoeken zonder cache (run 5), 98 (run 6), 34 (run 7), 31 (run 8). De 31
+zijn gelijk aan de lokale meting met volle cache.
 
 ### De drie overgebleven rechtbankpublicaties
 
