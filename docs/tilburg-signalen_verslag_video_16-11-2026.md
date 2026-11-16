@@ -11,7 +11,7 @@
 
 ## Stand
 
-**Tussenstand van 20:25 uur: de video is nog niet gemaakt.** De opname-opzet is gebouwd en stil
+**Tussenstand van 20:12 uur: de video is nog niet gemaakt.** De opname-opzet is gebouwd en stil
 proefgedraaid. Stem en geluidjes wachten op het akkoord van Wim op model, stem, raming en tekst.
 Er is bij ElevenLabs niets gegenereerd; het verbruik staat op 17.958 credits, gelijk aan het eind
 van de vorige ronde.
@@ -20,8 +20,8 @@ van de vorige ronde.
 
 | Tijdstip | Wat |
 |---|---|
-| 16-11-2026, 20:20 uur | **De tegel Onzeker toont nieuwe berichten niet meer als "Onzeker · 1 nieuw" maar als een bolletje "+1".** De tekst brak af over twee regels, waardoor die tegel er anders uitzag dan de andere twee. Gevonden in de proefopname. |
-| 16-11-2026, 20:20 uur | **De lege proefwerkstroom in het ElevenLabs-account is niet meer leeg.** Verwijderen kan niet via de koppeling. Het oude knooppunt is eruit gehaald en de werkstroom wordt hergebruikt voor de stem en de geluidjes van de video. Zie "ElevenLabs". |
+| 16-11-2026, 20:11 uur | **De tegel Onzeker toont nieuwe berichten niet meer als "Onzeker · 1 nieuw" maar als een bolletje "+1".** De tekst brak af over twee regels, waardoor die tegel er anders uitzag dan de andere twee. Gevonden in de proefopname. |
+| 16-11-2026, 20:11 uur | **De lege proefwerkstroom in het ElevenLabs-account is niet meer leeg.** Verwijderen kan niet via de koppeling. Het oude knooppunt is eruit gehaald en de werkstroom wordt hergebruikt voor de stem en de geluidjes van de video. Zie "ElevenLabs". |
 
 ## ElevenLabs
 
@@ -64,7 +64,7 @@ De app wordt gebruikt zoals hij is. Twee dingen zijn voor de opname gezet: de kl
 17-11-2026, 07:28 uur) en wat het toestel eerder heeft gezien (alles behalve de berichten van de
 laatste publicatiedag). De gegevens zelf zijn niet aangeraakt.
 
-## Gevonden tijdens de proefopname (20:05 – 20:20 uur)
+## Gevonden tijdens de proefopname (20:03 – 20:11 uur)
 
 De stille proefopname van 66 seconden is beeld voor beeld (één per seconde) nagekeken.
 
@@ -79,7 +79,7 @@ Niet gevonden: fouten in de console (0), stappen die hun doel niet vonden (0).
 
 ## Getest
 
-Stand 20:25 uur: 162 tests, 159 geslaagd, 3 overgeslagen (die drie controleren de film zelf en
+Stand 20:12 uur: 162 tests, 159 geslaagd, 3 overgeslagen (die drie controleren de film zelf en
 draaien zodra hij in `docs/video/` staat).
 
 ## Buiten dit verslag
