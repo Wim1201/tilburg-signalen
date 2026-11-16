@@ -250,24 +250,55 @@ class TekstEnVerrijkingTest(unittest.TestCase):
 
     def test_enrichment_uses_text_and_parcel_lookup(self):
         calls = []
-        items = update.verrijk(
+        items, fouten = update.verrijk(
             [self.item(), self.item(id="2", omschrijving="het kappen van een boom")], 400,
             haal_tekst=lambda url, titel, limiet: "het slopen van een loods",
             perceel_m2=lambda x, y: calls.append((x, y)) or 1200)
         self.assertEqual((items[0]["klasse"], items[0]["perceelM2"], items[0]["signalen"]), (O, 1200, ["sloop"]))
         self.assertEqual((items[1]["klasse"], items[1]["perceelM2"]), (W, None))
         self.assertEqual(calls, [(1.0, 2.0)])  # the parcel is only looked up where it decides the outcome
+        self.assertEqual(fouten, {"tekst": 0, "perceel": 0})
         self.assertFalse([key for key in items[0] if key.startswith("_")])
 
     def test_enrichment_without_text_or_parcel_is_uncertain(self):
-        items = update.verrijk([self.item(), self.item(id="2", omschrijving="het slopen van een loods")], 400,
-                               haal_tekst=lambda url, titel, limiet: None, perceel_m2=lambda x, y: None)
+        items, _ = update.verrijk([self.item(), self.item(id="2", omschrijving="het slopen van een loods")], 400,
+                                  haal_tekst=lambda url, titel, limiet: None, perceel_m2=lambda x, y: None)
         self.assertEqual([i["klasse"] for i in items], [U, U])
 
+    def test_failed_download_is_retried_once(self):
+        attempts = []
+
+        def flaky(url, titel, limiet):
+            attempts.append(url)
+            if len(attempts) == 1:
+                raise RuntimeError("429 te veel verzoeken")
+            return "het kappen van een boom"
+
+        items, fouten = update.verrijk([self.item()], 400, haal_tekst=flaky, perceel_m2=lambda x, y: None)
+        self.assertEqual((items[0]["klasse"], len(attempts), fouten["tekst"]), (W, 2, 0))
+
+    def test_text_that_cannot_be_fetched_is_uncertain_and_counted(self):
+        def down(url, titel, limiet):
+            raise RuntimeError("geen verbinding")
+
+        items, fouten = update.verrijk([self.item(), self.item(id="2", type="plan", fase="Ontwerp", titel="Wijziging omgevingsplan Dorpsstraat 1")],
+                                       400, haal_tekst=down, perceel_m2=lambda x, y: None)
+        self.assertEqual([i["klasse"] for i in items], [U, U])
+        self.assertTrue(all("kon niet worden opgehaald" in i["waarom"] for i in items))
+        self.assertEqual(fouten, {"tekst": 2, "perceel": 0})
+
+    def test_parcel_service_that_fails_is_counted(self):
+        def down(x, y):
+            raise RuntimeError("geen verbinding")
+
+        items, fouten = update.verrijk([self.item(omschrijving="het slopen van een loods")], 400,
+                                       haal_tekst=lambda url, titel, limiet: None, perceel_m2=down)
+        self.assertEqual((items[0]["klasse"], fouten), (U, {"tekst": 0, "perceel": 1}))
+
     def test_sale_notice_takes_size_from_text(self):
-        items = update.verrijk([self.item(type="verkoop", titel="Voornemen verkoop gemeentegrond", _rd=None, fase="Voornemen tot verkoop")], 400,
-                               haal_tekst=lambda url, titel, limiet: "een perceel van circa 1.250 m² aan de Dorpsstraat",
-                               perceel_m2=lambda x, y: None)
+        items, _ = update.verrijk([self.item(type="verkoop", titel="Voornemen verkoop gemeentegrond", _rd=None, fase="Voornemen tot verkoop")], 400,
+                                  haal_tekst=lambda url, titel, limiet: "een perceel van circa 1.250 m² aan de Dorpsstraat",
+                                  perceel_m2=lambda x, y: None)
         self.assertEqual((items[0]["klasse"], items[0]["perceelM2"]), (O, 1250))
 
 

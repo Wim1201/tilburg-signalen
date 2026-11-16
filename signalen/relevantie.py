@@ -170,7 +170,7 @@ def _size_bonus(parcel, threshold):
     return min(12, 6 * math.log10(max(parcel, threshold) / threshold)) if parcel else 0
 
 
-def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=True, drempel=400):
+def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=True, drempel=400, tekst_mislukt=False):
     """Return (klasse, score, waarom). `waarom` is one Dutch sentence shown with the notice."""
     signals = facts["signalen"]
     dwellings = facts["woningen"]
@@ -190,6 +190,8 @@ def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=T
                 what += f" ({dwellings} woningen)"
             base = {"wonen": 100, "bouwhoogte": 96, "ontwikkeling": 92}[facts["plan"]]
             return result(ONTWIKKELLOCATIE, base + min(8, (dwellings or 0) / 10), f"Planwijziging die ontwikkeling mogelijk maakt: {what}.")
+        if tekst_mislukt:
+            return result(ONZEKER, 60, "De tekst van deze planbekendmaking kon niet worden opgehaald; de volgende verversing probeert het opnieuw.")
         if locatie_bekend:
             return result(ONZEKER, 60, "Planwijziging voor één locatie; uit de bekendmaking blijkt niet wat er mogelijk wordt.")
         return result(WEGGEFILTERD, 0, "Planbericht zonder locatie en zonder ontwikkelsignaal in de tekst.")
@@ -229,6 +231,8 @@ def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=T
         return result(WEGGEFILTERD, 0, f"{label}{on_parcel}: kleiner dan {m2(drempel)}.")
     if facts["woningenOnbekend"]:
         return result(ONZEKER, 55, "Nieuwbouw van woningen, maar het aantal is niet eenduidig uit de bekendmaking te halen.")
+    if tekst_mislukt:
+        return result(ONZEKER, 20, "De tekst van deze bekendmaking kon niet worden opgehaald; de volgende verversing probeert het opnieuw.")
     if not informatief:
         return result(ONZEKER, 20, "De bekendmaking beschrijft niet wat er gebeurt, dus de omvang is niet te bepalen.")
     if dwellings == 1:

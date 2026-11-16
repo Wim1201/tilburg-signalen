@@ -19,6 +19,7 @@ De app gebruikt alleen openbare gegevens van overheden en heeft geen server of d
 | `signalen/relevantie.py` | De regels: wat is een ontwikkellocatie, wat is onzeker, wat valt af, en de zin waarom |
 | `signalen/insolventies.py` | Leest faillissementen van bedrijven uit de Staatscourant (alleen rechtspersonen met een bedrijfspand) |
 | `signalen/perceel.py` | Zoekt perceelgrootte (Kadaster) en gebruiksdoel van een pand (BAG) op |
+| `signalen/volledigheid.py` | Herkent dagen waarop de bron vrijwel niets doorgaf, zodat de app dat kan melden |
 | `signalen/tekst.py` | Leest de eerste regels van een bekendmaking als de omschrijving ontbreekt |
 | `signalen/bronnen.json` | De bronnenlijst die de app toont (aangesloten en niet aangesloten) |
 | `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
