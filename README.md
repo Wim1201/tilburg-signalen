@@ -1,2 +1,58 @@
-# tilburg-signalen
-lead generator 
+# Tilburg Signalen
+
+Mobiele webapp die elke ochtend laat zien welke ruimtelijke ontwikkelingen er spelen binnen
+15 km van Tilburg-centrum (de Heuvel): nieuwe omgevingsvergunningen en wijzigingen in
+omgevingsplannen en bestemmingsplannen. Bij elk bericht staan de bron en de afstand tot Tilburg.
+
+De app gebruikt alleen openbare gegevens van overheden en heeft geen server of database nodig.
+
+## Hoe het werkt
+
+| Onderdeel | Wat het doet |
+|---|---|
+| `signalen/gebied.py` | Bepaalt welke gemeenten en plaatsen binnen de straal vallen en schrijft `site/data/gebied.json` |
+| `signalen/update.py` | Haalt de berichten op bij alle bronnen en schrijft `site/data/berichten.json` |
+| `signalen/bekendmakingen.py` | Leest officielebekendmakingen.nl (Gemeenteblad, Provinciaal blad, Waterschapsblad, Staatscourant) |
+| `signalen/vlaanderen.py` | Leest Vlaamse omgevingsvergunningen voor het Belgische deel van de straal |
+| `signalen/bronnen.json` | De bronnenlijst die de app toont (aangesloten en niet aangesloten) |
+| `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
+| `.github/workflows/dagelijks.yml` | Ververst de gegevens elke ochtend en publiceert de app op GitHub Pages |
+| `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
+
+## Zelf draaien
+
+Alleen Python 3.9 of nieuwer is nodig, geen extra pakketten.
+
+```bash
+python -m signalen.gebied
+```
+
+```bash
+python -m signalen.update
+```
+
+```bash
+python -m http.server 8000 --directory site
+```
+
+Open daarna `http://localhost:8000`. Tests draaien met:
+
+```bash
+python -m unittest discover tests
+```
+
+## Online zetten
+
+1. Zet de code op de `main`-branch.
+2. Kies in GitHub bij **Settings → Pages → Build and deployment → Source** voor **GitHub Actions**.
+3. Start de workflow **Dagelijkse verversing** één keer met de hand (tabblad Actions) of wacht op de eerste ochtend.
+
+De app staat dan op `https://wim1201.github.io/tilburg-signalen/`. Op de telefoon: open die
+pagina en kies "Zet op beginscherm" om hem als app te installeren.
+
+## Instellingen aanpassen
+
+In `config.json` staan het middelpunt, de straal (`straal_km`) en de bewaartermijnen
+(`venster_dagen`). Draai na een wijziging van middelpunt of straal eerst `signalen.gebied`.
+
+Meer achtergrond over de bronnen en de gemaakte keuzes staat in `docs/`.

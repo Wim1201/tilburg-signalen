@@ -1,0 +1,56 @@
+[
+  {
+    "id": "officielebekendmakingen",
+    "naam": "Officiële bekendmakingen (overheid.nl)",
+    "beheerder": "KOOP, ministerie van Binnenlandse Zaken",
+    "aangesloten": true,
+    "levert": "Omgevingsvergunningen (aanvragen, besluiten, verlengingen) en bekendmakingen over omgevingsplannen en bestemmingsplannen uit Gemeenteblad, Provinciaal blad, Waterschapsblad en Staatscourant. Elke bekendmaking heeft een eigen locatie.",
+    "toegang": "Openbare zoekdienst (SRU), geen sleutel nodig",
+    "url": "https://www.officielebekendmakingen.nl/"
+  },
+  {
+    "id": "omgevingsloket-vlaanderen",
+    "naam": "Omgevingsloket Vlaanderen",
+    "beheerder": "Departement Omgeving, Vlaamse overheid",
+    "aangesloten": true,
+    "levert": "Vlaamse omgevingsvergunningen voor het Belgische deel van de straal (gemeente Ravels). Namen van aanvragers worden niet opgehaald.",
+    "toegang": "Openbare kaartdienst (WFS), geen sleutel nodig",
+    "url": "https://omgevingsloketinzage.omgeving.vlaanderen.be/"
+  },
+  {
+    "id": "pdok",
+    "naam": "PDOK: gemeentegrenzen, woonplaatsen en adressen",
+    "beheerder": "Kadaster",
+    "aangesloten": true,
+    "levert": "Gemeentegrenzen (BRK Bestuurlijke Gebieden) en woonplaatsgrenzen (BAG) om te bepalen wat binnen de straal valt. De Locatieserver zoekt een adres op als een bekendmaking geen eigen locatie heeft.",
+    "toegang": "Openbare diensten, geen sleutel nodig",
+    "url": "https://www.pdok.nl/"
+  },
+  {
+    "id": "vlaanderen-gemeentegrenzen",
+    "naam": "Vlaamse gemeentegrenzen (VRBG)",
+    "beheerder": "Digitaal Vlaanderen",
+    "aangesloten": true,
+    "levert": "Grenzen van de Vlaamse gemeenten, om te bepalen welk Belgisch gebied binnen de straal valt.",
+    "toegang": "Openbare kaartdienst (WFS), geen sleutel nodig",
+    "url": "https://www.vlaanderen.be/datavindplaats"
+  },
+  {
+    "id": "dso",
+    "naam": "Omgevingsloket: Regels op de kaart (DSO)",
+    "beheerder": "Kadaster, Digitaal Stelsel Omgevingswet",
+    "aangesloten": false,
+    "levert": "De inhoud van omgevingsplannen zelf: regels, kaarten en ontwerpen per locatie.",
+    "toegang": "Gegevens zijn openbaar, maar de koppeling vraagt een gratis aan te vragen sleutel. Niet aangesloten; de bekendmaking van elke planwijziging komt wel binnen via het Gemeenteblad.",
+    "url": "https://omgevingswet.overheid.nl/regels-op-de-kaart/"
+  },
+  {
+    "id": "ruimtelijkeplannen",
+    "naam": "Ruimtelijkeplannen.nl",
+    "beheerder": "Kadaster",
+    "aangesloten": false,
+    "levert": "Bestemmingsplannen van vóór de Omgevingswet en plannen die nog onder het overgangsrecht lopen.",
+    "toegang": "De open koppelingen voor afnemers zijn per 1 juli 2024 beëindigd; de opvolger vraagt een sleutel. Niet aangesloten; nieuwe besluiten over deze plannen komen wel binnen via het Gemeenteblad.",
+    "url": "https://www.ruimtelijkeplannen.nl/"
+  }
+]

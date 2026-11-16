@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tilburg Signalen</title>
+<meta name="description" content="Nieuwe omgevingsvergunningen en planwijzigingen binnen 15 km van Tilburg-centrum.">
+<meta name="theme-color" content="#0b5f47">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!-- app:start -->
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <div>
+      <h1>Tilburg Signalen</h1>
+      <p class="topbar-sub" id="scope">Ruimtelijke ontwikkelingen rond Tilburg</p>
+    </div>
+    <p class="updated" id="updated" aria-live="polite"></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="notice" id="load-error" hidden></p>
+
+  <section id="view-berichten" class="view" aria-labelledby="tab-berichten">
+    <div class="summary" id="summary"></div>
+
+    <div class="segmented" role="group" aria-label="Soort bericht">
+      <button type="button" id="type-alles" data-type="alles" aria-pressed="true">Alles <span></span></button>
+      <button type="button" id="type-vergunning" data-type="vergunning" aria-pressed="false">Vergunningen <span></span></button>
+      <button type="button" id="type-plan" data-type="plan" aria-pressed="false">Plannen <span></span></button>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="zoek" placeholder="Zoek op straat, plaats of trefwoord" aria-label="Zoeken in berichten" autocomplete="off">
+      <button type="button" id="filter-toggle" class="ghost" aria-expanded="false" aria-controls="filters">Filters</button>
+    </div>
+
+    <form id="filters" class="filters" hidden>
+      <label for="f-gemeente">Gemeente
+        <select id="f-gemeente"><option value="">Alle gemeenten</option></select>
+      </label>
+      <label for="f-fase">Stand
+        <select id="f-fase"><option value="">Elke stand</option></select>
+      </label>
+      <label for="f-activiteit">Activiteit
+        <select id="f-activiteit"><option value="">Elke activiteit</option></select>
+      </label>
+      <label for="f-dagen">Periode
+        <select id="f-dagen">
+          <option value="0">Alles</option>
+          <option value="1">Laatste publicatiedag</option>
+          <option value="7">Laatste 7 dagen</option>
+          <option value="14">Laatste 14 dagen</option>
+        </select>
+      </label>
+      <label for="f-sort">Volgorde
+        <select id="f-sort">
+          <option value="datum">Nieuwste eerst</option>
+          <option value="afstand">Dichtstbij eerst</option>
+        </select>
+      </label>
+      <label for="f-km" class="range">Afstand tot Tilburg-centrum: <output id="f-km-out" for="f-km">15 km</output>
+        <input type="range" id="f-km" min="1" max="15" step="1" value="15">
+      </label>
+      <label class="check" for="f-nieuw"><input type="checkbox" id="f-nieuw"> Alleen nieuw sinds mijn vorige bezoek</label>
+      <button type="button" id="filter-reset" class="ghost">Filters wissen</button>
+    </form>
+
+    <p class="result-count" id="result-count" aria-live="polite"></p>
+    <div id="list" class="list"></div>
+    <button type="button" id="more" class="more" hidden>Toon meer berichten</button>
+  </section>
+
+  <section id="view-gebied" class="view" hidden aria-labelledby="tab-gebied">
+    <h2>Het gebied</h2>
+    <p class="lede" id="gebied-intro"></p>
+    <figure class="radar">
+      <svg id="radar" viewBox="-18.5 -18.5 37 37" role="img" aria-label="Kaartje met de berichten van de laatste 14 dagen rond Tilburg-centrum"></svg>
+      <figcaption>Berichten van de laatste 14 dagen. <span class="dot dot-vergunning"></span> vergunning <span class="dot dot-plan"></span> plan. Noord is boven.</figcaption>
+    </figure>
+    <h3>Gemeenten binnen de straal</h3>
+    <p class="hint">Afstand van Tilburg-centrum tot het dichtste en het verste punt van de gemeente. Tik op een gemeente om haar berichten te zien.</p>
+    <div id="gemeenten" class="gemeenten"></div>
+  </section>
+
+  <section id="view-bronnen" class="view" hidden aria-labelledby="tab-bronnen">
+    <h2>Bronnen</h2>
+    <p class="lede">De app gebruikt alleen openbare gegevens van overheden. Bij elk bericht staat uit welke bron het komt, met een link naar het origineel.</p>
+    <h3>Aangesloten</h3>
+    <div id="bronnen-aan" class="bronnen"></div>
+    <h3>Bestaat wel, niet aangesloten</h3>
+    <div id="bronnen-uit" class="bronnen"></div>
+    <h3>Goed om te weten</h3>
+    <ul class="notes" id="notes"></ul>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Onderdelen">
+  <div class="wrap tabs-inner">
+    <a href="#berichten" id="tab-berichten" aria-current="page">Berichten</a>
+    <a href="#gebied" id="tab-gebied">Gebied</a>
+    <a href="#bronnen" id="tab-bronnen">Bronnen</a>
+  </div>
+</nav>
+<!-- app:end -->
+<script src="app.js"></script>
+</body>
+</html>
