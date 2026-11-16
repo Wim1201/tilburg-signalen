@@ -486,22 +486,28 @@ def playwright_available():
 
 @unittest.skipUnless(playwright_available(), "Playwright is niet geïnstalleerd")
 class InDeBrowser(unittest.TestCase):
-    """The app in a real browser at phone size, with the data in the repository."""
+    """The app in a real browser at phone size, with the data the page itself loads. By default the
+    site/ folder of this checkout; with TILBURG_SITE_URL set, the site at that address, for example
+    TILBURG_SITE_URL=https://wim1201.github.io/tilburg-signalen python -m unittest tests.test_site.InDeBrowser"""
 
     @classmethod
     def setUpClass(cls):
-        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Quiet, directory=SITE))
-        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+        cls.url = (os.environ.get("TILBURG_SITE_URL") or "").rstrip("/")
+        server = None
+        if not cls.url:
+            server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Quiet, directory=SITE))
+            threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
-            done = subprocess.run([NODE, os.path.join(JS, "browser_smoke.js"), "http://127.0.0.1:%d" % cls.server.server_address[1]],
-                                  capture_output=True, text=True, encoding="utf-8", timeout=180)
+            done = subprocess.run([NODE, os.path.join(JS, "browser_smoke.js"), cls.url or "http://127.0.0.1:%d" % server.server_address[1]],
+                                  capture_output=True, text=True, encoding="utf-8", timeout=300)
         finally:
-            cls.server.shutdown()
-            cls.server.server_close()
+            if server:
+                server.shutdown()
+                server.server_close()
         if done.returncode:
             raise AssertionError(done.stderr)
         cls.seen = json.loads(done.stdout)
-        cls.items = json.loads(read("data", "berichten.json"))["berichten"]
+        cls.items = cls.seen["data"]["berichten"]
         cls.locations = sorted([entry for entry in cls.items if entry["klasse"] == "ontwikkellocatie"], key=lambda entry: -entry["score"])
 
     def test_no_errors_and_nothing_wider_than_the_phone(self):
@@ -571,13 +577,19 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(self.seen["gemeenteRanks"], sorted(self.seen["gemeenteRanks"], key=int))
 
     def test_rules_are_shown_as_in_version_1(self):
-        limit = str(json.loads(read("data", "berichten.json"))["drempelPerceelM2"])
+        limit = str(self.seen["data"]["drempelPerceelM2"])
         self.assertEqual(self.seen["rules"], [rule.replace("400", limit) for rule in Pagina.RULES])
+
+    def test_house_style_is_the_one_in_this_checkout(self):
+        light = colour_tokens()[0]
+        bar = tuple(int(light["--bar-bg"][i:i + 2], 16) for i in (1, 3, 5))
+        self.assertEqual(self.seen["themeColor"], light["--bar-bg"])
+        self.assertEqual(self.seen["barColor"], "rgb(%d, %d, %d)" % bar)
 
     def test_top_of_the_app_shows_the_moment_of_the_last_refresh(self):
         import datetime
         import zoneinfo
-        stamp = datetime.datetime.fromisoformat(json.loads(read("data", "berichten.json"))["bijgewerkt"]).astimezone(zoneinfo.ZoneInfo("Europe/Amsterdam"))
+        stamp = datetime.datetime.fromisoformat(self.seen["data"]["bijgewerkt"]).astimezone(zoneinfo.ZoneInfo("Europe/Amsterdam"))
         shown = self.seen["updated"]
         self.assertTrue(shown.startswith("Bijgewerkt "), shown)
         self.assertIn(" %d " % stamp.day, shown)

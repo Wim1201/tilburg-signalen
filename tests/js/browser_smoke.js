@@ -1,5 +1,7 @@
 /* Opens the app in a real browser at phone size and reports what the page shows, as JSON.
-   Usage: node browser_smoke.js <base url>. Needs Playwright; the Python test skips without it. */
+   Usage: node browser_smoke.js <base url>. Needs Playwright; the Python test skips without it.
+   The base url may be the live site: the report includes the data the page loaded, and the service
+   worker is kept out so that every request is seen. */
 "use strict";
 var chromium = require("playwright").chromium;
 var SEEN = "tilburg-signalen.gezien";
@@ -9,7 +11,7 @@ var SEEN = "tilburg-signalen.gezien";
   var browser = await chromium.launch();
 
   async function open(width, changeData) {
-    var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam" });
+    var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
     var page = await context.newPage();
     page.on("console", function (message) { if (message.type() === "error") errors.push(message.text()); });
     page.on("pageerror", function (error) { errors.push(error.message); });
@@ -63,6 +65,15 @@ var SEEN = "tilburg-signalen.gezien";
   for (var name of ["ranglijst", "nieuw", "onzeker"]) result.tiles[name] = await page.textContent("#tile-" + name + " b");
   result.overflow = await overflow(page);
   result.updated = await page.textContent("#updated");
+  result.themeColor = await page.$eval('meta[name="theme-color"]', function (node) { return node.content; });
+  result.barColor = await page.$eval(".masthead", function (node) { return getComputedStyle(node).backgroundColor; });
+  result.data = await page.evaluate(function () {
+    return fetch("data/berichten.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (d) {
+      return { bijgewerkt: d.bijgewerkt, drempelPerceelM2: d.drempelPerceelM2, berichten: d.berichten.map(function (i) {
+        return { id: i.id, klasse: i.klasse, score: i.score, datum: i.datum, waarom: i.waarom, gemeente: i.gemeente };
+      }) };
+    });
+  });
   result.tileShapes = await tiles(page);
   result.badgeFirst = await badge(page);
   result.mark = await page.$$eval(".masthead svg.mark path", function (paths) { return paths.length; });
