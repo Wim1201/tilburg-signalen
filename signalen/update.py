@@ -18,48 +18,14 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "site" / "data" / "berichten.json"
 SOURCES = pathlib.Path(__file__).with_name("bronnen.json")
 WORKERS = 4  # modest on purpose: the sources are public services
-RETRY_SECONDS = 180  # time allowed for trying failed downloads once more
-MAX_RETRY_WACHT = 20  # seconds; longest pause before a retry
+MAX_RETRY_WACHT = http.MAX_RETRY_WACHT
 
 
 def _since(today, days):
     return (today - datetime.timedelta(days=days)).isoformat()
 
 
-def _alle(functie, argumenten, pool, slaap=time.sleep):
-    """Call `functie` for every argument tuple in parallel. Returns (results, statistiek).
-
-    results is a list of (value, ok). A call that fails is tried once more, one at a time, after the
-    parallel round: a public service that refuses a burst of requests usually answers a calm one.
-    Before each retry there is a pause that doubles while the service keeps failing, up to
-    MAX_RETRY_WACHT seconds, and drops back after a success. The whole retry round stops after
-    RETRY_SECONDS.
-    """
-    def probeer(args):
-        try:
-            return functie(*args), True
-        except Exception as error:
-            return error, False
-
-    def oorzaak(error):
-        return getattr(error, "reden", None) or type(error).__name__
-
-    results = list(pool.map(probeer, argumenten))
-    eerste = [value for value, ok in results if not ok]
-    redenen = collections.Counter(oorzaak(error) for error in eerste)
-    deadline = time.monotonic() + RETRY_SECONDS
-    wacht = 1
-    for index, (value, ok) in enumerate(results):
-        if ok or time.monotonic() >= deadline:
-            continue
-        slaap(wacht)
-        results[index] = probeer(argumenten[index])
-        wacht = 1 if results[index][1] else min(MAX_RETRY_WACHT, wacht * 2)
-    definitief = [value for value, ok in results if not ok]
-    statistiek = {"gevraagd": len(argumenten), "eersteRondeMislukt": len(eerste),
-                  "hersteld": len(eerste) - len(definitief), "definitiefMislukt": len(definitief),
-                  "redenen": dict(redenen.most_common(5))}
-    return [(value if ok else None, ok) for value, ok in results], statistiek
+_alle = http.parallel  # kept under its old name for the enrichment code below
 
 
 def verrijk(items, drempel, haal_tekst=tekst.haal_op, perceel_m2=perceel.kadaster_m2, slaap=time.sleep, cache=None):
@@ -114,12 +80,12 @@ def verrijk(items, drempel, haal_tekst=tekst.haal_op, perceel_m2=perceel.kadaste
     return items, statistiek
 
 
-def bron_ophalers(config, area, since, cache=None):
+def bron_ophalers(config, area, since, cache=None, statistiek=None):
     """The connected sources: source id -> function that returns its items for the whole window."""
     return {
         "officielebekendmakingen": lambda: (bekendmakingen.fetch(config, area, since, cache)
                                             + bekendmakingen.fetch_sales(config, area, since["verkoop"], cache)),
-        "staatscourant-insolventies": lambda: insolventies.fetch(config, area, since["faillissement"], cache),
+        "staatscourant-insolventies": lambda: insolventies.fetch(config, area, since["faillissement"], cache, statistiek=statistiek),
         "omgevingsloket-vlaanderen": lambda: vlaanderen.fetch(config, area, since["vergunning"]),
     }
 
@@ -132,7 +98,8 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
     """
     today = now.date()
     since = {kind: _since(today, days) for kind, days in config["venster_dagen"].items()}
-    fetchers = fetchers or bron_ophalers(config, area, since, cache)
+    bronstatistiek = {}
+    fetchers = fetchers or bron_ophalers(config, area, since, cache, bronstatistiek)
     verrijker = verrijker or (lambda found: verrijk(found, config["drempel_perceel_m2"], cache=cache))
 
     items, statuses = {}, {}
@@ -153,6 +120,7 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
         print(f"Dagcontrole mislukt: {error}", file=sys.stderr)
 
     items, statistiek = verrijker(list(items.values()))
+    statistiek = {**statistiek, **bronstatistiek}
     items.sort(key=lambda item: (item["datum"], -item["afstandKm"], item["id"]), reverse=True)
     sources = json.loads(SOURCES.read_text(encoding="utf-8"))
     for source in sources:
@@ -213,8 +181,11 @@ def main(argv=None):
     fouten = document["ophaalfouten"]
     if any(fouten.values()):
         # "::warning::" makes the line stand out in the GitHub Actions log.
-        print(f'::warning::Niet op te halen: {fouten.get("tekst", 0)} teksten en {fouten.get("perceel", 0)} perceelgroottes; '
-              "die berichten staan tot de volgende verversing onder Onzeker")
+        details = ", ".join(f"{count} x {kind}" for kind, count in fouten.items() if count)
+        print(f"::warning::Niet op te halen: {details}; de volgende verversing probeert het opnieuw")
+    for source in document["bronnen"]:
+        if source.get("status") == "fout":
+            print(f'::warning::Bron {source["id"]} niet bereikbaar: {source.get("melding", "")[:200]}')
     kind_of_run = "volledige verversing (cache niet gelezen)" if args.volledig else "gewone run"
     print(f'  {kind_of_run}: {document["verzoeken"]["totaal"]} verzoeken in {time.monotonic() - started:.0f} seconden')
     for soort, stats in document["cache"].items():

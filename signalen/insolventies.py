@@ -132,7 +132,7 @@ def to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges, lookup=
     return None
 
 
-def fetch(config, area, since, cache=None, lookup=perceel.bag_adres):
+def fetch(config, area, since, cache=None, lookup=perceel.bag_adres, statistiek=None):
     """Fetch new bankruptcies and moratoria of legal entities with premises inside the radius.
 
     With a cache, a court publication that was read before and had no company inside the radius is
@@ -151,29 +151,30 @@ def fetch(config, area, since, cache=None, lookup=perceel.bag_adres):
                         "url": bekendmakingen._text(record, "preferredUrl"), "urlTekst": urls.get("html"), "xml": urls.get("xml")})
 
     def load(record):
-        try:
-            return record, http.get(record["xml"], attempts=2, timeout=40).decode("utf-8-sig", "replace")
-        except Exception:
-            return record, ""
+        return http.get(record["xml"], attempts=2, timeout=40).decode("utf-8-sig", "replace")
 
     # After about a month the publisher withdraws the readable text of these publications (only a PDF
     # stays); those records are skipped on purpose, in line with that privacy measure.
     readable = [r for r in records if r["xml"]]
     todo = [r for r in readable if not (cache and r["id"] and cache.haal("insolventie", r["id"])[0])]
-    items, failed = {}, 0
-    with concurrent.futures.ThreadPoolExecutor(6) as pool:
-        for record, text in pool.map(load, todo):
-            failed += not text
-            found, fouten = 0, []
-            for entry in entries(text):
-                case = parse_entry(entry)
-                if case and any(in_postcode_range(a["postcode"], ranges) for a in case["adressen"]):
-                    item = to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges, lookup, fouten)
-                    if item:
-                        found += 1
-                        items.setdefault(item["id"], item)
-            if cache and record["id"] and text and not found and not fouten:
-                cache.zet("insolventie", record["id"], 0)
-    if todo and failed > len(todo) / 2:
-        raise RuntimeError(f"{failed} van {len(todo)} publicaties niet te lezen")
+    with concurrent.futures.ThreadPoolExecutor(4) as pool:
+        loaded, stats = http.parallel(load, [(record,) for record in todo], pool)
+    if statistiek is not None:
+        statistiek["insolventie"] = stats  # a publication that could not be read is counted, not hidden
+    items = {}
+    for record, (text, ok) in zip(todo, loaded):
+        if not ok:
+            continue  # not cached either, so the next run reads it again
+        found, fouten = 0, []
+        for entry in entries(text):
+            case = parse_entry(entry)
+            if case and any(in_postcode_range(a["postcode"], ranges) for a in case["adressen"]):
+                item = to_item(case, record, centre_rd, radius_m, town_to_gemeente, ranges, lookup, fouten)
+                if item:
+                    found += 1
+                    items.setdefault(item["id"], item)
+        if cache and record["id"] and not found and not fouten:
+            cache.zet("insolventie", record["id"], 0)
+    if todo and stats["definitiefMislukt"] > len(todo) / 2:
+        raise RuntimeError(f'{stats["definitiefMislukt"]} van {len(todo)} publicaties niet te lezen')
     return list(items.values())
