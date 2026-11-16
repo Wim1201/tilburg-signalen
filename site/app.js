@@ -7,8 +7,8 @@
   var STORE_KEY = "tilburg-signalen.gezien";
   var VIEWS = ["berichten", "gebied", "bronnen"];
   var state = {
-    data: null, area: null, type: "alles", zoek: "", gemeente: "", fase: "", activiteit: "",
-    dagen: 0, sort: "datum", maxKm: 15, alleenNieuw: false, limit: PAGE, nieuw: {},
+    data: null, area: null, klasse: "ontwikkellocatie", toonWeg: false, zoek: "", type: "", gemeente: "",
+    fase: "", signaal: "", dagen: 0, sort: "relevantie", maxKm: 15, alleenNieuw: false, limit: PAGE, nieuw: {},
   };
 
   function $(id) { return document.getElementById(id); }
@@ -76,21 +76,39 @@
     return result;
   }
 
+  var TYPE_LABEL = { vergunning: "Vergunning", plan: "Plan", faillissement: "Faillissement", verkoop: "Verkoop overheid" };
+  var KLASSE_LABEL = { ontwikkellocatie: "Ontwikkellocaties", onzeker: "Onzeker", weggefilterd: "Weggefilterd" };
+
+  /* Filters that apply to every list; the class (ontwikkellocatie, onzeker, weggefilterd) is chosen separately. */
   function matches(item) {
-    if (state.type !== "alles" && item.type !== state.type) return false;
+    if (state.type && item.type !== state.type) return false;
     if (state.gemeente && item.gemeente !== state.gemeente) return false;
     if (state.fase && item.fase !== state.fase) return false;
-    if (state.activiteit && item.activiteiten.indexOf(state.activiteit) === -1) return false;
+    if (state.signaal && item.signalen.indexOf(state.signaal) === -1) return false;
     if (item.afstandKm > state.maxKm) return false;
     if (state.alleenNieuw && !state.nieuw[item.id]) return false;
     if (state.dagen === 1 && item.datum !== state.latestDay) return false;
     if (state.dagen > 1 && item.datum < daysAgoIso(state.dagen)) return false;
     if (state.zoek) {
-      var hay = [item.titel, item.omschrijving, item.plaats, item.gemeente, item.overheid, item.fase].join(" ").toLowerCase();
+      var hay = [item.titel, item.omschrijving, item.waarom, item.plaats, item.gemeente, item.overheid, item.fase].join(" ").toLowerCase();
       var words = state.zoek.toLowerCase().split(/\s+/).filter(Boolean);
       for (var i = 0; i < words.length; i++) if (hay.indexOf(words[i]) === -1) return false;
     }
     return true;
+  }
+
+  function sorted(items) {
+    var list = items.slice();
+    if (state.sort === "afstand") {
+      list.sort(function (a, b) { return a.afstandKm - b.afstandKm || (a.datum < b.datum ? 1 : -1); });
+    } else if (state.sort === "relevantie") {
+      list.sort(function (a, b) { return b.score - a.score || (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : a.afstandKm - b.afstandKm); });
+    }
+    return list; // "datum": the data file is already newest first
+  }
+
+  function ofClass(klasse) {
+    return state.data.berichten.filter(function (item) { return item.klasse === klasse; });
   }
 
   function countBy(items, key) {
@@ -101,9 +119,9 @@
     return counts;
   }
 
-  function fillSelect(select, counts) {
+  function fillSelect(select, counts, labels) {
     Object.keys(counts).sort(function (a, b) { return a.localeCompare(b, "nl"); }).forEach(function (value) {
-      var option = el("option", null, value + " (" + counts[value] + ")");
+      var option = el("option", null, ((labels && labels[value]) || value) + " (" + counts[value] + ")");
       option.value = value;
       select.appendChild(option);
     });
@@ -117,27 +135,36 @@
   }
 
   function renderSummary() {
-    var items = state.data.berichten, box = $("summary");
+    var relevant = ofClass("ontwikkellocatie"), unsure = ofClass("onzeker"), box = $("summary");
     box.textContent = "";
-    var today = items.filter(function (item) { return item.datum === state.latestDay; });
     var line = el("p", "summary-day");
     line.appendChild(document.createTextNode("Laatste publicatiedag: "));
     line.appendChild(el("strong", null, state.latestDay ? dayLabel(state.latestDay).toLowerCase() : "nog geen berichten"));
     box.appendChild(line);
+    var isNew = function (item) { return state.nieuw[item.id]; };
     var figures = el("div", "summary-figures");
-    figures.appendChild(figure(today.filter(function (i) { return i.type === "vergunning"; }).length, "vergunningen", "is-permit"));
-    figures.appendChild(figure(today.filter(function (i) { return i.type === "plan"; }).length, "planwijzigingen", "is-plan"));
-    figures.appendChild(figure(Object.keys(state.nieuw).length, "nieuw sinds vorig bezoek", "is-new"));
+    figures.appendChild(figure(relevant.length, "ontwikkellocaties", "is-permit"));
+    figures.appendChild(figure(unsure.length, "onzeker", "is-plan"));
+    figures.appendChild(figure(relevant.filter(isNew).length + unsure.filter(isNew).length, "nieuw sinds vorig bezoek", "is-new"));
     box.appendChild(figures);
+
+    // Warn when the source had nothing for the day of the last refresh (a weekday, after ten o'clock).
+    var refreshed = new Date(state.data.bijgewerkt);
+    var weekday = refreshed.getDay() >= 1 && refreshed.getDay() <= 5;
+    if (weekday && refreshed.getHours() >= 10 && state.latestDay && state.latestDay < isoDay(refreshed)) {
+      box.appendChild(el("p", "stale", "Bij de laatste verversing had de bron nog geen publicaties van die dag doorgegeven. " +
+        "Ze verschijnen vanzelf zodra de zoekdienst van overheid.nl is bijgewerkt."));
+    }
   }
 
   function card(item) {
     var centre = state.data.centrum;
-    var node = el("article", "card" + (state.nieuw[item.id] ? " is-new" : ""));
+    var node = el("article", "card is-" + item.klasse + (state.nieuw[item.id] ? " is-new" : ""));
 
     var chips = el("div", "chips");
-    chips.appendChild(el("span", "chip is-" + item.type, item.type === "plan" ? (item.soort || "Plan") : "Vergunning"));
+    chips.appendChild(el("span", "chip is-" + item.type, item.type === "plan" ? (item.soort || "Plan") : TYPE_LABEL[item.type]));
     chips.appendChild(el("span", "chip", item.fase));
+    if (item.klasse === "ontwikkellocatie") chips.appendChild(el("span", "chip is-score", "relevantie " + item.score));
     if (state.nieuw[item.id]) chips.appendChild(el("span", "chip is-new", "Nieuw"));
     node.appendChild(chips);
 
@@ -147,6 +174,7 @@
     plate.title = "Afstand tot " + centre.naam;
     node.appendChild(plate);
 
+    node.appendChild(el("p", "why", item.waarom));
     node.appendChild(el("h4", null, item.titel));
     if (item.omschrijving) node.appendChild(el("p", "desc", item.omschrijving));
 
@@ -162,12 +190,10 @@
     node.appendChild(where);
 
     var source = el("p", "source");
-    var name = item.publicatie + (item.bron === "officielebekendmakingen" ? " " + item.overheid : "");
-    var origin = el("span", null, "Bron: " + name + " · " + shortDate.format(parseDay(item.datum)));
-    source.appendChild(origin);
-    var links = el("span");
+    var name = item.publicatie + (item.bron === "omgevingsloket-vlaanderen" ? "" : " " + item.overheid);
+    source.appendChild(el("span", null, "Bron: " + name + " · " + shortDate.format(parseDay(item.datum))));
+    var links = el("span"), parts = [];
     var url = safeUrl(item.url);
-    var parts = [];
     if (url) parts.push(link(url, "Open bij de bron"));
     if (safeUrl(item.urlTekst)) parts.push(link(item.urlTekst, "Alleen tekst"));
     if (item.lat !== null && item.lat !== undefined) {
@@ -182,20 +208,23 @@
     return node;
   }
 
-  function renderList() {
-    var list = $("list"), items = state.data.berichten.filter(matches);
-    if (state.sort === "afstand") {
-      items = items.slice().sort(function (a, b) { return a.afstandKm - b.afstandKm || (a.datum < b.datum ? 1 : -1); });
-    }
-    list.textContent = "";
-    $("result-count").textContent = items.length + (items.length === 1 ? " bericht" : " berichten") +
-      (items.length !== state.data.berichten.length ? " van " + state.data.berichten.length : "");
+  var EMPTY = {
+    ontwikkellocatie: "Geen ontwikkellocaties met deze filters. Kijk ook onder Onzeker, of wis de filters.",
+    onzeker: "Geen onzekere berichten met deze filters.",
+  };
 
-    if (!items.length) {
-      list.appendChild(el("p", "empty", "Geen berichten met deze filters. Wis de filters of kies een ruimere periode of afstand."));
-    }
-    var perDay = countBy(items, "datum"), lastDay = null;
-    items.slice(0, state.limit).forEach(function (item) {
+  function renderList() {
+    var list = $("list");
+    var main = sorted(ofClass(state.klasse).filter(matches));
+    var removed = state.toonWeg ? sorted(ofClass("weggefilterd").filter(matches)) : [];
+    list.textContent = "";
+    $("result-count").textContent = main.length + " " + KLASSE_LABEL[state.klasse].toLowerCase() +
+      (state.toonWeg ? " en " + removed.length + " weggefilterd" : "") + ", " +
+      { relevantie: "meest relevant eerst", datum: "nieuwste eerst", afstand: "dichtstbij eerst" }[state.sort];
+
+    if (!main.length) list.appendChild(el("p", "empty", EMPTY[state.klasse]));
+    var shown = 0, perDay = countBy(main, "datum"), lastDay = null;
+    main.slice(0, state.limit).forEach(function (item) {
       if (state.sort === "datum" && item.datum !== lastDay) {
         lastDay = item.datum;
         var head = el("h3", "day", dayLabel(item.datum));
@@ -203,18 +232,25 @@
         list.appendChild(head);
       }
       list.appendChild(card(item));
+      shown++;
     });
-    $("more").hidden = items.length <= state.limit;
+    if (state.toonWeg && shown === main.length) {
+      var divider = el("h3", "day is-removed", "Weggefilterd");
+      divider.appendChild(el("span", null, String(removed.length)));
+      list.appendChild(divider);
+      list.appendChild(el("p", "hint", "Deze berichten voldoen niet aan de regels voor een ontwikkellocatie. Bij elk bericht staat waarom."));
+      removed.slice(0, state.limit - shown).forEach(function (item) { list.appendChild(card(item)); });
+    }
+    $("more").hidden = main.length + removed.length <= state.limit;
 
-    var all = state.data.berichten;
-    ["alles", "vergunning", "plan"].forEach(function (type) {
-      var count = type === "alles" ? all.length : all.filter(function (i) { return i.type === type; }).length;
-      $("type-" + type).querySelector("span").textContent = count;
-      $("type-" + type).setAttribute("aria-pressed", String(state.type === type));
+    ["ontwikkellocatie", "onzeker"].forEach(function (klasse) {
+      $("klasse-" + klasse).querySelector("span").textContent = ofClass(klasse).length;
+      $("klasse-" + klasse).setAttribute("aria-pressed", String(state.klasse === klasse));
     });
+    $("weg-aantal").textContent = "(" + ofClass("weggefilterd").length + ")";
   }
 
-  /* Small overview map: rings at 5, 10 and 15 km, one dot per notice of the last 14 days. */
+  /* Small overview map: rings at 5, 10 and 15 km, one dot per development location. */
   function renderRadar() {
     var svg = $("radar"), ns = "http://www.w3.org/2000/svg", centre = state.data.centrum;
     function add(tag, attrs, text) {
@@ -230,12 +266,13 @@
       add("text", { x: 0.3, y: -km + 1.2 }, km + " km");
     });
     add("text", { x: 0, y: -16.6, "text-anchor": "middle" }, "N");
-    var since = daysAgoIso(14);
-    var recent = state.data.berichten.filter(function (i) { return i.lat !== null && i.lat !== undefined && i.datum >= since; });
-    recent.sort(function (a, b) { return (a.type === "plan") - (b.type === "plan"); }); // plans on top
-    recent.forEach(function (item) {
+    var located = state.data.berichten.filter(function (i) {
+      return i.klasse !== "weggefilterd" && i.lat !== null && i.lat !== undefined;
+    });
+    located.sort(function (a, b) { return (a.klasse === "ontwikkellocatie") - (b.klasse === "ontwikkellocatie"); });
+    located.forEach(function (item) {
       var o = offsetKm(item, centre);
-      add("circle", { cx: o.x.toFixed(2), cy: (-o.y).toFixed(2), r: item.type === "plan" ? 0.5 : 0.3, "class": "p-" + item.type });
+      add("circle", { cx: o.x.toFixed(2), cy: (-o.y).toFixed(2), r: item.klasse === "onzeker" ? 0.32 : 0.42, "class": "p-" + item.klasse });
     });
     add("circle", { cx: 0, cy: 0, r: 0.35, "class": "centre" });
     state.area.gemeenten.forEach(function (gemeente) {
@@ -252,7 +289,8 @@
   function gemeenteKey(gemeente) { return gemeente.land === "BE" ? gemeente.naam + " (België)" : gemeente.naam; }
 
   function renderGebied() {
-    var area = state.area, counts = countBy(state.data.berichten, "gemeente"), box = $("gemeenten");
+    var area = state.area, box = $("gemeenten");
+    var counts = countBy(ofClass("ontwikkellocatie"), "gemeente"), unsure = countBy(ofClass("onzeker"), "gemeente");
     $("gebied-intro").textContent = "Alles binnen " + area.straalKm + " km hemelsbreed van " + area.centrum.naam +
       ". Daarin liggen " + area.gemeenten.length + " gemeenten, waarvan de meeste maar voor een deel. Een bericht telt mee als de locatie zelf binnen de straal valt.";
     renderRadar();
@@ -265,7 +303,7 @@
       row.appendChild(el("span", "km", nf.format(gemeente.minKm) + " – " + nf.format(gemeente.maxKm) + " km"));
       var meta = el("span", "meta");
       meta.appendChild(el("span", "chip", gemeente.dekking === "geheel" ? "Geheel binnen de straal" : "Deels binnen de straal"));
-      meta.appendChild(el("span", null, (counts[key] || 0) + " berichten"));
+      meta.appendChild(el("span", null, (counts[key] || 0) + " ontwikkellocaties, " + (unsure[key] || 0) + " onzeker"));
       row.appendChild(meta);
       var towns = gemeente.woonplaatsen.map(function (w) { return w.naam + (w.dekking === "geheel" ? "" : " (deels)"); });
       row.appendChild(el("span", "towns", towns.length ? "Plaatsen: " + towns.join(", ") : "Grensgebied bij Tilburg en Goirle; plaatsnamen zijn voor België niet uitgesplitst."));
@@ -299,15 +337,29 @@
       if (url) { var p = el("p"); p.appendChild(link(url, url.replace(/^https:\/\/(www\.)?/, "").replace(/\/$/, ""))); box.appendChild(p); }
       (source.aangesloten ? on : off).appendChild(box);
     });
-    var notes = $("notes"), windows = state.data.vensterDagen;
-    notes.textContent = "";
-    [
-      "Vergunningen blijven " + windows.vergunning + " dagen in de lijst (de bezwaartermijn is zes weken), planwijzigingen " + windows.plan + " dagen.",
-      "Gemeenten publiceren op werkdagen rond 9 uur. De app haalt de gegevens daarna op; bovenaan staat het tijdstip van de laatste verversing.",
+    var windows = state.data.vensterDagen, limit = state.data.drempelPerceelM2;
+    function fill(id, lines) {
+      var box = $(id);
+      box.textContent = "";
+      lines.forEach(function (text) { box.appendChild(el("li", null, text)); });
+    }
+    fill("regels", [
+      "Hoogste rang: een wijziging van een omgevingsplan of bestemmingsplan die ontwikkeling mogelijk maakt, bijvoorbeeld naar wonen of met meer bouwhoogte.",
+      "Daarna: twee of meer nieuwe woningen. Hoe meer woningen, hoe hoger.",
+      "Daarna: een perceel van minstens " + limit + " m² met een ontwikkelsignaal: sloop, functiewijziging, kavelsplitsing, bestemmingswijziging of een leegstaand of vrijkomend bedrijfspand.",
+      "Ook: een overheid die grond of vastgoed van minstens " + limit + " m² wil verkopen, en een failliet bedrijf met een bedrijfspand op zo'n perceel.",
+      "Onzeker: er is een signaal, maar het aantal woningen of de perceelgrootte is niet te bepalen. Deze berichten worden niet verborgen.",
+      "Weggefilterd: al het andere, zoals dakkapellen, kappen, reclame en één losse woning. Met de schakelaar op het tabblad Berichten kun je ze bekijken; bij elk bericht staat de reden.",
+      "Ingetrokken en geweigerde aanvragen blijven zichtbaar, maar zakken in de rangorde.",
+    ]);
+    fill("notes", [
+      "Vergunningen blijven " + windows.vergunning + " dagen in de lijst, planberichten " + windows.plan + " dagen, verkoopvoornemens " + windows.verkoop + " dagen en faillissementen " + windows.faillissement + " dagen.",
+      "Het aantal woningen en de signalen komen uit de titel en de eerste regels van de bekendmaking. De perceelgrootte komt uit het Kadaster, voor het perceel op de locatie van het bericht. Beslaat een project meer percelen, dan kan de werkelijke omvang groter zijn.",
+      "Bij faillissementen gaat het alleen om rechtspersonen met een pand dat volgens de BAG geen woning is. Of het bedrijf eigenaar of huurder is, is niet bekend.",
+      "Gemeenten publiceren op werkdagen rond 9 uur. Bovenaan staat het tijdstip van de laatste verversing.",
       "De afstand is hemelsbreed tot " + state.data.centrum.naam + ", gemeten naar het dichtstbijzijnde punt van de locatie in de bekendmaking.",
-      "Heeft een bekendmaking geen eigen locatie, dan zoekt de app het adres uit de titel op. Lukt dat niet, dan staat er dat de afstand voor de hele gemeente geldt.",
-      "De stand (aanvraag, verleend, enzovoort) is afgeleid uit de titel van de bekendmaking. De bron zelf is altijd leidend.",
-    ].forEach(function (text) { notes.appendChild(el("li", null, text)); });
+      "De stand (aanvraag, verleend, enzovoort) en de reden van relevantie zijn automatisch afgeleid. De bron zelf is altijd leidend.",
+    ]);
   }
 
   function showView() {
@@ -327,10 +379,10 @@
   }
 
   function resetFilters() {
-    state.zoek = ""; state.gemeente = ""; state.fase = ""; state.activiteit = ""; state.dagen = 0;
-    state.sort = "datum"; state.maxKm = state.data.straalKm; state.alleenNieuw = false; state.limit = PAGE;
-    $("zoek").value = ""; $("f-gemeente").value = ""; $("f-fase").value = ""; $("f-activiteit").value = "";
-    $("f-dagen").value = "0"; $("f-sort").value = "datum"; $("f-nieuw").checked = false;
+    state.zoek = ""; state.type = ""; state.gemeente = ""; state.fase = ""; state.signaal = ""; state.dagen = 0;
+    state.sort = "relevantie"; state.maxKm = state.data.straalKm; state.alleenNieuw = false; state.limit = PAGE;
+    $("zoek").value = ""; $("f-type").value = ""; $("f-gemeente").value = ""; $("f-fase").value = ""; $("f-signaal").value = "";
+    $("f-dagen").value = "0"; $("f-sort").value = "relevantie"; $("f-nieuw").checked = false;
     $("f-km").value = state.maxKm; $("f-km-out").textContent = state.maxKm + " km";
   }
 
@@ -344,15 +396,17 @@
       });
     }
     onChange("zoek", "zoek");
+    onChange("f-type", "type");
     onChange("f-gemeente", "gemeente");
     onChange("f-fase", "fase");
-    onChange("f-activiteit", "activiteit");
+    onChange("f-signaal", "signaal");
     onChange("f-sort", "sort");
     onChange("f-dagen", "dagen", function (t) { return +t.value; });
     onChange("f-nieuw", "alleenNieuw", function (t) { return t.checked; });
+    onChange("toon-weg", "toonWeg", function (t) { return t.checked; });
     onChange("f-km", "maxKm", function (t) { $("f-km-out").textContent = t.value + " km"; return +t.value; });
-    ["alles", "vergunning", "plan"].forEach(function (type) {
-      $("type-" + type).addEventListener("click", function () { state.type = type; state.limit = PAGE; renderList(); });
+    ["ontwikkellocatie", "onzeker"].forEach(function (klasse) {
+      $("klasse-" + klasse).addEventListener("click", function () { state.klasse = klasse; state.limit = PAGE; renderList(); });
     });
     $("filter-toggle").addEventListener("click", function () { showFilters($("filters").hidden); });
     $("filter-reset").addEventListener("click", function () { resetFilters(); renderList(); });
@@ -366,12 +420,15 @@
     state.maxKm = data.straalKm;
     state.latestDay = data.berichten.length ? data.berichten.reduce(function (a, b) { return a.datum > b.datum ? a : b; }).datum : "";
     state.nieuw = markNew(data.berichten);
-    $("scope").textContent = "Binnen " + data.straalKm + " km van " + data.centrum.naam;
+    state.toonWeg = $("toon-weg").checked;
+    $("scope").textContent = "Ontwikkellocaties binnen " + data.straalKm + " km van " + data.centrum.naam;
     $("updated").textContent = "Bijgewerkt " + stampFormat.format(new Date(data.bijgewerkt));
     $("f-km").max = data.straalKm; $("f-km").value = data.straalKm; $("f-km-out").textContent = data.straalKm + " km";
-    fillSelect($("f-gemeente"), countBy(data.berichten, "gemeente"));
-    fillSelect($("f-fase"), countBy(data.berichten, "fase"));
-    fillSelect($("f-activiteit"), countBy(data.berichten, "activiteiten"));
+    var relevant = data.berichten.filter(function (item) { return item.klasse !== "weggefilterd"; });
+    fillSelect($("f-type"), countBy(relevant, "type"), TYPE_LABEL);
+    fillSelect($("f-gemeente"), countBy(relevant, "gemeente"));
+    fillSelect($("f-fase"), countBy(relevant, "fase"));
+    fillSelect($("f-signaal"), countBy(relevant, "signalen"));
     bind();
     renderSummary(); renderList(); renderGebied(); renderBronnen(); showView();
   }

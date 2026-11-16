@@ -71,6 +71,9 @@ def to_item(feature, centre_rd, radius_m, since, gemeente):
         "planId": None,
         "url": props.get("project_link"),
         "urlTekst": None,
+        "_rd": None,
+        "_perceelM2": round(geo.area(parts)) if kind == "polygon" else None,
+        "_urlXml": None,
     }
 
 

@@ -91,6 +91,19 @@ def centre(parts):
     return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
 
 
+def area(parts):
+    """Area in m² of polygon rings (shoelace); holes cancel out when wound the other way."""
+    total = 0.0
+    for ring in parts:
+        total += sum(ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1] for i in range(len(ring) - 1)) / 2
+    return abs(total)
+
+
+def contains(p, parts):
+    """True when point p lies inside the polygon rings."""
+    return _inside(p, parts)
+
+
 def pin(p, kind, parts, radius):
     """Point to show on a map: the centre of the part nearest to p.
 
