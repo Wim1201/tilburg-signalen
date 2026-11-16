@@ -13,6 +13,8 @@
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 15:00 uur | **De eerste run op GitHub (14:53 uur) leverde slechtere gegevens dan de lokale runs; de zin "Lokaal draait alles" onder "Bekende beperkingen" gaf dus een te gunstig beeld.** De run slaagde en de app is live, maar 56 teksten en 3 perceelgroottes konden vanaf GitHub niet worden opgehaald. Die berichten kwamen onterecht onder "Onzeker" (80 in plaats van 22). Oorzaak van het mislukken is niet vastgesteld: de fout werd niet gelogd. Zie "Na de eerste run op GitHub". |
+| 16-11-2026, 15:00 uur | PR #2 is samengevoegd; "Samenvoegen met `main` is niet gedaan" onder "Buiten dit verslag" is achterhaald. Wat daarna is gebouwd (onvolledige dagen, robuuster ophalen) staat op de werkbranch en is nog niet samengevoegd. |
 | 16-11-2026, ca. 12:35 uur | Het vorige verslag noemt de livegang als open punt. Dat is achterhaald: PR #1 is samengevoegd, Wim heeft GitHub Pages aangezet en `https://wim1201.github.io/tilburg-signalen/` geeft de app. Die draait nog op de eerste versie tot deze branch is samengevoegd. |
 | 16-11-2026, ca. 13:00 uur | Het vorige verslag noemt de hoofdbron en PDOK "openbaar, geen sleutel" zonder de robots.txt te noemen. Aanvulling: `repository.overheid.nl/robots.txt` bevat `Disallow: /` en `api.pdok.nl/robots.txt` sluit de Locatieserver uit. Dat zijn aanwijzingen voor zoekmachines. De app gebruikt de gedocumenteerde koppelingen die de beheerders juist voor geautomatiseerd gebruik aanbieden (zie "Wat mag"). Het punt staat hier zodat Wim het zelf kan wegen. |
 | 16-11-2026, 14:50 uur | **Oorzaak ontbrekende publicaties van 16-11 gevonden; de regel hieronder ("oorzaak niet vastgesteld") is daarmee achterhaald.** De vertraging ligt bij de bron, niet bij de app. Zie "Onderzoek: publicaties van 16-11". |
@@ -168,6 +170,52 @@ niets verloren.
 
 Toegevoegd naar aanleiding hiervan: de app toont een melding als de bron bij de laatste verversing
 (werkdag, na 10 uur) nog niets van die dag had.
+
+## Na de eerste run op GitHub (16-11-2026, 14:53 uur)
+
+| Meting | Lokaal, 14:50 uur | GitHub, 14:53 uur |
+|---|---|---|
+| Ontwikkellocatie / onzeker / weggefilterd | 79 / 22 / 976 | 75 / 80 / 922 |
+| Onzeker met reden "beschrijft niet wat er gebeurt" | 0 | 56 |
+| Berichten met perceelgrootte | 105 | 102 |
+| Duur stap "Berichten ophalen" | ongeveer 85 seconden | 3 minuten 51 seconden |
+| Uitkomst workflow | n.v.t. | geslaagd, gepubliceerd |
+
+Waarneming: op GitHub mislukte het ophalen van de tekst bij 56 bekendmakingen, verspreid over
+minstens acht gemeenten. Vermoeden: de bron begrenst of vertraagt gelijktijdige verzoeken vanaf GitHub; de
+langere looptijd past daarbij. Dat is niet bewezen, want de fout werd weggevangen zonder melding.
+
+Wat daarop is aangepast (werkbranch, nog niet samengevoegd):
+
+| Aanpassing | Uitwerking |
+|---|---|
+| Minder gelijktijdige verzoeken | 4 in plaats van 8 |
+| Mislukte verzoeken opnieuw | Na de eerste ronde één voor één, maximaal drie minuten lang |
+| Mislukken wordt geteld en gelogd | De eerste drie foutmeldingen staan in het log; het totaal staat in de gegevens (`ophaalfouten`) en als waarschuwing in de run |
+| Eerlijke reden bij het bericht | "De tekst van deze bekendmaking kon niet worden opgehaald; de volgende verversing probeert het opnieuw." |
+| Melding in de app | Aantal bekendmakingen dat niet volledig is gelezen |
+
+Lokaal geeft de aangepaste versie 0 ophaalfouten in ruim 2 minuten. Of het op GitHub nu goed gaat,
+blijkt pas na samenvoegen; het log laat dan in elk geval de oorzaak zien.
+
+## Onvolledige dagen en inhalen (toegevoegd 16-11-2026, 15:00 uur)
+
+| Onderdeel | Uitwerking |
+|---|---|
+| Gemiste dagen alsnog ophalen | Elke verversing haalt het hele venster opnieuw op (vergunningen 42 dagen) en onthoudt niets. Een dag die de bron miste, komt daardoor binnen bij de eerste verversing waarin de bron hem wel heeft. Dit was al zo; het is nu vastgelegd in een test. |
+| Onvolledige dag herkennen | Per werkdag in de laatste 28 dagen telt de app het aantal Gemeenteblad-publicaties dat de zoekdienst kent. Een dag in de laatste 14 dagen met minder dan de helft van het gebruikelijke aantal (de mediaan) geldt als onvolledig. |
+| Niet beoordeeld | Weekenden, feestdagen (Nieuwjaar, tweede paasdag, Koningsdag, 5 mei, Hemelvaart, tweede pinksterdag, Kerst) en de lopende dag vóór 10 uur. |
+| Melding in de app | "De gegevens van maandag 16 november zijn onvolledig: de bron gaf 0 van de gebruikelijke circa 2.097 publicaties door." Bij sorteren op datum staat "onvolledig" ook bij de dag. |
+| Storing zonder verversing | Is het gegevensbestand ouder dan 26 uur, dan meldt de app dat er niet ververst is. Faalt de hoofdbron helemaal, dan publiceert de workflow niets en blijft de vorige versie staan. |
+
+Referentie (15:01 uur): Gemeenteblad per werkdag tussen 1.860 en 2.973, mediaan 2.097; 16-11 staat op 0.
+
+Tests: 12 nieuwe (61 in totaal), waaronder een dag met 4 in plaats van ruim 2.000 publicaties, een
+half geleverde dag, weekend en Kerst, en twee opeenvolgende runs waarin de gemiste dag in de tweede
+run binnenkomt en de melding verdwijnt.
+
+Beperking: een nieuwe, onbekende feestdag of een dag waarop gemeenten uit zichzelf weinig
+publiceren kan onterecht als onvolledig worden gemeld. De melding noemt daarom de aantallen.
 
 ## Getest
 

@@ -24,8 +24,5 @@ def uittreksel(xml_text, titel, limiet=600):
 
 
 def haal_op(url, titel, limiet=600):
-    """Download a publication (XML) and return its descriptive part, or None when that fails."""
-    try:
-        return uittreksel(http.get(url, attempts=2, timeout=40).decode("utf-8-sig", "replace"), titel, limiet)
-    except Exception:  # the description is an enrichment; a missing one is handled as 'onzeker'
-        return None
+    """Download a publication (XML) and return its descriptive part. Raises when the download fails."""
+    return uittreksel(http.get(url, timeout=20, attempts=2).decode("utf-8-sig", "replace"), titel, limiet)

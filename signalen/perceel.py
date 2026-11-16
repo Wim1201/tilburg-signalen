@@ -7,13 +7,13 @@ RD_CRS = "http://www.opengis.net/def/crs/EPSG/0/28992"
 
 
 def kadaster_m2(x, y):
-    """Registered size in m² of the cadastral parcel at an RD coordinate, or None."""
-    try:
-        data = http.get_json(PERCELEN, {
-            "f": "json", "limit": 10, "crs": RD_CRS, "bbox-crs": RD_CRS,
-            "bbox": f"{x - 0.5:.2f},{y - 0.5:.2f},{x + 0.5:.2f},{y + 0.5:.2f}"}, attempts=2, timeout=40)
-    except Exception:
-        return None
+    """Registered size in m² of the cadastral parcel at an RD coordinate, or None when there is none.
+
+    Raises when the service cannot be reached, so the caller can tell "no parcel" from "no answer".
+    """
+    data = http.get_json(PERCELEN, {
+        "f": "json", "limit": 10, "crs": RD_CRS, "bbox-crs": RD_CRS,
+        "bbox": f"{x - 0.5:.2f},{y - 0.5:.2f},{x + 0.5:.2f},{y + 0.5:.2f}"}, timeout=20, attempts=2)
     features = data.get("features", [])
     for feature in features:
         if geo.contains((x, y), geo.geojson_parts(feature["geometry"])[1]):

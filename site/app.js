@@ -148,13 +148,28 @@
     figures.appendChild(figure(relevant.filter(isNew).length + unsure.filter(isNew).length, "nieuw sinds vorig bezoek", "is-new"));
     box.appendChild(figures);
 
-    // Warn when the source had nothing for the day of the last refresh (a weekday, after ten o'clock).
-    var refreshed = new Date(state.data.bijgewerkt);
-    var weekday = refreshed.getDay() >= 1 && refreshed.getDay() <= 5;
-    if (weekday && refreshed.getHours() >= 10 && state.latestDay && state.latestDay < isoDay(refreshed)) {
-      box.appendChild(el("p", "stale", "Bij de laatste verversing had de bron nog geen publicaties van die dag doorgegeven. " +
-        "Ze verschijnen vanzelf zodra de zoekdienst van overheid.nl is bijgewerkt."));
+    notices().forEach(function (text) { box.appendChild(el("p", "stale", text)); });
+  }
+
+  /* Messages about gaps in the data: days the source delivered incompletely, and a refresh that is overdue. */
+  function notices() {
+    var lines = [], gaps = state.data.onvolledigeDagen || [];
+    gaps.forEach(function (gap) {
+      lines.push("De gegevens van " + dayFormat.format(parseDay(gap.datum)) + " zijn onvolledig: de bron gaf " + gap.aantal +
+        " van de gebruikelijke circa " + gap.verwacht.toLocaleString("nl-NL") + " publicaties door. " +
+        "De app haalt die dag bij elke volgende verversing opnieuw op.");
+    });
+    var failed = state.data.ophaalfouten || {}, missing = (failed.tekst || 0) + (failed.perceel || 0);
+    if (missing) {
+      lines.push("Bij de laatste verversing konden " + missing + " bekendmakingen niet volledig worden gelezen. " +
+        "Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw.");
     }
+    var hours = (Date.now() - new Date(state.data.bijgewerkt).getTime()) / 3600000;
+    if (hours > 26) {
+      lines.push("De gegevens zijn sinds " + stampFormat.format(new Date(state.data.bijgewerkt)) +
+        " niet ververst. Mogelijk heeft de bron een storing; zodra die voorbij is, worden de gemiste dagen alsnog opgehaald.");
+    }
+    return lines;
   }
 
   function card(item) {
@@ -228,7 +243,8 @@
       if (state.sort === "datum" && item.datum !== lastDay) {
         lastDay = item.datum;
         var head = el("h3", "day", dayLabel(item.datum));
-        head.appendChild(el("span", null, String(perDay[item.datum])));
+        var gap = (state.data.onvolledigeDagen || []).some(function (g) { return g.datum === item.datum; });
+        head.appendChild(el("span", null, perDay[item.datum] + (gap ? " · onvolledig" : "")));
         list.appendChild(head);
       }
       list.appendChild(card(item));
