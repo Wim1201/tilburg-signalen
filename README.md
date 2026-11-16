@@ -1,8 +1,10 @@
 # Tilburg Signalen
 
-Mobiele webapp die elke ochtend laat zien welke ruimtelijke ontwikkelingen er spelen binnen
-15 km van Tilburg-centrum (de Heuvel): nieuwe omgevingsvergunningen en wijzigingen in
-omgevingsplannen en bestemmingsplannen. Bij elk bericht staan de bron en de afstand tot Tilburg.
+Mobiele webapp die elke ochtend laat zien waar binnen 15 km van Tilburg-centrum (de Heuvel)
+ontwikkellocaties ontstaan. De app leest omgevingsvergunningen, wijzigingen in omgevingsplannen en
+bestemmingsplannen, verkoopvoornemens van overheden en faillissementen van bedrijven, houdt alleen
+de ontwikkellocaties over en rangschikt die op relevantie. Bij elk bericht staan de reden, de bron
+en de afstand tot Tilburg.
 
 De app gebruikt alleen openbare gegevens van overheden en heeft geen server of database nodig.
 
@@ -14,6 +16,10 @@ De app gebruikt alleen openbare gegevens van overheden en heeft geen server of d
 | `signalen/update.py` | Haalt de berichten op bij alle bronnen en schrijft `site/data/berichten.json` |
 | `signalen/bekendmakingen.py` | Leest officielebekendmakingen.nl (Gemeenteblad, Provinciaal blad, Waterschapsblad, Staatscourant) |
 | `signalen/vlaanderen.py` | Leest Vlaamse omgevingsvergunningen voor het Belgische deel van de straal |
+| `signalen/relevantie.py` | De regels: wat is een ontwikkellocatie, wat is onzeker, wat valt af, en de zin waarom |
+| `signalen/insolventies.py` | Leest faillissementen van bedrijven uit de Staatscourant (alleen rechtspersonen met een bedrijfspand) |
+| `signalen/perceel.py` | Zoekt perceelgrootte (Kadaster) en gebruiksdoel van een pand (BAG) op |
+| `signalen/tekst.py` | Leest de eerste regels van een bekendmaking als de omschrijving ontbreekt |
 | `signalen/bronnen.json` | De bronnenlijst die de app toont (aangesloten en niet aangesloten) |
 | `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
 | `.github/workflows/dagelijks.yml` | Ververst de gegevens elke ochtend en publiceert de app op GitHub Pages |
@@ -52,7 +58,7 @@ pagina en kies "Zet op beginscherm" om hem als app te installeren.
 
 ## Instellingen aanpassen
 
-In `config.json` staan het middelpunt, de straal (`straal_km`) en de bewaartermijnen
-(`venster_dagen`). Draai na een wijziging van middelpunt of straal eerst `signalen.gebied`.
+In `config.json` staan het middelpunt, de straal (`straal_km`), de bewaartermijnen
+(`venster_dagen`) en de drempel voor de perceelgrootte (`drempel_perceel_m2`). Draai na een wijziging van middelpunt of straal eerst `signalen.gebied`.
 
 Meer achtergrond over de bronnen en de gemaakte keuzes staat in `docs/`.

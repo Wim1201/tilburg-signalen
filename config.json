@@ -1,20 +1,48 @@
 {
   "centrum": {
     "naam": "De Heuvel, Tilburg-centrum",
-    "rd": [134458.696, 396511.411],
+    "rd": [
+      134458.696,
+      396511.411
+    ],
     "lat": 51.55717769,
     "lon": 5.0910001
   },
   "straal_km": 15,
   "venster_dagen": {
     "vergunning": 42,
-    "plan": 180
+    "plan": 180,
+    "faillissement": 28,
+    "verkoop": 120
   },
   "extra_overheden": [
-    {"naam": "Noord-Brabant", "soort": "provincie"},
-    {"naam": "Waterschap De Dommel", "soort": "waterschap"},
-    {"naam": "Waterschap Brabantse Delta", "soort": "waterschap"},
-    {"naam": "Waterschap Aa en Maas", "soort": "waterschap"}
+    {
+      "naam": "Noord-Brabant",
+      "soort": "provincie"
+    },
+    {
+      "naam": "Waterschap De Dommel",
+      "soort": "waterschap"
+    },
+    {
+      "naam": "Waterschap Brabantse Delta",
+      "soort": "waterschap"
+    },
+    {
+      "naam": "Waterschap Aa en Maas",
+      "soort": "waterschap"
+    }
   ],
-  "tijdzone": "Europe/Amsterdam"
+  "tijdzone": "Europe/Amsterdam",
+  "drempel_perceel_m2": 400,
+  "postcode_bereik": [
+    [
+      4840,
+      5299
+    ],
+    [
+      5680,
+      5699
+    ]
+  ]
 }

@@ -4,8 +4,17 @@
     "naam": "Officiële bekendmakingen (overheid.nl)",
     "beheerder": "KOOP, ministerie van Binnenlandse Zaken",
     "aangesloten": true,
-    "levert": "Omgevingsvergunningen (aanvragen, besluiten, verlengingen) en bekendmakingen over omgevingsplannen en bestemmingsplannen uit Gemeenteblad, Provinciaal blad, Waterschapsblad en Staatscourant. Elke bekendmaking heeft een eigen locatie.",
-    "toegang": "Openbare zoekdienst (SRU), geen sleutel nodig",
+    "levert": "Omgevingsvergunningen, bekendmakingen over omgevingsplannen en bestemmingsplannen, en voornemens van overheden om grond of vastgoed te verkopen, uit Gemeenteblad, Provinciaal blad, Waterschapsblad en Staatscourant. Elke bekendmaking heeft een eigen locatie. Waar de omschrijving ontbreekt, leest de app de eerste regels van de bekendmaking zelf.",
+    "toegang": "Openbare zoekdienst (SRU) die de overheid aanbiedt voor geautomatiseerd hergebruik; licentie CC0; geen sleutel nodig",
+    "url": "https://www.officielebekendmakingen.nl/"
+  },
+  {
+    "id": "staatscourant-insolventies",
+    "naam": "Faillissementen in de Staatscourant",
+    "beheerder": "Rechtbanken, gepubliceerd via KOOP (overheid.nl)",
+    "aangesloten": true,
+    "levert": "Nieuw uitgesproken faillissementen en surseances van bedrijven met een bedrijfspand binnen de straal. Alleen rechtspersonen (bv, nv, stichting, coöperatie, vereniging); particulieren, eenmanszaken, vof's en bedrijven op een woonadres worden overgeslagen. Namen van curatoren worden niet bewaard.",
+    "toegang": "Zelfde openbare zoekdienst als de vergunningen. De overheid haalt de leesbare tekst na ongeveer een maand weg; de app bewaart deze berichten daarom 28 dagen.",
     "url": "https://www.officielebekendmakingen.nl/"
   },
   {
@@ -16,6 +25,15 @@
     "levert": "Vlaamse omgevingsvergunningen voor het Belgische deel van de straal (gemeente Ravels). Namen van aanvragers worden niet opgehaald.",
     "toegang": "Openbare kaartdienst (WFS), geen sleutel nodig",
     "url": "https://omgevingsloketinzage.omgeving.vlaanderen.be/"
+  },
+  {
+    "id": "kadaster-percelen",
+    "naam": "Kadastrale kaart en BAG (via PDOK)",
+    "beheerder": "Kadaster",
+    "aangesloten": true,
+    "levert": "De geregistreerde grootte van het perceel op de locatie van een bericht, en het gebruiksdoel van een pand (woning of bedrijfspand). Geen eigenaren of andere persoonsgegevens.",
+    "toegang": "Openbare diensten, geen sleutel nodig",
+    "url": "https://www.pdok.nl/"
   },
   {
     "id": "pdok",
@@ -52,5 +70,32 @@
     "levert": "Bestemmingsplannen van vóór de Omgevingswet en plannen die nog onder het overgangsrecht lopen.",
     "toegang": "De open koppelingen voor afnemers zijn per 1 juli 2024 beëindigd; de opvolger vraagt een sleutel. Niet aangesloten; nieuwe besluiten over deze plannen komen wel binnen via het Gemeenteblad.",
     "url": "https://www.ruimtelijkeplannen.nl/"
+  },
+  {
+    "id": "cir",
+    "naam": "Centraal Insolventieregister (Rechtspraak)",
+    "beheerder": "Raad voor de rechtspraak",
+    "aangesloten": false,
+    "levert": "Dezelfde faillissementen, met verslagen van curatoren.",
+    "toegang": "De website staat zoekresultaten en detailpagina's niet toe aan geautomatiseerde bezoekers (robots.txt). De webservice is gratis, maar vraagt een abonnement met een ondertekende overeenkomst. Niet aangesloten; de uitspraken zelf komen binnen via de Staatscourant.",
+    "url": "https://insolventies.rechtspraak.nl/"
+  },
+  {
+    "id": "vastgoedsites",
+    "naam": "Commerciële vastgoedsites (Funda in Business e.a.)",
+    "beheerder": "Particuliere bedrijven",
+    "aangesloten": false,
+    "levert": "Bedrijfspanden die te koop of te huur staan.",
+    "toegang": "Geen open data. Funda weert geautomatiseerde bezoekers actief (ook de gebruiksvoorwaarden waren daardoor niet te lezen), Bedrijfspand.com sluit zijn zoekpagina's uit in robots.txt. Niet aangesloten en niet gescrapet.",
+    "url": "https://www.fundainbusiness.nl/"
+  },
+  {
+    "id": "leegstand",
+    "naam": "Leegstand van bedrijfspanden",
+    "beheerder": "Gemeenten, CBS, Kadaster",
+    "aangesloten": false,
+    "levert": "Welke panden leeg staan.",
+    "toegang": "Er bestaat geen openbaar register per pand. Het CBS publiceert alleen cijfers per gebied, gemeentelijke leegstandslijsten zijn niet openbaar, en de BAG-status 'buiten gebruik' komt binnen de straal maar bij vier objecten voor, vrijwel alleen woningen. Niet aangesloten.",
+    "url": "https://www.cbs.nl/"
   }
 ]

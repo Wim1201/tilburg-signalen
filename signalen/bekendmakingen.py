@@ -132,12 +132,28 @@ def _street_matches(found, wanted):
     return bool(found) and (wanted == found or wanted.endswith(" " + found))
 
 
-def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, reverse=reverse_gemeente):
-    """Turn one SRU record into an app item, or None when it falls outside the radius."""
-    rubric = next((c.text for c in _children(record, "type") if c.text in RUBRICS), None)
-    if rubric is None:
-        return None
-    kind = RUBRICS[rubric]
+def parcel_area(record):
+    """Total area in m² of the cadastral parcels named in a record, or None."""
+    total = 0.0
+    for marker in _children(record, "Perceel"):
+        wkt = _text(marker, "geometrie")
+        if wkt:
+            kind, parts = geo.parse_wkt(wkt)
+            if kind == "polygon":
+                total += geo.area(parts)
+    return round(total) or None
+
+
+def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, reverse=reverse_gemeente, kind=None):
+    """Turn one SRU record into an app item, or None when it falls outside the radius.
+
+    `kind` forces the item type (used for sale notices, which have no rubric of their own).
+    """
+    if kind is None:
+        rubric = next((c.text for c in _children(record, "type") if c.text in RUBRICS), None)
+        if rubric is None:
+            return None
+        kind = RUBRICS[rubric]
     title = _text(record, "title") or ""
     creator = _text(record, "creator") or ""
     gemeente = _text(record, "ligtInGemeente") or _text(record, "gemeentenaam")
@@ -179,8 +195,8 @@ def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, re
         "publicatie": _text(record, "publicatienaam") or "Officiële bekendmaking",
         "overheid": creator,
         "type": kind,
-        "fase": classify.permit_phase(title) if kind == "vergunning" else classify.plan_phase(title),
-        "soort": None if kind == "vergunning" else classify.plan_kind(title),
+        "fase": {"vergunning": classify.permit_phase, "plan": classify.plan_phase}.get(kind, lambda _: "Voornemen tot verkoop")(title),
+        "soort": classify.plan_kind(title) if kind == "plan" else None,
         "titel": title,
         "omschrijving": _text(record, "abstract"),
         "activiteiten": activities,
@@ -196,7 +212,42 @@ def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, re
         "url": _text(record, "preferredUrl"),
         # Plain-text copy in the open data repository; a fallback when the main site is down.
         "urlTekst": next((c.text for c in _children(record, "itemUrl") if c.get("manifestation") == "html"), None),
+        # Internal fields (leading underscore): used for enrichment, removed before the data is published.
+        "_rd": location if location_kind == "exact" else None,
+        "_perceelM2": parcel_area(record),
+        "_urlXml": next((c.text for c in _children(record, "itemUrl") if c.get("manifestation") == "xml"), None),
     }
+
+
+_SALE_WORDS = "verkoop verkopen grondverkoop gronduitgifte uitgifte vervreemding verkoopvoornemen Didam"
+_SALE = re.compile(r"voornemen|voorgenomen|didam|verkoop van|verkoop bouwkavel|grondverkoop|gronduitgifte|uitgifte van")
+_NOT_SALE = re.compile(r"standplaats|oliebollen|vergunning|ontheffing|collecte|loterij|vuurwerk|alcohol|kermis|"
+                       r"\bmarkt\b|verhuur|verhuren|overeenkomst van verkoop")
+
+
+def is_sale_notice(title):
+    """True for a notice in which a government announces it intends to sell land or property."""
+    lowered = title.lower()
+    return bool(_SALE.search(lowered)) and not _NOT_SALE.search(lowered) and bool(re.search(r"verko|uitgifte|vervreemd|didam", lowered))
+
+
+def fetch_sales(config, area, since):
+    """Intended sales of public land and property ('Didam' notices) inside the radius."""
+    centre_rd = tuple(config["centrum"]["rd"])
+    radius_m = config["straal_km"] * 1000
+    area_by_name = {g["naam"]: g for g in area["gemeenten"] if g["land"] == "NL"}
+    creators = sorted(area_by_name) + [o["naam"] for o in config["extra_overheden"]]
+    query = ("c.product-area==officielepublicaties AND dt.date>=" + since
+             + " AND (" + " OR ".join(f'dt.creator=="{name}"' for name in creators) + ")"
+             + f' AND dt.title any "{_SALE_WORDS}"')
+    items = {}
+    for record in search(query):
+        if not is_sale_notice(_text(record, "title") or ""):
+            continue
+        item = to_item(record, centre_rd, radius_m, area_by_name, kind="verkoop")
+        if item and item["id"]:
+            items[item["id"]] = item
+    return list(items.values())
 
 
 def fetch(config, area, since_by_kind):

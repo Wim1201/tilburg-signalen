@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tilburg Signalen</title>
 <meta name="description" content="Nieuwe omgevingsvergunningen en planwijzigingen binnen 15 km van Tilburg-centrum.">
+<meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0b5f47">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -30,11 +31,11 @@
   <section id="view-berichten" class="view" aria-labelledby="tab-berichten">
     <div class="summary" id="summary"></div>
 
-    <div class="segmented" role="group" aria-label="Soort bericht">
-      <button type="button" id="type-alles" data-type="alles" aria-pressed="true">Alles <span></span></button>
-      <button type="button" id="type-vergunning" data-type="vergunning" aria-pressed="false">Vergunningen <span></span></button>
-      <button type="button" id="type-plan" data-type="plan" aria-pressed="false">Plannen <span></span></button>
+    <div class="segmented" role="group" aria-label="Welke berichten">
+      <button type="button" id="klasse-ontwikkellocatie" data-klasse="ontwikkellocatie" aria-pressed="true">Ontwikkellocaties <span></span></button>
+      <button type="button" id="klasse-onzeker" data-klasse="onzeker" aria-pressed="false">Onzeker <span></span></button>
     </div>
+    <label class="switch" for="toon-weg"><input type="checkbox" id="toon-weg" role="switch"> <span>Toon ook wat is weggefilterd <b id="weg-aantal"></b></span></label>
 
     <div class="toolbar">
       <input type="search" id="zoek" placeholder="Zoek op straat, plaats of trefwoord" aria-label="Zoeken in berichten" autocomplete="off">
@@ -42,14 +43,24 @@
     </div>
 
     <form id="filters" class="filters" hidden>
+      <label for="f-sort">Volgorde
+        <select id="f-sort">
+          <option value="relevantie">Meest relevant eerst</option>
+          <option value="datum">Nieuwste eerst</option>
+          <option value="afstand">Dichtstbij eerst</option>
+        </select>
+      </label>
+      <label for="f-type">Soort bericht
+        <select id="f-type"><option value="">Alle soorten</option></select>
+      </label>
       <label for="f-gemeente">Gemeente
         <select id="f-gemeente"><option value="">Alle gemeenten</option></select>
       </label>
+      <label for="f-signaal">Signaal
+        <select id="f-signaal"><option value="">Elk signaal</option></select>
+      </label>
       <label for="f-fase">Stand
         <select id="f-fase"><option value="">Elke stand</option></select>
-      </label>
-      <label for="f-activiteit">Activiteit
-        <select id="f-activiteit"><option value="">Elke activiteit</option></select>
       </label>
       <label for="f-dagen">Periode
         <select id="f-dagen">
@@ -57,12 +68,6 @@
           <option value="1">Laatste publicatiedag</option>
           <option value="7">Laatste 7 dagen</option>
           <option value="14">Laatste 14 dagen</option>
-        </select>
-      </label>
-      <label for="f-sort">Volgorde
-        <select id="f-sort">
-          <option value="datum">Nieuwste eerst</option>
-          <option value="afstand">Dichtstbij eerst</option>
         </select>
       </label>
       <label for="f-km" class="range">Afstand tot Tilburg-centrum: <output id="f-km-out" for="f-km">15 km</output>
@@ -81,8 +86,8 @@
     <h2>Het gebied</h2>
     <p class="lede" id="gebied-intro"></p>
     <figure class="radar">
-      <svg id="radar" viewBox="-18.5 -18.5 37 37" role="img" aria-label="Kaartje met de berichten van de laatste 14 dagen rond Tilburg-centrum"></svg>
-      <figcaption>Berichten van de laatste 14 dagen. <span class="dot dot-vergunning"></span> vergunning <span class="dot dot-plan"></span> plan. Noord is boven.</figcaption>
+      <svg id="radar" viewBox="-18.5 -18.5 37 37" role="img" aria-label="Kaartje met de ontwikkellocaties rond Tilburg-centrum"></svg>
+      <figcaption><span class="dot dot-locatie"></span> ontwikkellocatie <span class="dot dot-onzeker"></span> onzeker. Noord is boven.</figcaption>
     </figure>
     <h3>Gemeenten binnen de straal</h3>
     <p class="hint">Afstand van Tilburg-centrum tot het dichtste en het verste punt van de gemeente. Tik op een gemeente om haar berichten te zien.</p>
@@ -92,6 +97,8 @@
   <section id="view-bronnen" class="view" hidden aria-labelledby="tab-bronnen">
     <h2>Bronnen</h2>
     <p class="lede">De app gebruikt alleen openbare gegevens van overheden. Bij elk bericht staat uit welke bron het komt, met een link naar het origineel.</p>
+    <h3>Wat telt als ontwikkellocatie</h3>
+    <ul class="notes" id="regels"></ul>
     <h3>Aangesloten</h3>
     <div id="bronnen-aan" class="bronnen"></div>
     <h3>Bestaat wel, niet aangesloten</h3>
