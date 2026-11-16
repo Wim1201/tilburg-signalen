@@ -1,0 +1,587 @@
+{
+ "bijgewerkt": "2026-11-16T09:02:55+00:00",
+ "centrum": {
+  "naam": "De Heuvel, Tilburg-centrum",
+  "rd": [
+   134458.696,
+   396511.411
+  ],
+  "lat": 51.55717769,
+  "lon": 5.0910001
+ },
+ "straalKm": 15,
+ "gemeenten": [
+  {
+   "naam": "Tilburg",
+   "code": "GM0855",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.585544,
+   "lon": 5.079464,
+   "minKm": 0.0,
+   "maxKm": 11.6,
+   "dekking": "geheel",
+   "woonplaatsen": [
+    {
+     "naam": "Tilburg",
+     "lat": 51.573617,
+     "lon": 5.041723,
+     "minKm": 0.0,
+     "maxKm": 11.6,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Berkel-Enschot",
+     "lat": 51.570204,
+     "lon": 5.143767,
+     "minKm": 2.2,
+     "maxKm": 7.0,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Udenhout",
+     "lat": 51.616386,
+     "lon": 5.138827,
+     "minKm": 4.9,
+     "maxKm": 10.0,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Biezenmortel",
+     "lat": 51.619663,
+     "lon": 5.177833,
+     "minKm": 7.6,
+     "maxKm": 11.5,
+     "dekking": "geheel"
+    }
+   ]
+  },
+  {
+   "naam": "Hilvarenbeek",
+   "code": "GM0798",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.487093,
+   "lon": 5.150001,
+   "minKm": 2.3,
+   "maxKm": 15.7,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Hilvarenbeek",
+     "lat": 51.507711,
+     "lon": 5.102982,
+     "minKm": 2.3,
+     "maxKm": 10.5,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Biest-Houtakker",
+     "lat": 51.507998,
+     "lon": 5.155617,
+     "minKm": 5.4,
+     "maxKm": 9.0,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Haghorst",
+     "lat": 51.501335,
+     "lon": 5.214367,
+     "minKm": 8.2,
+     "maxKm": 12.6,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Diessen",
+     "lat": 51.46406,
+     "lon": 5.189218,
+     "minKm": 8.6,
+     "maxKm": 15.7,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Esbeek",
+     "lat": 51.454367,
+     "lon": 5.135191,
+     "minKm": 8.6,
+     "maxKm": 15.7,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Goirle",
+   "code": "GM0785",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.505704,
+   "lon": 5.036807,
+   "minKm": 2.4,
+   "maxKm": 11.0,
+   "dekking": "geheel",
+   "woonplaatsen": [
+    {
+     "naam": "Goirle",
+     "lat": 51.505185,
+     "lon": 5.0549,
+     "minKm": 2.4,
+     "maxKm": 11.0,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Riel",
+     "lat": 51.510118,
+     "lon": 4.998013,
+     "minKm": 5.0,
+     "maxKm": 10.9,
+     "dekking": "geheel"
+    }
+   ]
+  },
+  {
+   "naam": "Oisterwijk",
+   "code": "GM0824",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.566148,
+   "lon": 5.204417,
+   "minKm": 3.2,
+   "maxKm": 14.1,
+   "dekking": "geheel",
+   "woonplaatsen": [
+    {
+     "naam": "Heukelom",
+     "lat": 51.566346,
+     "lon": 5.155226,
+     "minKm": 3.2,
+     "maxKm": 6.4,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Moergestel",
+     "lat": 51.533176,
+     "lon": 5.182485,
+     "minKm": 3.5,
+     "maxKm": 10.5,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Oisterwijk",
+     "lat": 51.563757,
+     "lon": 5.215998,
+     "minKm": 4.5,
+     "maxKm": 13.0,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Haaren",
+     "lat": 51.605244,
+     "lon": 5.232797,
+     "minKm": 8.1,
+     "maxKm": 14.1,
+     "dekking": "geheel"
+    }
+   ]
+  },
+  {
+   "naam": "Loon op Zand",
+   "code": "GM0809",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.641149,
+   "lon": 5.046745,
+   "minKm": 5.5,
+   "maxKm": 14.9,
+   "dekking": "geheel",
+   "woonplaatsen": [
+    {
+     "naam": "Loon op Zand",
+     "lat": 51.629426,
+     "lon": 5.064452,
+     "minKm": 5.5,
+     "maxKm": 10.7,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "De Moer",
+     "lat": 51.624429,
+     "lon": 5.019211,
+     "minKm": 6.5,
+     "maxKm": 11.5,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Kaatsheuvel",
+     "lat": 51.658797,
+     "lon": 5.045719,
+     "minKm": 9.6,
+     "maxKm": 14.9,
+     "dekking": "geheel"
+    }
+   ]
+  },
+  {
+   "naam": "Gilze en Rijen",
+   "code": "GM0784",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.563147,
+   "lon": 4.904034,
+   "minKm": 7.9,
+   "maxKm": 18.4,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Gilze",
+     "lat": 51.536304,
+     "lon": 4.904319,
+     "minKm": 7.9,
+     "maxKm": 18.4,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Hulten",
+     "lat": 51.579375,
+     "lon": 4.959008,
+     "minKm": 8.6,
+     "maxKm": 10.5,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Rijen",
+     "lat": 51.587152,
+     "lon": 4.928855,
+     "minKm": 9.7,
+     "maxKm": 14.4,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Molenschot",
+     "lat": 51.564824,
+     "lon": 4.882459,
+     "minKm": 12.4,
+     "maxKm": 16.6,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Dongen",
+   "code": "GM0766",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.64294,
+   "lon": 4.954142,
+   "minKm": 8.2,
+   "maxKm": 17.4,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Dongen",
+     "lat": 51.630707,
+     "lon": 4.954259,
+     "minKm": 8.2,
+     "maxKm": 15.1,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "'s Gravenmoer",
+     "lat": 51.664032,
+     "lon": 4.941724,
+     "minKm": 14.0,
+     "maxKm": 17.4,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Alphen-Chaam",
+   "code": "GM1723",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.506946,
+   "lon": 4.881768,
+   "minKm": 8.5,
+   "maxKm": 24.3,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Alphen",
+     "lat": 51.491323,
+     "lon": 4.951772,
+     "minKm": 8.5,
+     "maxKm": 16.4,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Chaam",
+     "lat": 51.507652,
+     "lon": 4.866135,
+     "minKm": 13.5,
+     "maxKm": 20.0,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Ravels",
+   "code": "NIS13035",
+   "land": "BE",
+   "provincie": "Antwerpen (Vlaanderen)",
+   "lat": 51.419553,
+   "lon": 5.014056,
+   "minKm": 8.7,
+   "maxKm": 23.9,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": []
+  },
+  {
+   "naam": "Heusden",
+   "code": "GM0797",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.689283,
+   "lon": 5.166816,
+   "minKm": 8.8,
+   "maxKm": 22.0,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Drunen",
+     "lat": 51.666948,
+     "lon": 5.13895,
+     "minKm": 8.8,
+     "maxKm": 16.6,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Vlijmen",
+     "lat": 51.691606,
+     "lon": 5.213207,
+     "minKm": 13.7,
+     "maxKm": 20.3,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Nieuwkuijk",
+     "lat": 51.691775,
+     "lon": 5.179281,
+     "minKm": 14.6,
+     "maxKm": 17.7,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Oirschot",
+   "code": "GM0823",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.489,
+   "lon": 5.290983,
+   "minKm": 10.3,
+   "maxKm": 22.9,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Oirschot",
+     "lat": 51.507573,
+     "lon": 5.307832,
+     "minKm": 10.3,
+     "maxKm": 22.9,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Oost West en Middelbeers",
+     "lat": 51.471166,
+     "lon": 5.262788,
+     "minKm": 10.3,
+     "maxKm": 19.9,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Vught",
+   "code": "GM0865",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.651276,
+   "lon": 5.237823,
+   "minKm": 10.3,
+   "maxKm": 20.2,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Helvoirt",
+     "lat": 51.642712,
+     "lon": 5.210781,
+     "minKm": 10.3,
+     "maxKm": 14.8,
+     "dekking": "geheel"
+    },
+    {
+     "naam": "Vught",
+     "lat": 51.648645,
+     "lon": 5.278717,
+     "minKm": 13.7,
+     "maxKm": 20.2,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Cromvoirt",
+     "lat": 51.670257,
+     "lon": 5.229604,
+     "minKm": 14.1,
+     "maxKm": 18.2,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Boxtel",
+   "code": "GM0757",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.589058,
+   "lon": 5.325683,
+   "minKm": 11.0,
+   "maxKm": 21.8,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Boxtel",
+     "lat": 51.590311,
+     "lon": 5.316181,
+     "minKm": 11.0,
+     "maxKm": 21.0,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Esch",
+     "lat": 51.618032,
+     "lon": 5.29237,
+     "minKm": 13.7,
+     "maxKm": 17.5,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Waalwijk",
+   "code": "GM0867",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.687514,
+   "lon": 5.014969,
+   "minKm": 11.8,
+   "maxKm": 21.7,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Sprang-Capelle",
+     "lat": 51.687569,
+     "lon": 5.012642,
+     "minKm": 11.8,
+     "maxKm": 20.1,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Waalwijk",
+     "lat": 51.695231,
+     "lon": 5.069671,
+     "minKm": 12.7,
+     "maxKm": 18.4,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Waspik",
+     "lat": 51.687284,
+     "lon": 4.948536,
+     "minKm": 13.3,
+     "maxKm": 21.7,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Baarle-Nassau",
+   "code": "GM0744",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.43734,
+   "lon": 4.888816,
+   "minKm": 12.3,
+   "maxKm": 27.3,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Baarle-Nassau",
+     "lat": 51.436808,
+     "lon": 4.907462,
+     "minKm": 12.3,
+     "maxKm": 25.1,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Oosterhout",
+   "code": "GM0826",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.632241,
+   "lon": 4.85808,
+   "minKm": 12.9,
+   "maxKm": 24.5,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Dorst",
+     "lat": 51.601352,
+     "lon": 4.87634,
+     "minKm": 12.9,
+     "maxKm": 18.4,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Oosteind",
+     "lat": 51.650627,
+     "lon": 4.907295,
+     "minKm": 14.6,
+     "maxKm": 19.5,
+     "dekking": "gedeeltelijk"
+    },
+    {
+     "naam": "Oosterhout",
+     "lat": 51.64426,
+     "lon": 4.846379,
+     "minKm": 14.7,
+     "maxKm": 22.8,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  },
+  {
+   "naam": "Reusel-De Mierden",
+   "code": "GM1667",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.371201,
+   "lon": 5.137928,
+   "minKm": 14.3,
+   "maxKm": 27.9,
+   "dekking": "gedeeltelijk",
+   "woonplaatsen": [
+    {
+     "naam": "Lage Mierde",
+     "lat": 51.409413,
+     "lon": 5.144923,
+     "minKm": 14.3,
+     "maxKm": 19.5,
+     "dekking": "gedeeltelijk"
+    }
+   ]
+  }
+ ]
+}
