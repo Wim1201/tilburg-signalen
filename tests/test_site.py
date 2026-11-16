@@ -574,9 +574,24 @@ class InDeBrowser(unittest.TestCase):
         limit = str(json.loads(read("data", "berichten.json"))["drempelPerceelM2"])
         self.assertEqual(self.seen["rules"], [rule.replace("400", limit) for rule in Pagina.RULES])
 
+    def test_top_of_the_app_shows_the_moment_of_the_last_refresh(self):
+        import datetime
+        import zoneinfo
+        stamp = datetime.datetime.fromisoformat(json.loads(read("data", "berichten.json"))["bijgewerkt"]).astimezone(zoneinfo.ZoneInfo("Europe/Amsterdam"))
+        shown = self.seen["updated"]
+        self.assertTrue(shown.startswith("Bijgewerkt "), shown)
+        self.assertIn(" %d " % stamp.day, shown)
+        self.assertTrue(shown.endswith(stamp.strftime("%H:%M")), shown)
+
+    def test_a_skipped_refresh_shows_as_an_old_time_and_a_warning(self):
+        self.assertIn(" %d " % self.seen["staleDay"], self.seen["updatedStale"])
+        stale = [line for line in self.seen["notices"] if "niet ververst" in line]
+        self.assertEqual(len(stale), 1)
+        self.assertTrue(stale[0].startswith("De gegevens zijn sinds "), stale[0])
+
     def test_gaps_in_the_data_are_reported(self):
         notices = " ".join(self.seen["notices"])
-        self.assertEqual(len(self.seen["notices"]), 4)
+        self.assertEqual(len(self.seen["notices"]), 5)
         for part in ("zijn onvolledig: de bron gaf 4 van de gebruikelijke circa 2.097", "was bij de laatste verversing niet bereikbaar",
                      "konden 3 bekendmakingen niet volledig worden gelezen", "konden 3 rechtbankpublicaties"):
             self.assertIn(part, notices)

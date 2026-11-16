@@ -62,6 +62,7 @@ var SEEN = "tilburg-signalen.gezien";
   result.brief = await page.textContent("#brief-title");
   for (var name of ["ranglijst", "nieuw", "onzeker"]) result.tiles[name] = await page.textContent("#tile-" + name + " b");
   result.overflow = await overflow(page);
+  result.updated = await page.textContent("#updated");
   result.tileShapes = await tiles(page);
   result.badgeFirst = await badge(page);
   result.mark = await page.$$eval(".masthead svg.mark path", function (paths) { return paths.length; });
@@ -185,7 +186,10 @@ var SEEN = "tilburg-signalen.gezien";
     data.onvolledigeDagen = [{ datum: latest, aantal: 4, verwacht: 2097 }];
     data.bronnen[0].status = "fout";
     data.ophaalfouten = { tekst: 2, perceel: 1, insolventie: 3 };
+    data.bijgewerkt = new Date(Date.now() - 30 * 3600 * 1000).toISOString(); // a refresh was skipped
   });
+  result.updatedStale = await page.textContent("#updated");
+  result.staleDay = await page.evaluate(function () { return new Date(Date.now() - 30 * 3600 * 1000).getDate(); });
   result.notices = await page.$$eval("#notices .stale", function (nodes) { return nodes.map(function (node) { return node.textContent; }); });
   await page.click("#filter-toggle");
   await page.selectOption("#f-sort", "datum");

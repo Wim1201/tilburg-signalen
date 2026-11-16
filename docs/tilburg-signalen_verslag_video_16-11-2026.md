@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 16-11-2026, 20:00 – 20:55 uur |
+| Datum | 16-11-2026, 20:00 – 21:10 uur |
 | Versie | versie 2 van de app, branch `claude/awesome-brown-i18j4o` |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | `site/data/berichten.json` zoals het in de repo staat (bijgewerkt 16-11-2026, 15:37 uur); vergeleken met de nieuwste run op de live app (17:38 uur) |
@@ -11,8 +11,9 @@
 
 ## Stand
 
-De video staat in `docs/video/tilburg-signalen_ochtendronde.mp4`: 70 seconden, 1920 × 1080, 5,2 MB,
-met Nederlandse stem en drie zachte geluidjes. Een stilstaand beeld staat ernaast als `.jpg`.
+De video is gemaakt: 70 seconden, 1920 × 1080, 5,2 MB (5.167.073 bytes), met Nederlandse stem en drie
+zachte geluidjes. **Hij staat niet in de repo** (zie de correctie hieronder); hij is via de sessie
+aan Wim geleverd. Opnieuw maken kan met `tools/video/` en kost geen credits.
 
 **Ik heb de video niet kunnen beluisteren.** Beeld, lengte, pauzes, volume en de gelijkloop van
 beeld en stem zijn gemeten. Uitspraak en klank zijn niet beoordeeld; dat moet Wim doen.
@@ -21,6 +22,10 @@ beeld en stem zijn gemeten. Uitspraak en klank zijn niet beoordeeld; dat moet Wi
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 21:00 uur | **De film is uit de repository gehaald; "De video staat in `docs/video/`" in de versie van 20:52 uur van dit verslag geldt niet meer.** Ik had de film (5,2 MB) en een stilstaand beeld (0,1 MB) in git gezet en gepusht zonder de grootte te noemen of te vragen of dat de bedoeling was. Wim wees erop dat zo'n bestand in een openbare repo voorgoed in de geschiedenis blijft. Zie "Film uit de repository". |
+| 16-11-2026, 21:00 uur | **De geschiedenis van de branch is herschreven.** De commit `4626889` (20:51 uur) is vervangen door `7523af7`, met dezelfde inhoud zonder de film en het stilstaande beeld. Wie `4626889` al had opgehaald, moet de branch opnieuw ophalen. Er was geen pull request en niets is samengevoegd met `main`. |
+| 16-11-2026, 21:00 uur | **Aanvulling op wat ik over "Bijgewerkt ma 16 nov, 15:37" schreef.** Dat is het tijdstip van de laatste geslaagde verversing van het gegevensbestand dat de film gebruikte, niet van de laatste wijziging van de berichten. Het bestand in de repo is een momentopname van 15:37 uur; de live app stond op dat moment op 17:38 uur. Zie "Wat Bijgewerkt betekent". |
+| 16-11-2026, 21:00 uur | **Het inkorten van twee geluidjes had ik moeten voorleggen.** Het akkoord gold voor het voorstel zoals het er lag (signaal 1,5 s, veeg 0,8 s). Ik heb ze ingekort om onder de 920 credits te blijven en dat pas achteraf gemeld. |
 | 16-11-2026, 20:52 uur | **Correctie op de tussenstand van dit verslag (commits `a04749b` en `54d570b`, 20:12 en 20:13 uur): de tabel "Voorstel dat op akkoord wacht" is vervangen door "Raming en werkelijk verbruik".** De tekst is op verzoek van Wim op twee plaatsen gewijzigd, twee geluidjes zijn korter gemaakt en de geluidjes kostten een derde van wat ik had berekend. |
 | 16-11-2026, 20:52 uur | **Mijn verdeling van de raming over de geluidjes (11 credits per seconde) klopte niet.** Dat getal had ik zelf afgeleid uit de raming van ElevenLabs voor de drie samen. Afgerekend is ongeveer 3,3 credits per seconde. De raming voor de stem klopte wel. |
 | 16-11-2026, 20:11 uur | **De tegel Onzeker toont nieuwe berichten niet meer als "Onzeker · 1 nieuw" maar als een bolletje "+1".** De tekst brak af over twee regels, waardoor die tegel er anders uitzag dan de andere twee. Gevonden in de proefopname. Dit wijzigt wat in het vorige verslag over die tegel staat. |
@@ -136,7 +141,7 @@ koppeling): beeldmerk, illustratie, en de voormalige proefwerkstroom met nu vier
 
 | | |
 |---|---|
-| Bestand | `docs/video/tilburg-signalen_ochtendronde.mp4` (H.264 en AAC, 30 beelden per seconde) |
+| Bestand | `tilburg-signalen_ochtendronde.mp4` (H.264 en AAC, 30 beelden per seconde); niet in de repo, geleverd via de sessie. Wie hem opnieuw maakt, krijgt hem in `tools/video/uit/`, een map die git overslaat |
 | Lengte | 70,0 seconden |
 | Beeld | 1920 × 1080: links de scène en de gesproken tekst, rechts de app in een telefoon van 390 × 844 |
 | Cursor | Een oranje rondje dat beweegt naar wat getoond wordt; bij een tik krimpt het en loopt er een ring uit |
@@ -179,7 +184,7 @@ node tools/video/opname.js --timing tools/video/timing.json --uit stil.mp4 --geb
 ```
 
 ```bash
-python3 tools/video/geluid.py mix --film stil.mp4 --stem tools/video/geluid/stem.mp3 --gebeurtenissen gebeurtenissen.json --timing tools/video/timing.json --tik tools/video/geluid/tik.mp3 --signaal tools/video/geluid/signaal.mp3 --veeg tools/video/geluid/veeg.mp3 --uit docs/video/tilburg-signalen_ochtendronde.mp4
+python3 tools/video/geluid.py mix --film stil.mp4 --stem tools/video/geluid/stem.mp3 --gebeurtenissen gebeurtenissen.json --timing tools/video/timing.json --tik tools/video/geluid/tik.mp3 --signaal tools/video/geluid/signaal.mp3 --veeg tools/video/geluid/veeg.mp3 --uit tools/video/uit/tilburg-signalen_ochtendronde.mp4
 ```
 
 Dat kost geen credits: de stem en de geluidjes staan in `tools/video/geluid/`. Nodig: Node,
@@ -195,6 +200,61 @@ nodig.
 | `tools/video/geluid.py` | Zoekt de pauzes in de stem, bepaalt daaruit de lengte van de scènes en mengt stem en geluidjes onder de film |
 | `tools/video/timing.json` | De gemeten lengte van elke scène voor deze opname van de stem |
 | `tools/video/geluid/` | De stem en de drie geluidjes van ElevenLabs, ongewijzigd |
+
+## Film uit de repository (21:00 uur)
+
+| Vraag | Antwoord |
+|---|---|
+| Hoe groot is de film? | 5.167.073 bytes (5,2 MB) |
+| Stond hij in git? | Ja: sinds commit `4626889` (20:51 uur) op de branch `claude/awesome-brown-i18j4o`, gepusht naar GitHub. Niet in `main`. Het stilstaande beeld (110.830 bytes) ook |
+| Wat is gedaan? | De commit is herschreven zonder beide bestanden en de branch op GitHub is daardoor vervangen (`7523af7`). Een gewone verwijdering in een nieuwe commit had de film in de geschiedenis gelaten |
+| Staat hij nu nog ergens in de branch? | Nee: geen enkel bestand in de geschiedenis van de branch heet nog zo (gecontroleerd op de stand van GitHub na het pushen) |
+
+| Meting | Vóór de film (`54d570b`) | Met de film (`4626889`) | Na het verwijderen (`7523af7`) |
+|---|---|---|---|
+| Bestanden | 54 | 61 | 59 |
+| Werkmap (alle bestanden samen) | 1,84 MB | 8,27 MB | 3,00 MB |
+| Geschiedenis van de branch (gecomprimeerd, wat een kloon ophaalt) | 0,59 MB | 6,73 MB | 1,71 MB |
+| Ter vergelijking: `main` | 37 bestanden, 1,57 MB, 0,33 MB | | |
+
+De 1,1 MB die er ten opzichte van vóór de film bij blijft, zijn de bron van de film: de stem
+(1.048.692 bytes) en de drie geluidjes (86.197 bytes) van ElevenLabs, plus het gereedschap. Die
+geluidsbestanden zijn bewust gehouden: zonder ze kost opnieuw maken ongeveer 900 credits. Ze
+blijven net als de film voorgoed in de geschiedenis zodra de branch wordt samengevoegd; wil Wim dat
+niet, dan moeten ze er vóór het samenvoegen uit.
+
+**Wat ik niet kan afdwingen:** GitHub bewaart een vervangen commit nog enige tijd. Wie de oude hash
+`4626889` kent, kan de film daar mogelijk nog opvragen tot GitHub opruimt. De film bevat niets
+vertrouwelijks: de app met openbare gegevens.
+
+Om herhaling te voorkomen: `.gitignore` slaat `tools/video/uit/` en filmbestanden over, en een test
+faalt als er een film, een bestand uit die map of een bestand groter dan 1,5 MB in git staat.
+
+## Wat Bijgewerkt betekent (21:00 uur)
+
+| Vraag | Antwoord |
+|---|---|
+| Wat toont "Bijgewerkt" bovenaan de app? | Het tijdstip waarop de laatste **geslaagde verversing** begon. Niet het tijdstip waarop de berichten voor het laatst veranderden |
+| Waar komt het vandaan? | `signalen/update.py` schrijft bij elke run het moment van die run in het veld `bijgewerkt`, ook als er niets nieuws is gevonden |
+| Wat als een run mislukt of wordt overgeslagen? | Dan wordt het bestand niet geschreven en blijft het oude tijdstip staan. Na 26 uur toont de app bovendien de melding "De gegevens zijn sinds … niet ververst" |
+| Waarom stond er in de film 15:37 uur terwijl de laatste run van 17:38 uur was? | De film gebruikte `site/data/berichten.json` uit de repo. Dat bestand is een momentopname: de runs op GitHub maken het opnieuw en zetten het op de live app, maar schrijven het niet terug in de repo. De live app toonde 17:38 uur |
+
+Er hoefde dus niets aan het gedrag te veranderen; het was al het tijdstip van de laatste
+verversing. Code van de app en van het ophalen is niet gewijzigd. Wel toegevoegd: tests die dit
+vastleggen, zodat het niet ongemerkt kan verschuiven.
+
+| Test | Wat hij vastlegt |
+|---|---|
+| Tijdstip is het moment van de run | Een run om 06:45:12 uur geeft `2026-11-17T06:45:12+01:00` |
+| Niets nieuws verzet het tijdstip toch | Twee runs met dezelfde berichten, maandag 17:38 uur en dinsdag 06:45 uur: gelijke berichten, verschillend tijdstip |
+| Volgt niet de datum van het nieuwste bericht | Nieuwste bericht van 1 oktober, run op 17 november: het tijdstip is 17 november |
+| Geslaagde run schrijft zijn eigen moment, in Nederlandse tijd | Het geschreven bestand, met nagebootste bronnen |
+| Mislukte run laat het oude tijdstip staan | Hoofdbron onbereikbaar: het bestand blijft onaangeroerd |
+| De app toont dat tijdstip | In de browser: "Bijgewerkt" met dag en tijd uit het bestand |
+| Overgeslagen verversing is zichtbaar | Bestand van 30 uur oud: oud tijdstip bovenaan én de melding "niet ververst" |
+
+Wat een test niet kan vastleggen: of GitHub de geplande run van 06:45 uur werkelijk start. Dat is
+te zien bij Actions, en aan het tijdstip bovenaan de live app.
 
 ## Gevonden tijdens het opnemen
 
@@ -231,7 +291,7 @@ in de app. De twee punten in de app (1 en 2) zijn opmaak.
 | Grootte | Film 5,2 MB; stem 1,0 MB; geluidjes samen 86 kB |
 | Tikken / scrollbewegingen | 5 / 3 |
 | Opnemen | 2.101 beelden, enkele minuten rekentijd (niet precies gemeten) |
-| Unittests | 167, alle geslaagd (was 139) |
+| Unittests | 175, alle geslaagd (was 139; 167 om 20:51 uur, daarna 8 erbij voor Bijgewerkt en de bewaker tegen films in git) |
 
 ## Getest
 
@@ -258,12 +318,12 @@ zonder ffmpeg worden de vijf tests die het nodig hebben overgeslagen. Dat is nie
 | Of alle woorden gezegd zijn | Niet gecontroleerd met spraakherkenning; dat had extra credits gekost. De lengte van elk stuk past bij de tekst. |
 | Het tempo | De stem laat veel pauzes van ongeveer een seconde vallen. Als dat te traag is, kan de tweede en laatste generatie met dezelfde stem daarvoor gebruikt worden (ongeveer 897 credits), of kan de stem sneller worden gezet. Niet gedaan. |
 | Afspelen | De film is niet in een speler afgespeeld; de opbouw is gecontroleerd met ffprobe. |
-| De workflow op GitHub | Niet uitgevoerd met deze wijziging. De film en de geluidsbestanden staan in `docs/` en `tools/`, niet in `site/`, en gaan dus niet mee naar de live app. |
+| De workflow op GitHub | Niet uitgevoerd met deze wijziging. De geluidsbestanden staan in `tools/`, niet in `site/`, en gaan dus niet mee naar de live app. |
 
 ## Buiten dit verslag
 
 - **Pushnotificatie.** Verstuurd toen de video klaar was en gepusht.
-- **Samenvoegen met `main` is niet gedaan.** De branch is gepusht; er is geen pull request.
+- **Samenvoegen met `main` is niet gedaan en er is geen pull request.** Wim beoordeelt eerst de film.
 - **ElevenLabs opruimen** kan alleen Wim zelf, in de app (zie "Opruimen").
 - **Stem uit de bibliotheek.** "Daan" is een stem uit de openbare bibliotheek van ElevenLabs. De teller van stemplekken staat na afloop nog op 0 van 30. Onder welke voorwaarden zo'n stem in eigen materiaal gebruikt mag worden heb ik niet uitgezocht.
 - **Geen subsessie** deze ronde: het werk hing aan één stem en één opname en liet zich niet verdelen.
