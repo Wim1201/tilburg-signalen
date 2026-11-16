@@ -13,6 +13,10 @@
 
 | Tijdstip | Wat |
 |---|---|
+| 16-11-2026, 17:25 uur | **De cache is samengevoegd en op GitHub gemeten; de kop "Cache (… werkbranch, nog niet samengevoegd)" en de zin "Op GitHub is dit nog niet gemeten" zijn achterhaald.** PR #5 is samengevoegd met `main`. Run 5 schreef de eerste cache zelf (1.056 verzoeken), run 6 gebruikte hem (98 verzoeken). Zie "Cache op GitHub: run 5 en run 6". |
+| 16-11-2026, 17:25 uur | **De 209 bij "insolventie" in de tabel "Wat er in de cache staat" is een lokaal getal.** Op GitHub stonden er na run 5 maar 157 en na run 6 206, omdat een deel van de rechtbankpublicaties niet werd gelezen zonder dat dat werd geteld. Zie "Twee gebreken gevonden in run 5". |
+| 16-11-2026, 17:25 uur | **"Cache op GitHub controleren" onder "Nog te doen" is gedaan voor het terugzetten van de cache en het aantal verzoeken.** De handmatige en de wekelijkse volledige verversing zijn nog niet op GitHub uitgevoerd. |
+| 16-11-2026, 17:25 uur | **Claude Code kan geen run starten.** GitHub weigert dat voor de toegang van deze sessie (403 bij handmatig starten en bij opnieuw draaien). De geplande run van 16:10 uur is niet gestart; Wim heeft run 6 om 17:21 uur handmatig gestart. |
 | 16-11-2026, 15:40 uur | **"Elke verversing haalt het hele venster opnieuw op en onthoudt niets" (onder "Onvolledige dagen en inhalen") geldt niet meer letterlijk.** De lijst met publicaties wordt nog steeds elke run volledig opgevraagd, dus gemiste dagen komen nog steeds vanzelf binnen. Maar de tekst, perceelgrootte en adreslocatie per publicatie komen nu uit een cache; alleen nieuwe publicaties worden opgehaald. Zie "Cache". |
 | 16-11-2026, 15:40 uur | PR #4 (dit verslag tot en met "Run na PR #3") is samengevoegd met `main`. De storing bij de bron is voorbij: om 15:35 uur meldde de dagcontrole 16-11 niet meer als onvolledig. |
 | 16-11-2026, 15:20 uur | **Oorzaak van de mislukte verzoeken op GitHub vastgesteld; "oorzaak niet vastgesteld" en het vermoeden onder "Na de eerste run op GitHub" zijn daarmee vervangen door een waarneming.** De bron antwoordde met HTTP 429 (te veel verzoeken). In de run na PR #3 zijn alle 11 geweigerde verzoeken bij opnieuw proberen alsnog gelukt. Zie "Run na PR #3". |
@@ -342,6 +346,108 @@ curator in het bestand; een mislukte adrescontrole wordt niet bewaard als "geen 
 |---|---|
 | **Actions-versies (Node) bijwerken** | GitHub waarschuwt in het log dat `actions/checkout@v4`, `actions/setup-python@v5`, `actions/configure-pages@v5` en `actions/upload-pages-artifact@v3` (met daarin `upload-artifact@v4`) op Node.js 20 zijn gebouwd en gedwongen op Node.js 24 draaien. Het werkt nu, maar de versienummers in `.github/workflows/dagelijks.yml` moeten omhoog naar uitgaven die Node.js 24 ondersteunen. Nog niet gedaan. |
 | Cache op GitHub controleren | Na samenvoegen: slaagt het terugzetten van de cache, hoeveel verzoeken doet een gewone run, en werkt de handmatige volledige verversing. |
+
+## Cache op GitHub: run 5 en run 6 (toegevoegd 16-11-2026, 17:25 uur)
+
+### Wat er is samengevoegd (PR #5)
+
+| Punt | Uitwerking |
+|---|---|
+| Cachebestand niet meegeleverd | `cache/ophaalcache.json` was lokaal aangemaakt en is vóór het samenvoegen uit de branch gehaald. De eerste cache is door de workflow zelf geschreven. |
+| Eén run tegelijk | `concurrency` met groep `dagelijkse-verversing` en `cancel-in-progress: false`. Een geplande, handmatige of merge-run wacht tot de lopende run klaar is. GitHub houdt per groep één wachtende run vast; komt er nog een bij, dan vervalt de oudste wachtende. |
+| Actuele stand ophalen | De checkout neemt de laatste stand van de branch en niet de commit waarmee de run is aangevraagd. Een run die heeft gewacht krijgt zo de cache van de run vóór hem. |
+| Alleen vanaf `main` | De stap die de cache terugzet draait alleen op `main`. |
+| Manier van samenvoegen | Squash, zodat de commit waarin het lokale cachebestand stond niet in de geschiedenis van `main` komt. |
+
+### Meting
+
+| | Run 5 | Run 6 | Lokaal, met de cache van `main` na run 6 |
+|---|---|---|---|
+| Tijdstip | 15:42 uur | 17:21 uur | 17:24 uur |
+| Aanleiding | samenvoegen van PR #5 | handmatig gestart door Wim | controle door Claude Code |
+| Cache bij de start | geen | die van run 5 | die van run 6 |
+| Verzoeken totaal | 1.056 | 98 | 34 |
+| waarvan repository.overheid.nl | 940 | 94 | niet uitgesplitst |
+| waarvan PDOK | 112 | 2 | niet uitgesplitst |
+| waarvan Vlaanderen | 4 (mislukt) | 2 | niet uitgesplitst |
+| Teksten: uit cache / opgehaald | 0 / 495 | 495 / 0 | 495 / 0 |
+| Perceelgroottes: uit cache / opgehaald | 0 / 40 | 40 / 0 | 40 / 0 |
+| Rechtbankpublicaties: uit cache / gelezen | 0 / 157 | 157 / 49 | 206 / 3 |
+| Geweigerde verzoeken (HTTP 429) bij teksten | 43, alle 43 hersteld | 0 | 0 |
+| Teksten of perceelgroottes die ontbreken | 0 | 0 | 0 |
+| Duur stap "Berichten ophalen" | 7 minuten 56 | 58 seconden | 30 seconden |
+| Duur hele run | 8 minuten 30 | 2 minuten 0 | n.v.t. |
+| Cache teruggezet in `main` | ja, commit `9e76b01` | ja, commit `3b28c5e` (49 regels erbij) | n.v.t. (niets vastgelegd) |
+| Berichten | 1.107 | 1.116 | 1.116 |
+| Ontwikkellocatie / onzeker / weggefilterd | 78 / 23 / 1.006 | 81 / 23 / 1.012 | niet vergeleken |
+
+Feiten:
+
+- Het terugzetten van de cache is in beide runs geslaagd. De commit is van `github-actions[bot]` en
+  heet "Cache bijgewerkt [skip ci]".
+- Run 6 heeft geen enkele tekst, perceelgrootte of adreslocatie opnieuw opgehaald. De cache wordt
+  dus gebruikt.
+- Run 6 deed 98 verzoeken en niet rond de dertig. De 49 rechtbankpublicaties die run 5 niet had
+  gelezen, zijn in run 6 alsnog gelezen. Daarna bleven er 3 ongelezen; die las de lokale run.
+- Met de cache van `main` zoals die nu is, doet een run 34 verzoeken (lokaal gemeten).
+- Het verschil van 9 berichten tussen run 5 en run 6 zijn de 9 Vlaamse berichten. De Vlaamse bron
+  was in run 5 onbereikbaar en in run 6 niet.
+
+Vermoedens:
+
+- Een derde run op GitHub komt rond de 34 verzoeken uit. Dat is lokaal gemeten, niet op GitHub.
+- Van de 94 verzoeken aan repository.overheid.nl in run 6 zijn er ongeveer 30 voor de lijsten en de
+  dagtelling en 49 voor rechtbankpublicaties. De overige circa 15 zijn waarschijnlijk herhaalde
+  pogingen na een weigering. `main` telt dat voor rechtbankpublicaties nog niet.
+- Run 5 duurde lang door het wachten na de 43 weigeringen en door de 52 rechtbankpublicaties die
+  na vier pogingen werden opgegeven. De wachttijd zelf staat niet in het log.
+
+Niet vastgesteld: waarom de geplande run van 16:10 uur niet is gestart. Tot 17:25 uur is er geen
+enkele geplande run geweest; alle zes de runs zijn gestart door samenvoegen of met de hand. Bekend
+is dat GitHub geplande runs bij drukte later start of overslaat.
+
+### Twee gebreken gevonden in run 5
+
+| Gebrek | Gevolg in run 5 | Stand |
+|---|---|---|
+| Uitval van een bron stond alleen op het tabblad Bronnen | De Vlaamse bron gaf een naamfout op de GitHub-machine ("Temporary failure in name resolution", vier pogingen). 9 Vlaamse berichten ontbraken zonder melding bij de berichten. | Hersteld op de werkbranch: de app meldt een onbereikbare bron boven de berichten en het log krijgt een waarschuwing. In run 6 was de bron weer bereikbaar. |
+| Niet gelezen rechtbankpublicaties werden niet geteld | 52 van de 209 publicaties zijn niet gelezen; in run 6 nog 3. Ze kwamen niet in de cache, dus een volgende run leest ze alsnog. Er was geen melding. | Hersteld op de werkbranch: zelfde manier van opnieuw proberen als bij teksten, telling in de gegevens, waarschuwing in het log en melding in de app. |
+
+De herstelcode staat op de werkbranch (commit `ab0318f`, 80 tests geslaagd) en is niet samengevoegd
+met `main`. De live app heeft deze meldingen dus nog niet.
+
+### Waarom de cache in `main` staat, en de alternatieven
+
+Wim vroeg de cache in het repository te bewaren. Binnen het repository is gekozen voor `main`.
+
+| Mogelijkheid | Voor | Tegen |
+|---|---|---|
+| **Commit in `main` (gekozen)** | Eén plek. De inhoud is in te zien en elke wijziging is na te gaan. Verloopt niet. Een lokale run gebruikt dezelfde cache. Geen extra stappen in de workflow. | Per run waarin de cache verandert een commit van de robot in de geschiedenis van `main` (vier geplande runs per werkdag, dus meestal een tot vier commits per dag). De teksten staan blijvend in de geschiedenis van een openbaar repository. De workflow heeft schrijfrecht op `main` nodig. Een werkbranch loopt na elke run achter op `main`. |
+| Aparte branch alleen voor de cache | De geschiedenis van `main` blijft schoon. De branch kan telkens worden overschreven, zodat oude teksten niet blijven staan. | Twee checkouts in de workflow. Een lokale run heeft de cache niet vanzelf. Nog steeds openbaar. |
+| Tijdelijke opslag van GitHub Actions (`actions/cache`) | Staat niet in het repository en niet in de geschiedenis. | Niet in te zien. Vervalt na 7 dagen zonder gebruik en kan door GitHub worden opgeruimd. Een bewaarde cache kan niet worden overschreven, dus elke run heeft een nieuwe sleutel nodig. Lokaal niet beschikbaar. Voldoet niet aan "in het repository". |
+| Artifact van de vorige run | Staat niet in de geschiedenis. | De run moet het artifact van een eerdere run opzoeken en downloaden; bewaartermijn hoogstens 90 dagen. Breekbaar als een run mislukt. |
+| De vorige publicatie op Pages teruglezen | Geen schrijfrecht nodig. | De cache moet dan openbaar op de site staan. Na een mislukte publicatie is de keten gebroken. |
+| Geen cache | Eenvoudigst. | 1.056 verzoeken en ruim 8 minuten per run, met weigeringen door de bron (run 5). |
+
+Advies van Claude Code: laten staan in `main`. Storen de commits van de robot in de geschiedenis,
+dan is de aparte branch de kleinste stap; die houdt de cache in het repository.
+
+Twee dingen om te weten bij de gekozen opzet:
+
+- De commit van de robot start zelf geen nieuwe run ("[skip ci]", en GitHub start geen runs op
+  commits van de eigen workflow).
+- Het cachebestand is van de workflow. Een pull request moet het niet wijzigen, anders botst hij
+  met de commit van de robot. De werkbranch raakt het bestand niet aan.
+
+### Nog te doen (stand 17:25 uur)
+
+| Punt | Toelichting |
+|---|---|
+| Herstel van de twee gebreken samenvoegen | Staat op de werkbranch, samen met deze aanvulling op het verslag. Er is nog geen pull request; Wim beslist. |
+| Derde run op GitHub | Om de circa 34 verzoeken op GitHub zelf te zien. Start vanzelf bij de volgende geplande of handmatige run. |
+| Geplande runs volgen | Nagaan of de run van morgenochtend (08:40 of 09:40 uur) vanzelf start. |
+| Volledige verversing op GitHub | Handmatig (vinkje "Volledige verversing") en wekelijks (zondag) zijn nog niet uitgevoerd. |
+| **Actions-versies (Node) bijwerken** | Ongewijzigd open; de waarschuwing stond ook in het log van run 6. Zie "Nog te doen" onder "Cache". |
 
 ## Onvolledige dagen en inhalen (toegevoegd 16-11-2026, 15:00 uur)
 
