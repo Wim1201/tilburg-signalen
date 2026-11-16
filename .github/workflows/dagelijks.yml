@@ -1,14 +1,25 @@
 name: Dagelijkse verversing
 
-# Haalt elke ochtend de berichten op en zet de app op GitHub Pages.
-# Gemeenten publiceren op werkdagen rond 09:00 uur; tijden hieronder zijn in UTC.
+# Haalt de berichten op en zet de app op GitHub Pages.
+# De bron publiceert het Gemeenteblad op werkdagen tussen 09:00 en 09:21 uur (gemeten op 12, 13 en
+# 16-11-2026). De tijden hieronder zijn Nederlandse tijd (timezone Europe/Amsterdam), zomer en winter
+# gelijk. Zonder timezone rekent GitHub in UTC. GitHub kan een geplande run later starten of bij
+# drukte overslaan; daarom staan er meer runs dan strikt nodig. Een run met cache kost ongeveer
+# 35 verzoeken en anderhalve minuut.
 on:
   schedule:
-    - cron: "40 7 * * 1-5"   # 09:40 zomertijd (08:40 wintertijd)
-    - cron: "40 8 * * 1-5"   # 09:40 wintertijd (10:40 zomertijd)
-    - cron: "10 11 * * *"    # vangnet rond het middaguur, ook in het weekend
-    - cron: "10 15 * * 1-5"  # tweede vangnet voor publicaties die later op de dag verschijnen
-    - cron: "30 3 * * 0"     # wekelijkse volledige verversing (zondagnacht): cache negeren, alles opnieuw
+    - cron: "45 6 * * 1-5"    # 06:45 uur: alles tot en met gisteren staat klaar bij het opstaan
+      timezone: "Europe/Amsterdam"
+    - cron: "35 9 * * 1-5"    # 09:35 uur: de publicaties van vandaag
+      timezone: "Europe/Amsterdam"
+    - cron: "20 10 * * 1-5"   # 10:20 uur: vangnet voor de ochtend; vanaf 10 uur telt ook de dagcontrole
+      timezone: "Europe/Amsterdam"
+    - cron: "10 12 * * *"     # 12:10 uur: vangnet, ook in het weekend
+      timezone: "Europe/Amsterdam"
+    - cron: "10 16 * * 1-5"   # 16:10 uur: publicaties die later op de dag verschijnen
+      timezone: "Europe/Amsterdam"
+    - cron: "30 4 * * 0"      # zondag 04:30 uur: wekelijkse volledige verversing, cache negeren
+      timezone: "Europe/Amsterdam"
   push:
     branches: [main]
   workflow_dispatch:
@@ -51,7 +62,14 @@ jobs:
         # Gewone run: alleen nieuwe publicaties ophalen, de rest komt uit cache/ophaalcache.json.
         # Wekelijks en op verzoek: alles opnieuw, zodat wijzigingen en intrekkingen binnenkomen.
         run: |
-          if [ "${{ github.event.schedule }}" = "30 3 * * 0" ] || [ "${{ inputs.volledig }}" = "true" ]; then
+          # De wekelijkse run is de enige geplande run op zondag vóór 9 uur (de andere is 12:10 uur).
+          # Op de klok herkend en niet op de cron-regel, zodat een wijziging van het schema dit niet breekt.
+          dag_uur="$(TZ=Europe/Amsterdam date +%u-%H)"
+          wekelijks=false
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${dag_uur%-*}" = "7" ] && [ "${dag_uur#*-}" -lt 9 ]; then
+            wekelijks=true
+          fi
+          if [ "$wekelijks" = "true" ] || [ "${{ inputs.volledig }}" = "true" ]; then
             python -m signalen.update --volledig
           else
             python -m signalen.update

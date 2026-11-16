@@ -24,7 +24,7 @@ De app gebruikt alleen openbare gegevens van overheden en heeft geen server of d
 | `signalen/tekst.py` | Leest de eerste regels van een bekendmaking als de omschrijving ontbreekt |
 | `signalen/bronnen.json` | De bronnenlijst die de app toont (aangesloten en niet aangesloten) |
 | `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
-| `.github/workflows/dagelijks.yml` | Ververst de gegevens elke ochtend en publiceert de app op GitHub Pages |
+| `.github/workflows/dagelijks.yml` | Ververst de gegevens op vaste tijden (werkdagen 06:45, 09:35, 10:20, 12:10 en 16:10 uur Nederlandse tijd) en publiceert de app op GitHub Pages |
 | `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
 
 ## Zelf draaien
