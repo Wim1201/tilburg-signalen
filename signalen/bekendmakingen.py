@@ -94,13 +94,10 @@ def geocode_title(title, gemeente):
     candidates = [(f"{street} {number}", "adres", street) for street, number in _ADDRESS.findall(title)]
     candidates += [(street, "weg", street) for street in _STREET.findall(title)]
     for text, kind, street in candidates:
-        try:
-            result = http.get_json(LOCATIESERVER, {
-                "q": text, "fq": [f"type:{kind}", f'gemeentenaam:"{gemeente}"'], "rows": 1,
-                "fl": "straatnaam,woonplaatsnaam,centroide_rd",
-            }, attempts=2)
-        except Exception:  # geocoding is a nice-to-have; never let it break the run
-            return None
+        result = http.get_json(LOCATIESERVER, {
+            "q": text, "fq": [f"type:{kind}", f'gemeentenaam:"{gemeente}"'], "rows": 1,
+            "fl": "straatnaam,woonplaatsnaam,centroide_rd",
+        }, attempts=2)
         docs = result.get("response", {}).get("docs", [])
         if docs and _street_matches(docs[0].get("straatnaam", ""), street):
             x, y = re.findall(r"-?\d+(?:\.\d+)?", docs[0]["centroide_rd"])
@@ -111,12 +108,9 @@ def geocode_title(title, gemeente):
 
 
 def reverse_gemeente(x, y):
-    """Name of the Dutch municipality at an RD coordinate, or None."""
-    try:
-        result = http.get_json(LOCATIESERVER.replace("/free", "/reverse"), {
-            "X": round(x), "Y": round(y), "type": "gemeente", "distance": 0, "fl": "gemeentenaam"}, attempts=2)
-    except Exception:
-        return None
+    """Name of the Dutch municipality at an RD coordinate, or None. Raises when the service fails."""
+    result = http.get_json(LOCATIESERVER.replace("/free", "/reverse"), {
+        "X": round(x), "Y": round(y), "type": "gemeente", "distance": 0, "fl": "gemeentenaam"}, attempts=2)
     docs = result.get("response", {}).get("docs", [])
     return docs[0].get("gemeentenaam") if docs else None
 
@@ -142,6 +136,35 @@ def parcel_area(record):
             if kind == "polygon":
                 total += geo.area(parts)
     return round(total) or None
+
+
+def _optional(lookup, *args):
+    """Call a lookup that only refines the location; a failure means 'unknown', never a broken run."""
+    try:
+        return lookup(*args)
+    except Exception:
+        return None
+
+
+def lookups(cache=None):
+    """The geocoder and reverse geocoder, answering from the cache where they can.
+
+    A failed lookup raises inside and is therefore not cached; the next run asks again.
+    """
+    if not cache:
+        return geocode_title, reverse_gemeente
+
+    def geocode(title, gemeente):
+        key = f"{gemeente}|{title}"
+        found, value = cache.haal("locatie", key)
+        if found:
+            return (value[0], (value[1], value[2])) if value else None
+        hit = geocode_title(title, gemeente)
+        cache.zet("locatie", key, [hit[0], hit[1][0], hit[1][1]] if hit else None)
+        return hit
+
+    reverse = cache.omwikkel("gemeente", reverse_gemeente, lambda x, y: f"{round(x)},{round(y)}")
+    return geocode, reverse
 
 
 def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, reverse=reverse_gemeente, kind=None):
@@ -172,9 +195,9 @@ def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, re
         if place is None and label and label.startswith("Perceel"):
             place = label
         if gemeente is None and reverse:
-            gemeente = reverse(*location)
+            gemeente = _optional(reverse, *location)
     elif gemeente in area_by_name:
-        hit = geocode(title, gemeente) if geocode else None
+        hit = _optional(geocode, title, gemeente) if geocode else None
         if hit:
             place, location = hit
             metres = geo.distance(centre_rd, "point", [[location]])
@@ -231,7 +254,7 @@ def is_sale_notice(title):
     return bool(_SALE.search(lowered)) and not _NOT_SALE.search(lowered) and bool(re.search(r"verko|uitgifte|vervreemd|didam", lowered))
 
 
-def fetch_sales(config, area, since):
+def fetch_sales(config, area, since, cache=None):
     """Intended sales of public land and property ('Didam' notices) inside the radius."""
     centre_rd = tuple(config["centrum"]["rd"])
     radius_m = config["straal_km"] * 1000
@@ -244,13 +267,13 @@ def fetch_sales(config, area, since):
     for record in search(query):
         if not is_sale_notice(_text(record, "title") or ""):
             continue
-        item = to_item(record, centre_rd, radius_m, area_by_name, kind="verkoop")
+        item = to_item(record, centre_rd, radius_m, area_by_name, *lookups(cache), kind="verkoop")
         if item and item["id"]:
             items[item["id"]] = item
     return list(items.values())
 
 
-def fetch(config, area, since_by_kind):
+def fetch(config, area, since_by_kind, cache=None):
     """Fetch all notices within the radius. Returns a list of items (newest first is done by the caller)."""
     centre_rd = tuple(config["centrum"]["rd"])
     radius_m = config["straal_km"] * 1000
@@ -266,7 +289,7 @@ def fetch(config, area, since_by_kind):
         ]
         for query in queries:
             for record in search(query):
-                item = to_item(record, centre_rd, radius_m, area_by_name)
+                item = to_item(record, centre_rd, radius_m, area_by_name, *lookups(cache))
                 if item and item["id"]:
                     items[item["id"]] = item
     return list(items.values())
