@@ -147,6 +147,14 @@
     figures.appendChild(figure(unsure.length, "onzeker", "is-plan"));
     figures.appendChild(figure(relevant.filter(isNew).length + unsure.filter(isNew).length, "nieuw sinds vorig bezoek", "is-new"));
     box.appendChild(figures);
+
+    // Warn when the source had nothing for the day of the last refresh (a weekday, after ten o'clock).
+    var refreshed = new Date(state.data.bijgewerkt);
+    var weekday = refreshed.getDay() >= 1 && refreshed.getDay() <= 5;
+    if (weekday && refreshed.getHours() >= 10 && state.latestDay && state.latestDay < isoDay(refreshed)) {
+      box.appendChild(el("p", "stale", "Bij de laatste verversing had de bron nog geen publicaties van die dag doorgegeven. " +
+        "Ze verschijnen vanzelf zodra de zoekdienst van overheid.nl is bijgewerkt."));
+    }
   }
 
   function card(item) {

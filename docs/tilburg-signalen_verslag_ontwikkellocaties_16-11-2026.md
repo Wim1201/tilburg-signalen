@@ -15,6 +15,8 @@
 |---|---|
 | 16-11-2026, ca. 12:35 uur | Het vorige verslag noemt de livegang als open punt. Dat is achterhaald: PR #1 is samengevoegd, Wim heeft GitHub Pages aangezet en `https://wim1201.github.io/tilburg-signalen/` geeft de app. Die draait nog op de eerste versie tot deze branch is samengevoegd. |
 | 16-11-2026, ca. 13:00 uur | Het vorige verslag noemt de hoofdbron en PDOK "openbaar, geen sleutel" zonder de robots.txt te noemen. Aanvulling: `repository.overheid.nl/robots.txt` bevat `Disallow: /` en `api.pdok.nl/robots.txt` sluit de Locatieserver uit. Dat zijn aanwijzingen voor zoekmachines. De app gebruikt de gedocumenteerde koppelingen die de beheerders juist voor geautomatiseerd gebruik aanbieden (zie "Wat mag"). Het punt staat hier zodat Wim het zelf kan wegen. |
+| 16-11-2026, 14:50 uur | **Oorzaak ontbrekende publicaties van 16-11 gevonden; de regel hieronder ("oorzaak niet vastgesteld") is daarmee achterhaald.** De vertraging ligt bij de bron, niet bij de app. Zie "Onderzoek: publicaties van 16-11". |
+| 16-11-2026, 14:50 uur | **Telregel voor woningen gewijzigd op verzoek van Wim.** Alleen getallen die direct voor een woord op "woning(en)" of "appartement(en)" staan tellen, en ze worden opgeteld. De beperking "aantal woningen is het grootste genoemde getal" verderop geldt niet meer. De referentiewaarden van 14:27 uur zijn vervangen door die van 14:50 uur in "Referentiewaarden na de wijziging"; de oude tabel is blijven staan. |
 | 16-11-2026, 14:27 uur | Het vorige verslag vermoedde een vertraging bij de bron voor de publicaties van 16-11. Om 14:27 uur stond er landelijk nog steeds niets van 16-11 in de zoekdienst. De oorzaak is niet vastgesteld. De laatste publicatiedag in de gegevens is vrijdag 13-11. |
 
 ## Wat er is veranderd
@@ -119,6 +121,53 @@ berichten krijgen dan "geen exacte locatie".
 | Duur van een verversing | ongeveer 85 seconden (was 40) |
 | Grootte gegevensbestand | 991 kB |
 | Unittests | 44, alle geslaagd |
+
+## Referentiewaarden na de wijziging van de telregel (run van 16-11-2026, 14:50 uur)
+
+| Meting | 14:27 uur | 14:50 uur |
+|---|---|---|
+| Ontwikkellocatie / onzeker / weggefilterd | 87 / 15 / 975 | 79 / 22 / 976 |
+| Ontwikkellocaties: vergunningen / plannen / verkoop | 56 / 28 / 3 | 48 / 28 / 3 |
+| Vergunningen met 2 of meer woningen | 32 | 23 |
+| Unittests | 44 | 49 |
+
+Acht berichten gingen van "ontwikkellocatie" naar "onzeker", omdat het getal niet direct voor het
+woord staat of omdat het woord geen woning of appartement is. Voorbeelden: "zeven aaneen gebouwde
+woningen", "23 sociale huurappartementen", "6 wooneenheden", "71 wooneenheden". Eén bericht ging van
+"onzeker" naar "weggefilterd". Het voorbeeld "19 grondgebonden woningen … in totaal 98
+appartementen" telt als 98, omdat "19" niet direct voor "woningen" staat; "19 woningen en 98
+appartementen" telt als 117.
+
+Twee aanvullingen die niet letterlijk gevraagd zijn, maar zonder welke het optellen fout gaat:
+
+| Aanvulling | Waarom |
+|---|---|
+| Dezelfde vermelding telt één keer | Titel en tekst van een bekendmaking herhalen elkaar. Zonder dit werd "een woning" 2 en "98 appartementen" 196. Deze fout zat kort in de code en is door de voor-en-na-vergelijking gevonden, vóór het samenvoegen. |
+| Gesloopte woningen tellen niet mee | "Sloop van 2 woningen en nieuwbouw van 14 woningen" telt als 14. |
+
+Een huisnummer telt niet: staat het getal direct na een straatnaam ("Hoofdstraat 120 woningen"),
+dan wordt het overgeslagen.
+
+## Onderzoek: publicaties van 16-11
+
+| Waarneming | Tijdstip | Uitkomst |
+|---|---|---|
+| Startpagina officielebekendmakingen.nl | 14:47 uur | "In totaal 2565 publicaties op maandag 16 november 2026": Gemeenteblad 2153, Staatscourant 160, Waterschapsblad 141, Provinciaal blad 103 |
+| Melding op diezelfde pagina | 14:47 uur | "Mogelijk ervaart u problemen met het zoeken naar publicaties. We begrijpen dat dit hinder veroorzaakt en werken aan een oplossing." |
+| Zoekpagina van overheid.nl voor 16-11 en 13-11 | 14:47 uur | Foutcode 503 |
+| Zoekdienst (SRU) die de app gebruikt, publicatiedatum 16-11 | 14:48 uur | 4 publicaties (Kamerstukken en één Provinciaal blad, binnengekomen na 14:20 uur); geen Gemeenteblad of Staatscourant |
+| Zoekdienst, publicatiedatum 13-11 | 14:47 uur | 2692 publicaties; de Staatscourant-publicaties kwamen die dag binnen tussen 09:08 en 09:31 uur |
+| Vijf Staatscourant-publicaties van 16-11 rechtstreeks in de repository opgevraagd | 14:48 uur | Alle vijf aanwezig, met datum 16-11 |
+| Dezelfde publicaties in de zoekdienst | 14:48 uur | Niet bekend |
+
+Conclusie: overheid.nl heeft de publicaties van 16-11 gewoon geplaatst, maar de zoekindex is niet
+bijgewerkt. De zoekpagina van overheid.nl zelf en de zoekdienst van de app hebben hetzelfde
+probleem. De vertraging ligt dus bij de bron. De app haalt bij elke verversing het hele venster
+opnieuw op, dus de berichten van 16-11 komen vanzelf binnen zodra de index is bijgewerkt; er gaat
+niets verloren.
+
+Toegevoegd naar aanleiding hiervan: de app toont een melding als de bron bij de laatste verversing
+(werkdag, na 10 uur) nog niets van die dag had.
 
 ## Getest
 

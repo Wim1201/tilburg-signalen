@@ -14,13 +14,47 @@ def oordeel(soort, titel, tekst_="", perceel=None, fase="Aanvraag", activiteiten
 
 
 class WoningenTest(unittest.TestCase):
-    def test_counts(self):
+    def test_counts_only_numbers_directly_before_the_noun(self):
         self.assertEqual(relevantie.count_dwellings("het bouwen van 12 appartementen"), 12)
-        self.assertEqual(relevantie.count_dwellings("bouwen van zeven aaneen gebouwde woningen"), 7)
-        self.assertEqual(relevantie.count_dwellings("sloop van 2 woningen en nieuwbouw van 14 levensloopbestendige woningen"), 14)
+        self.assertEqual(relevantie.count_dwellings("realiseren van 6 huurwoningen"), 6)
+        self.assertEqual(relevantie.count_dwellings("bouwen van twee woningen"), 2)
+        self.assertIsNone(relevantie.count_dwellings("bouwen van zeven aaneen gebouwde woningen"))
         self.assertIsNone(relevantie.count_dwellings("het bouwen van 3 dakkapellen op woningen"))
         self.assertIsNone(relevantie.count_dwellings("het kappen van 12 bomen bij de woningen"))
         self.assertIsNone(relevantie.count_dwellings("uitbreiden van de woning over 2 bouwlagen"))
+        self.assertIsNone(relevantie.count_dwellings("2 appartementengebouwen"))
+
+    def test_counts_are_added_up(self):
+        self.assertEqual(relevantie.count_dwellings("19 woningen en 98 appartementen"), 117)
+        self.assertEqual(relevantie.count_dwellings("bouw van 3 woningen en 22 appartementen"), 25)
+        klasse, _, waarom = oordeel("vergunning", "Aanvraag vergunning voor het bouwen van 19 woningen en 98 appartementen")
+        self.assertEqual((klasse, waarom), (O, "117 nieuwe woningen."))
+
+    def test_repeated_mentions_count_once(self):
+        # Title and body of a notice say the same thing twice.
+        self.assertEqual(relevantie.count_dwellings("bouwen van een woning. verleend: het bouwen van een woning"), 1)
+        self.assertEqual(relevantie.count_dwellings("19 woningen en 98 appartementen; in totaal 98 appartementen en 19 woningen"), 117)
+        facts = relevantie.kenmerken("vergunning", "Toestemming voor het bouwen van een woning", "het bouwen van een woning (verzonden 11-11)")
+        self.assertEqual(facts["woningen"], 1)
+
+    def test_rebuilding_an_existing_dwelling_is_not_new_construction(self):
+        for text in ["het verbouwen van een woning en het bouwen van een bijgebouw", "het uitbreiden en verbouwen van 2 woningen"]:
+            facts = relevantie.kenmerken("vergunning", text, "")
+            self.assertIsNone(facts["woningen"], text)
+        self.assertEqual(relevantie.kenmerken("vergunning", "het verbouwen van een kantoor tot 8 appartementen", "")["woningen"], 8)
+
+    def test_house_number_is_not_a_count(self):
+        self.assertIsNone(relevantie.count_dwellings("het bouwen van een bedrijfshal aan de hoofdstraat 120"))
+        self.assertIsNone(relevantie.count_dwellings("hoofdstraat 120 woningen bouwen"))
+        self.assertEqual(relevantie.count_dwellings("hoofdstraat 120, het bouwen van 4 woningen"), 4)
+        self.assertEqual(relevantie.count_dwellings("bredaseweg 90 bouwen 12 appartementen"), 12)
+        klasse, _, waarom = oordeel("vergunning", "Aanvraag omgevingsvergunning, Hoofdstraat 120", "het plaatsen van een dakkapel op de woning")
+        self.assertEqual(klasse, W)
+        self.assertEqual(oordeel("vergunning", "Aanvraag omgevingsvergunning Hoofdstraat 120 woningen bouwen")[0], U)
+
+    def test_demolished_dwellings_are_not_counted(self):
+        self.assertEqual(relevantie.count_dwellings("sloop van 2 woningen en nieuwbouw van 14 woningen"), 14)
+        self.assertIsNone(relevantie.count_dwellings("het slopen van 3 woningen"))
 
     def test_two_or_more_new_dwellings_is_a_development_location(self):
         klasse, score, waarom = oordeel("vergunning", "Aanvraag omgevingsvergunning, Bredaseweg 90", "bouwen 12 appartementen")
@@ -37,7 +71,8 @@ class WoningenTest(unittest.TestCase):
     def test_unknown_number_is_uncertain_not_hidden(self):
         klasse, _, waarom = oordeel("vergunning", "het bouwen van woningen aan de Dorpsstraat")
         self.assertEqual(klasse, U)
-        self.assertIn("aantal staat niet", waarom)
+        self.assertIn("aantal is niet eenduidig", waarom)
+        self.assertEqual(oordeel("vergunning", "bouwen van zeven aaneen gebouwde woningen")[0], U)
         self.assertEqual(oordeel("vergunning", "nieuwbouw appartementencomplex")[0], U)
 
 

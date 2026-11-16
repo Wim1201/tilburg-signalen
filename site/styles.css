@@ -90,6 +90,8 @@ main.wrap { padding-block: 16px calc(var(--tabs-height) + 32px); display: flex; 
 .figure.is-plan b { color: var(--plan); }
 .figure.is-new b { color: var(--new); }
 
+.stale { background: var(--warn-bg); color: var(--warn-ink); font-size: 13px; padding: 8px 10px; border-radius: 8px; }
+
 /* Controls */
 .segmented { display: grid; grid-template-columns: repeat(2, 1fr); background: var(--chip-bg); border-radius: var(--radius); padding: 3px; gap: 3px; }
 .segmented button { border: 0; background: transparent; color: var(--muted); font: 500 13px/1.2 var(--font-text); padding: 9px 4px; border-radius: 8px; cursor: pointer; min-width: 0; }

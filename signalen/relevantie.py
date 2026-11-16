@@ -21,9 +21,12 @@ _NUMBER_WORDS = {
 }
 _NUMBER = r"\d{1,4}|" + "|".join(sorted(_NUMBER_WORDS, key=len, reverse=True))
 _DWELLINGS = r"woningen|appartementen|wooneenheden|woonunits|studio's|woonkavels|bouwkavels|kavels"
-# The words between the number and the noun may not contain digits: in "Bredaseweg 90 bouwen 12 appartementen"
-# the count is 12, not the house number.
-_COUNTED = re.compile(rf"(?<![\w/.,-])({_NUMBER})\s+((?:[^\W\d]['’\w\-]*\s+){{0,3}}?)(?:[^\W\d][\w\-]*)?(?:{_DWELLINGS})\b")
+# A number only counts when it stands directly before a word ending in woning(en) or appartement(en),
+# e.g. "19 woningen" or "98 huurappartementen". "3 dakkapellen op woningen" does not count.
+_COUNTED = re.compile(rf"(?<![\w/.,\-])({_NUMBER})\s+[\w\-]*?(?:woningen|woning|appartementen|appartement)\b")
+_STREET_END = re.compile(r"(?:straat|weg|laan|kade|dijk|plein|pad|dreef|hof|ring|steeg|baan|singel|park|veld|akker|"
+                         r"heide|hoek|eind|berg|gracht|markt|wal|erf|plantsoen|dam)$")
+_DEMOLISHED = re.compile(r"^(?:sloop|slopen|gesloopt|gesloopte|amoveren|sloopwerk)")
 _SINGLE = re.compile(
     r"\b(?:bouwen|oprichten|realiseren|nieuwbouw|herbouwen|herbouw|bouw)\s+(?:van\s+)?(?:een\s+|één\s+|1\s+)?"
     r"((?:[\w\-]+\s+){0,2}?)[\w\-]*(?:woning|woonhuis|villa|bungalow|woonboerderij)\b")
@@ -33,8 +36,8 @@ _BREAKERS = {"op", "aan", "bij", "van", "voor", "in", "naast", "achter", "tussen
              "te", "tot", "naar", "bomen", "boom", "dakkapellen", "zonnepanelen", "bouwen", "verbouwen", "realiseren",
              "oprichten", "nieuwbouw", "plaatsen", "slopen", "uitbreiden", "wijzigen", "herbouwen", "splitsen",
              "transformeren", "renoveren", "bouw", "sloop"}
-_NEW_BUILD = re.compile(r"nieuwbouw|bouwen|oprichten|realiseren|\bbouw van|te bouwen|herbouw|woningbouw|toevoegen|"
-                        r"transformatie|transformeren|ombouwen|omzetten")
+_NEW_BUILD = re.compile(r"\bnieuwbouw|\bbouwen\b|oprichten|realiseren|\bbouw van|te bouwen|\bherbouw|woningbouw|toevoegen|"
+                        r"transformatie|transformeren|ombouwen|omzetten|verbouwen\b.{0,80}?\b(?:tot|naar)\b")
 _PLURAL_UNKNOWN = re.compile(
     rf"\b[\w\-]*(?:{_DWELLINGS})\b|woongebouw|appartementencomplex|appartementengebouw|woningbouw|woontoren|"
     r"woonzorgcomplex|twee-onder-een-kap|2-onder-1-kap|tweekapper")
@@ -87,13 +90,21 @@ def _number(token):
 
 
 def count_dwellings(text):
-    """Largest number of dwellings named in the text, or None."""
-    best = None
+    """Number of dwellings named in the text: the sum of all counted numbers, or None.
+
+    Two kinds of numbers are left out: a house number ("Hoofdstraat 120 woningen") and dwellings
+    that are demolished ("sloop van 2 woningen"), because the count is about what is added.
+    """
+    mentions = set()
     for match in _COUNTED.finditer(text):
-        if set(match.group(2).split()) & _BREAKERS:
+        before = text[:match.start()].split()
+        if before and _STREET_END.search(before[-1].rstrip(",")):
             continue
-        best = max(best or 0, _number(match.group(1)))
-    return best
+        if any(_DEMOLISHED.match(word) for word in before[-3:]):
+            continue
+        # Title and body of a notice repeat each other; the same mention counts once.
+        mentions.add((_number(match.group(1)), match.group(0).split()[-1]))
+    return sum(number for number, _ in mentions) if mentions else None
 
 
 def kenmerken(soort, titel, tekst, activiteiten=()):
@@ -109,7 +120,7 @@ def kenmerken(soort, titel, tekst, activiteiten=()):
         dwellings = count
     elif new_build and not renovation_only and _PLURAL_UNKNOWN.search(text) and not count:
         unknown = True
-    elif single or count == 1:
+    elif single:
         dwellings = 1
 
     signals = [name for name, pattern in _SIGNALS if pattern.search(text)]
@@ -209,7 +220,7 @@ def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=T
     if signals:
         label = _join(signals).capitalize()
         if facts["woningenOnbekend"]:
-            label += " en nieuwbouw van woningen (aantal niet vermeld)"
+            label += " en nieuwbouw van woningen (aantal niet eenduidig)"
         if perceel_m2 is None:
             return result(ONZEKER, 38 + 4 * len(signals), f"{label}, maar de perceelgrootte is niet te bepalen.")
         if perceel_m2 >= drempel:
@@ -217,7 +228,7 @@ def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=T
             return result(ONTWIKKELLOCATIE, score, f"{label}{on_parcel}.")
         return result(WEGGEFILTERD, 0, f"{label}{on_parcel}: kleiner dan {m2(drempel)}.")
     if facts["woningenOnbekend"]:
-        return result(ONZEKER, 55, "Nieuwbouw van woningen, maar het aantal staat niet in de bekendmaking.")
+        return result(ONZEKER, 55, "Nieuwbouw van woningen, maar het aantal is niet eenduidig uit de bekendmaking te halen.")
     if not informatief:
         return result(ONZEKER, 20, "De bekendmaking beschrijft niet wat er gebeurt, dus de omvang is niet te bepalen.")
     if dwellings == 1:
