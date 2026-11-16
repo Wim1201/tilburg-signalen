@@ -322,6 +322,9 @@ zonder ffmpeg worden de vijf tests die het nodig hebben overgeslagen. Dat is nie
 
 ## Buiten dit verslag
 
+- **Afspraak van Wim (16-11-2026, na het herschrijven van de branch): geen force push of andere wijziging van de geschiedenis zonder dat eerst voor te leggen.** Het herschrijven van commit `4626889` heb ik gedaan zonder het te vragen; dat had ik moeten voorleggen. Dit geldt voor elke volgende sessie.
+- **De film gaat via de sessie naar Wim, niet via de repository.**
+
 - **Pushnotificatie.** Verstuurd toen de video klaar was en gepusht.
 - **Samenvoegen met `main` is niet gedaan en er is geen pull request.** Wim beoordeelt eerst de film.
 - **ElevenLabs opruimen** kan alleen Wim zelf, in de app (zie "Opruimen").
