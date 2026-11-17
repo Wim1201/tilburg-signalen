@@ -24,7 +24,7 @@ de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel.
 | Onderdeel | Wat het doet |
 |---|---|
 | `signalen/gebied.py` | Bepaalt welke gemeenten en plaatsen binnen de straal vallen (de kern), meet de gemeenten van de regio's uit `config.json` en schrijft `site/data/gebied.json` |
-| `signalen/update.py` | Haalt de berichten op bij alle bronnen en schrijft `site/data/berichten.json` |
+| `signalen/update.py` | Haalt de berichten op bij alle bronnen en schrijft `site/data/berichten.json` (de kern) en per regio een eigen bestand, zoals `site/data/regio-zeeland.json` |
 | `signalen/bekendmakingen.py` | Leest officielebekendmakingen.nl (Gemeenteblad, Provinciaal blad, Waterschapsblad, Staatscourant) |
 | `signalen/vlaanderen.py` | Leest Vlaamse omgevingsvergunningen voor het Belgische deel van de straal |
 | `signalen/relevantie.py` | De regels: wat is een ontwikkellocatie, wat is onzeker, wat valt af, en de zin waarom |

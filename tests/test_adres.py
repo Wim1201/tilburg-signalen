@@ -553,7 +553,7 @@ class EchteBronnen(unittest.TestCase):
     def test_every_address_is_found_and_filled_without_errors(self):
         self.assertEqual(self.seen["errors"], [])
         self.assertEqual(self.seen["hosts"], ["api.pdok.nl", "service.pdok.nl"])
-        self.assertEqual(len(self.seen["addresses"]), 5)
+        self.assertEqual(len(self.seen["addresses"]), 7)
         for entry in self.seen["addresses"]:
             with self.subTest(adres=entry["label"]):
                 self.assertIn(entry["label"], entry["suggestions"])
@@ -577,6 +577,19 @@ class EchteBronnen(unittest.TestCase):
         self.assertNotIn(with_letter[0]["Aanduiding"], [parcel["Aanduiding"] for parcel in without])
         self.assertEqual(self.by_label["Tilburgseweg 172e, 5051AM Goirle"]["name"], "Tilburgseweg 172e")
         self.assertEqual(self.by_label["Heuvelring 67-12, 5038CJ Tilburg"]["name"], "Heuvelring 67-12")
+
+    def test_addresses_outside_the_core_find_the_notices_of_their_region(self):
+        # With the region files as they are in the repository (run of 17-11-2026) each of these two
+        # addresses has a notice of 16-11-2026. The app itself shows the core; the tab reads the file.
+        for label, regio, file in (("Noordweg 402, 4333KK Middelburg", "Zeeland", "regio-zeeland.json"),
+                                   ("Prinsenkade 10, 4811VB Breda", "West-Brabant", "regio-west-brabant.json")):
+            with self.subTest(adres=label):
+                entry = self.by_label[label]
+                self.assertEqual(entry["regionFiles"], [file])
+                self.assertIn("en die van " + regio, entry["searched"])
+                self.assertTrue(entry["notices"].get("Dit adres"), "geen publicatie over dit adres gevonden")
+        for label in ("Heuvelring 67-12, 5038CJ Tilburg", "Burgemeester van de Mortelplein 118a, 5037PL Tilburg"):
+            self.assertEqual(self.by_label[label]["regionFiles"], [], "voor een adres in Tilburg is een regiobestand gelezen")
 
     def test_tilburg_and_dongen(self):
         tilburg = self.by_label["Burgemeester van de Mortelplein 118a, 5037PL Tilburg"]
