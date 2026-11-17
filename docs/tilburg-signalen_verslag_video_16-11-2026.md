@@ -25,6 +25,10 @@ publiceren wordt de live site getest. Zie "Browsertests op GitHub (17-11-2026)".
 
 | Tijdstip | Wat |
 |---|---|
+| 17-11-2026, 11:45 uur | **Run 13 heeft gepubliceerd, maar staat als mislukt bij Actions: de controle van de live site faalde.** De site zelf is in orde en staat op 11:35 uur. De test rekende er niet op dat op de live site een bron echt onbereikbaar kan zijn, en ook niet op een dag zonder ontwikkellocaties. Beide zijn in de test hersteld; dat herstel staat op de werkbranch en nog niet op `main`. Zie "Run 13 (17-11-2026, 11:33 uur)". |
+| 17-11-2026, 11:45 uur | **De Vlaamse bron was tijdens run 13 onbereikbaar; de 9 Vlaamse berichten uit run 12 ontbreken nu op de live site.** De runner kon de naam `www.mercator.vlaanderen.be` niet vinden (vier pogingen). De app meldt het bovenaan. Vanuit de cloudsessie was de dienst om 11:40 uur wel bereikbaar. De volgende geslaagde verversing zet de berichten terug. |
+| 17-11-2026, 11:45 uur | **"bouwen met bewaarde browser" is nu gemeten; mijn afleiding van ongeveer 40 seconden was te laag voor deze run.** Run 13: 46 seconden erbij (27 s klaarzetten, 19 s testen). Het terugzetten van de browser kostte dit keer 4,5 en 5,1 seconden, in run 12 nog 13,5; het is dus ongeveer even snel als downloaden. Het verschil tussen runs zit in de systeempakketten (8 tot 30 seconden). |
+| 17-11-2026, 11:45 uur | **De planner en de invoer `gepland` staan op `main`** (pull request [Wim1201/tilburg-signalen#13](https://github.com/Wim1201/tilburg-signalen/pull/13)); "Staat op de werkbranch, niet op `main`" hieronder geldt niet meer. Bij Cloudflare is niets geplaatst. |
 | 17-11-2026, 10:31 uur | **Controle van 10:30 uur: nog steeds geen enkele run met de aanleiding "schedule". Gemist vandaag: de slots van 06:45, 09:35 en 10:20 uur.** Het slot van 09:35 uur was bij de controle 55 minuten oud, dat van 10:20 uur 10 minuten. Er is sinds run 12 (08:39 uur, door een push) geen run bijgekomen. De live site staat daardoor nog op 08:40 uur: de publicaties van vandaag, die de bron tussen 09:00 en 09:21 uur plaatst, staan er niet op. De volgende slots zijn 12:10 en 16:10 uur. Het schema is niet gewijzigd; de oorzaak is niet onderzocht. |
 | 17-11-2026, 09:51 uur | **Controle van 09:50 uur: nog geen enkele run met de aanleiding "schedule". Gemist vandaag: de slots van 06:45 en 09:35 uur.** Het slot van 09:35 uur was bij de controle 16 minuten oud; GitHub start geplande runs soms later, dus dat slot kan nog komen. De laatste run is run 12 (08:39 uur, door een push); de live site staat op 08:40 uur. Het schema is niet gewijzigd. |
 | 17-11-2026, 09:51 uur | **Een push die alleen `docs/` raakt, start inderdaad geen run.** Pull request [Wim1201/tilburg-signalen#12](https://github.com/Wim1201/tilburg-signalen/pull/12) (alleen het verslag) is om 08:48 uur samengevoegd; een uur later was er geen run bijgekomen. Daarmee is beantwoord wat onder "Workflow: verslagen starten geen run" als niet getest stond. |
@@ -328,7 +332,7 @@ De stappen die erbij zijn gekomen:
 | Vraag | Antwoord |
 |---|---|
 | Hoeveel langer duurt bouwen bij een push of handmatige run? | 35 seconden (16 + 16 + 3), zonder bewaarde browser. De site staat daardoor ongeveer 35 seconden later live |
-| En met bewaarde browser? | **Niet als geheel gemeten in bouwen:** daarvoor is nog een push of handmatige run nodig. Uit de gemeten stappen afgeleid: ongeveer 40 seconden, dus niet korter. Terugzetten kostte 13,5 seconden, downloaden 5,3 en 6,4 seconden |
+| En met bewaarde browser? | Gemeten in run 13: 46 seconden (27 + 19). Dus niet korter dan zonder. Terugzetten kostte 13,5 seconden in run 12 en 4,5 en 5,1 seconden in run 13; downloaden 5,3 en 6,4 seconden |
 | Hoeveel langer duurt een geplande run? | bouwen en publiceren blijven gelijk: de browserstappen worden overgeslagen en de site staat even snel live. Daarna komt de controle van de live site: 71 seconden in run 12. **Op een geplande run nog niet gemeten:** er is er nog geen gestart |
 | Waar zit de tijd? | In de systeempakketten: 8 tot 30 seconden, sterk wisselend per runner (in live-controleren duurde alleen het verversen van de pakketlijst al 16 seconden). Er worden daarbij 9 pakketten geïnstalleerd, alle lettertypen; de bibliotheken die Chromium nodig heeft, staan al op de runner |
 
@@ -372,12 +376,68 @@ uitbreiding van een bestaande test.
 |---|---|
 | Een geplande run met de nieuwe workflow | Nog niet gezien. Dat de browserstappen in bouwen dan worden overgeslagen en `live-controleren` wel draait, is alleen door de tests op de tekst van de workflow vastgelegd |
 | De geplande runs zelf | Er is er nog geen gestart (zie de correcties bovenaan). Om 10:31 uur waren de slots van 06:45, 09:35 en 10:20 uur gemist. Een handmatige run haalt de publicaties van vandaag wel op; die kan alleen Wim starten |
-| bouwen met bewaarde browser | Afgeleid, niet gemeten |
+| bouwen met bewaarde browser | Gemeten in run 13; zie "Run 13" |
 | Vals alarm van `live-controleren` | De test begint zodra de job klaarstaat. Geeft GitHub Pages op dat moment nog de vorige versie en is in dezelfde push de pagina én een test gewijzigd, dan faalt de controle ten onrechte. In run 12 ging het goed (62 seconden na het publiceren) |
 | Een rood kruis moet iemand zien | GitHub kan bij een mislukte run een e-mail sturen; dat hangt af van de meldingsinstellingen van Wim. Of er na run 11 een is aangekomen, weet ik niet |
 | Handmatige run vanaf een andere branch | Niet uitgeprobeerd: ik mag via de koppeling geen run starten. Dat publiceren dan wordt overgeslagen, is vastgelegd door een test op de tekst |
 | Verouderde versies van de actions | GitHub meldt bij elke run dat `actions/checkout@v4`, `setup-python@v5`, `setup-node@v4`, `cache@v4`, `configure-pages@v5` en `upload-artifact@v4` voor Node 20 zijn gemaakt en nu op Node 24 worden gedraaid. Het werkt; bijwerken is niet gedaan |
 | De film | Toont het bolletje nog op de oude plaats. Niet opnieuw gemaakt |
+
+## Run 13 (17-11-2026, 11:33 uur)
+
+Gestart door het samenvoegen van pull request 13. Op pull requests voert GitHub in deze repo geen
+controles uit (de workflow start alleen bij een push naar `main`); vooraf zijn lokaal alle 223
+tests gedraaid, de browsertests ook met het terugvallettertype van de runner.
+
+| Job | Stap | Uitkomst |
+|---|---|---|
+| bouwen | Tests | `Ran 223 tests in 7.978s`, `OK (skipped=31)` |
+| bouwen | Browser klaarzetten | Geslaagd, 27 s; de bewaarde browser is teruggezet (4,5 s) |
+| bouwen | Browsertests | `Ran 24 tests in 17.963s`, `OK` |
+| bouwen | Berichten ophalen | 1.096 berichten; 49 verzoeken in 86 seconden. **Bron Omgevingsloket Vlaanderen: fout** (naam niet gevonden, vier pogingen); de andere twee bronnen in orde |
+| bouwen | Cache bewaren | Gewijzigd; commit `982a51d` op `main` |
+| publiceren | | Geslaagd; de site stond om 11:36:49 uur live |
+| live-controleren | Paginatest tegen de live site | **Mislukt:** `Ran 21 tests in 3.818s`, `FAILED (failures=1)` |
+
+| Duur | Run 12 | Run 13 |
+|---|---|---|
+| Job bouwen | 81 s | 158 s (waarvan 86 s ophalen, door de onbereikbare bron) |
+| Job live-controleren | 71 s | 44 s |
+| Van start tot de site live staat | 95 s | 174 s |
+| Hele run | 169 s | 222 s |
+
+### De live site om 11:38 uur
+
+| Controle | Uitkomst |
+|---|---|
+| Bovenaan de app | "Bijgewerkt di 17 nov, 11:35" |
+| Publicaties van vandaag | 18 berichten met de datum 17-11-2026 (vergunningen en plannen in Dongen, Gilze en Rijen, Goirle, Heusden, Tilburg en Waalwijk) |
+| Wat de app daarvan toont | Alle 18 vallen onder "weggefilterd"; geen ervan is een ontwikkellocatie of onzeker. De ochtendregel zegt daarom "Geen ontwikkellocaties op de laatste publicatiedag." en de tegel Nieuw staat op 0. Ze zijn te zien met de schakelaar voor weggefilterde berichten |
+| Tellingen | 77 ontwikkellocaties, 23 onzeker, 996 weggefilterd (run 12: 1.087 berichten, waarvan 9 uit Vlaanderen) |
+| Melding in de app | "De bron Omgevingsloket Vlaanderen was bij de laatste verversing niet bereikbaar." |
+| Onvolledige dagen, mislukte verzoeken | Geen |
+
+Of 18 publicaties alles is wat de bron vandaag voor dit gebied heeft, heb ik niet bij de bron zelf
+nageteld; de dagcontrole van de app meldt geen onvolledige dag.
+
+### Waarom de controle van de live site faalde
+
+De test `test_gaps_in_the_data_are_reported` zet zelf gaten in de gegevens die de pagina laadt en
+telt de meldingen. Tegen de live site van vanochtend ging dat twee keer mis, beide keren door de
+test en niet door de pagina:
+
+| Nr. | Aanname in de test | Vandaag op de live site | Hersteld |
+|---|---|---|---|
+| 1 | Alleen de bron die de test zelf uitzet, staat op "fout": precies 5 meldingen | De Vlaamse bron was echt onbereikbaar: 6 meldingen | Ja: de test zet eerst elke bron op "in orde" en dan één op "fout" |
+| 2 | Op de laatste publicatiedag staat een ontwikkellocatie; de eerste dagkop in de lijst krijgt "· onvolledig" | Vandaag is geen enkele publicatie een ontwikkellocatie; de eerste dagkop was maandag | Ja: de test markeert de laatste dag die in de lijst staat |
+
+Na het herstel slagen de 21 tests tegen de live site zoals die er nu staat, met beide lettertypen,
+en alle 223 tests lokaal. De pagina deed wat hij moest doen: hij toonde de echte melding.
+
+Wat dit zegt over mogelijkheid C: de controle van de live site draait de tests tegen gegevens die
+elke run anders zijn. Twee aannames zijn nu weg; er kunnen er meer zijn, en die tonen zich als een
+rood kruis op een ongewone dag. Dat een bron onbereikbaar is, maakt een run op zich niet rood: de
+stap Berichten ophalen geeft er een waarschuwing bij en de app meldt het.
 
 ## Planner op Cloudflare (voorbereid, 17-11-2026)
 
