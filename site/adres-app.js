@@ -11,6 +11,8 @@
   var MIN = 3;          // characters before the first suggestion
   var CENTRE = { lat: 51.55717769, lon: 5.0910001 }; // until the data file gives the centre
   var typed = 0, chosen = 0, timer = null, shown = [];
+  // What is known about the chosen address so far; the notices are drawn again as more comes in.
+  var current = { address: null, parcels: [], withParcel: false, regios: [], extra: [], regioFout: false };
 
   function $(id) { return document.getElementById(id); }
 
@@ -214,7 +216,8 @@
       if (mine !== chosen) return;
       found = found.filter(Boolean);
       renderParcels(box, address, found, linked);
-      renderNotices(address, found, true); // now also the notices that lie on the parcel
+      current.parcels = found; current.withParcel = true;
+      renderNotices(); // now also the notices that lie on the parcel
     }).catch(function () {
       if (mine !== chosen) return;
       failed(box, "De kadastrale kaart (Kadaster, via PDOK) antwoordt niet. Het perceel en het kaartje ontbreken daardoor.",
@@ -243,10 +246,27 @@
     return group;
   }
 
-  /* The notices of the app about this address. `withParcel` says whether the parcel is known, so
-     that notices can also be matched by where they lie. */
-  function renderNotices(address, found, withParcel) {
-    var box = $("adres-publicaties"), loaded = data();
+  /* An address outside the core: the notices of its region come from a file of their own, which
+     the app reads when it is needed. Until then, and when it does not come, the core is searched. */
+  function loadRegion(address, mine) {
+    var regios = window.TilburgSignalenRegios;
+    if (!regios) return;
+    regios.voorGemeente(address.gemeente).then(function (found) {
+      if (mine !== chosen) return;
+      current.regios = found.regios; current.extra = found.berichten;
+      renderNotices();
+    }).catch(function () {
+      if (mine !== chosen) return;
+      current.regioFout = true;
+      renderNotices();
+    });
+  }
+
+  /* The notices of the app about the chosen address: those of the core and, when they are in,
+     those of the region of the address. With the parcel known, notices are also matched by where
+     they lie. */
+  function renderNotices() {
+    var box = $("adres-publicaties"), loaded = data(), address = current.address;
     box.textContent = "";
     if (!loaded || !loaded.berichten) {
       box.appendChild(el("p", "stale", "De berichten van de app zijn niet geladen; er kan niet in worden gezocht."));
@@ -254,7 +274,7 @@
     }
     // First of all the period the list covers, so that an empty list is not read as "never anything".
     box.appendChild(el("p", "periode", A.periodLine(loaded.vensterDagen)));
-    var result = A.findNotices(loaded.berichten, address, found);
+    var result = A.findNotices(window.TilburgSignalen.merged(loaded.berichten, [current.extra]), address, current.parcels);
     if (!result.adres.length && !result.mogelijk.length && !result.straat.length) {
       box.appendChild(el("p", null, "Geen publicaties over " + address.straat + " " + A.houseNumber(address) + " in de berichten van de app."));
     }
@@ -270,9 +290,11 @@
       more.appendChild(list);
       box.appendChild(more);
     }
-    box.appendChild(el("p", "bronregel", "Doorzocht: " + result.doorzocht.toLocaleString("nl-NL") + " berichten die de app nu heeft, ook de weggefilterde. " +
-      "De bronnen schrijven adressen niet in een vaste vorm: een bericht kan ontbreken."));
-    if (!withParcel) box.appendChild(el("p", "bronregel", "Berichten zonder dit adres in de tekst worden pas gekoppeld als het perceel bekend is."));
+    box.appendChild(el("p", "bronregel", "Doorzocht: " + result.doorzocht.toLocaleString("nl-NL") + " berichten die de app nu heeft, ook de weggefilterde" +
+      (current.regios.length ? " en die van " + window.TilburgSignalen.nameList(current.regios) : "") +
+      ". De bronnen schrijven adressen niet in een vaste vorm: een bericht kan ontbreken."));
+    if (current.regioFout) box.appendChild(el("p", "stale", "De berichten van de regio van dit adres konden niet worden geladen; alleen de kern is doorzocht."));
+    if (!current.withParcel) box.appendChild(el("p", "bronregel", "Berichten zonder dit adres in de tekst worden pas gekoppeld als het perceel bekend is."));
   }
 
   function renderLinks(address) {
@@ -298,8 +320,10 @@
     $("adres-sub").textContent = [address.postcode, address.woonplaats].filter(Boolean).join(" ") +
       (address.gemeente && address.gemeente !== address.woonplaats ? " · gemeente " + address.gemeente : "");
     $("adres-uitkomst").hidden = false;
+    current = { address: address, parcels: [], withParcel: false, regios: [], extra: [], regioFout: false };
     renderLinks(address);
-    renderNotices(address, [], false);
+    renderNotices();
+    loadRegion(address, mine);
     loadBag(address, mine);
     loadParcels(address, mine);
   }

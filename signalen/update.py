@@ -107,6 +107,7 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
         try:
             fetched = fetcher()
             for item in fetched:
+                item.setdefault("regio", "kern")  # bankruptcies and the Flemish source only cover the core
                 items.setdefault(item["id"], item)
             statuses[source_id] = {"status": "ok", "aantal": len(fetched)}
         except Exception as error:  # one failing source must not hide the others
@@ -140,6 +141,33 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
     }
 
 
+def regio_bestand(naam):
+    """File name of the notices of one region, next to berichten.json: 'regio-west-brabant.json'."""
+    return "regio-" + "-".join(naam.lower().split()) + ".json"
+
+
+def verdeel(document, regios):
+    """Split the output of a run: the core stays in the document, every region gets a document of its own.
+
+    The app opens with the core only, so berichten.json stays as large as it was; a region is read
+    when someone chooses it. The core document lists the regions with what each of them holds.
+    Returns (core document, {file name: region document}). Every region of the config gets a file,
+    also when it is empty, so the app never asks for a file that is not there.
+    """
+    per_region = {naam: [] for naam in regios}
+    core = []
+    for item in document["berichten"]:
+        (per_region[item["regio"]] if item.get("regio", "kern") in per_region else core).append(item)
+    files, overview = {}, []
+    for naam in regios:
+        items = per_region[naam]
+        files[regio_bestand(naam)] = {"regio": naam, "bijgewerkt": document["bijgewerkt"], "berichten": items}
+        overview.append({"naam": naam, "bestand": regio_bestand(naam), "berichten": len(items),
+                         "locaties": sum(1 for item in items if item["klasse"] == "ontwikkellocatie"),
+                         "onzeker": sum(1 for item in items if item["klasse"] == "onzeker")})
+    return {**document, "regios": overview, "berichten": core}, files
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Berichten ophalen en beoordelen")
     parser.add_argument("--volledig", action="store_true",
@@ -151,10 +179,12 @@ def main(argv=None):
     now = datetime.datetime.now(zoneinfo.ZoneInfo(config["tijdzone"]))
     cache = cachemodule.Cache(lezen=not args.volledig, sleutel=cachemodule.insolventie_sleutel(config))
     http.VERZOEKEN.clear()
+    http.GEWEIGERD.clear()
     started = time.monotonic()
     document = run(config, area, now, cache=cache)
     document["volledigeVerversing"] = args.volledig
-    document["verzoeken"] = {"totaal": sum(http.VERZOEKEN.values()), "perDienst": dict(http.VERZOEKEN)}
+    document["verzoeken"] = {"totaal": sum(http.VERZOEKEN.values()), "perDienst": dict(http.VERZOEKEN),
+                             "geweigerd429": sum(http.GEWEIGERD.values())}
 
     main_source = next(s for s in document["bronnen"] if s["id"] == "officielebekendmakingen")
     if main_source.get("status") != "ok":
@@ -165,13 +195,17 @@ def main(argv=None):
     insolvency_ok = next(s for s in document["bronnen"] if s["id"] == "staatscourant-insolventies").get("status") == "ok"
     cache.bewaar(snoei=("tekst", "perceel", "locatie", "gemeente") + (("insolventie",) if insolvency_ok else ()))
 
+    everything = document["berichten"]
+    document, region_files = verdeel(document, config.get("regios", []))
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+    for name, region_document in region_files.items():
+        (OUTPUT.parent / name).write_text(json.dumps(region_document, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     counts = {}
-    for item in document["berichten"]:
+    for item in everything:
         key = (item["klasse"], item["type"])
         counts[key] = counts.get(key, 0) + 1
-    print(f'{len(document["berichten"])} berichten geschreven')
+    print(f'{len(everything)} berichten geschreven, waarvan {len(document["berichten"])} in de kern')
     for (klasse, kind), count in sorted(counts.items()):
         print(f"  {klasse:17} {kind:14} {count}")
     for kind, stats in document["ophaalstatistiek"].items():
@@ -187,7 +221,9 @@ def main(argv=None):
         if source.get("status") == "fout":
             print(f'::warning::Bron {source["id"]} niet bereikbaar: {source.get("melding", "")[:200]}')
     kind_of_run = "volledige verversing (cache niet gelezen)" if args.volledig else "gewone run"
-    print(f'  {kind_of_run}: {document["verzoeken"]["totaal"]} verzoeken in {time.monotonic() - started:.0f} seconden')
+    print(f'  {kind_of_run}: {document["verzoeken"]["totaal"]} verzoeken in {time.monotonic() - started:.0f} seconden, '
+          f'{document["verzoeken"]["geweigerd429"]} keer geweigerd (HTTP 429)')
+    print("  per regio: " + ", ".join(f'{regio["naam"]} {regio["berichten"]} ({regio["bestand"]})' for regio in document["regios"]))
     for soort, stats in document["cache"].items():
         print(f'  cache {soort}: {stats["uitCache"]} uit cache, {stats["opgehaald"]} opgehaald')
     for gap in document["onvolledigeDagen"]:

@@ -167,10 +167,25 @@ def lookups(cache=None):
     return geocode, reverse
 
 
-def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, reverse=reverse_gemeente, kind=None):
-    """Turn one SRU record into an app item, or None when it falls outside the radius.
+def region_outside(gemeente, area_by_name):
+    """The region a location outside the radius belongs to, or None when it belongs to none.
 
-    `kind` forces the item type (used for sale notices, which have no rubric of their own).
+    A municipality of a region counts whole; of a core municipality only the part outside the radius
+    can belong to a region (`buitenStraal`). An unknown municipality belongs to none: it is not
+    looked up, because that would cost a request for every notice in the country.
+    """
+    entry = area_by_name.get(gemeente) or {}
+    label = entry.get("regio", "kern")
+    return entry.get("buitenStraal") if label == "kern" else label
+
+
+def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, reverse=reverse_gemeente, kind=None):
+    """Turn one SRU record into an app item, or None when it falls outside the radius and outside
+    the regions.
+
+    The item gets `regio`: "kern" inside the radius, exactly as before the regions existed, and
+    otherwise the region of its municipality. `kind` forces the item type (used for sale notices,
+    which have no rubric of their own).
     """
     if kind is None:
         rubric = next((c.text for c in _children(record, "type") if c.text in RUBRICS), None)
@@ -183,14 +198,17 @@ def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, re
     if gemeente is None and creator in area_by_name:
         gemeente = creator
 
-    location, location_kind, place = None, None, None
+    location, location_kind, place, regio = None, None, None, "kern"
     geometries = _geometries(record)
     if geometries:
         label, gkind, parts = min(geometries, key=lambda g: geo.distance(centre_rd, g[1], g[2]))
         metres = geo.distance(centre_rd, gkind, parts)
         if metres > radius_m:
-            return None
-        location, location_kind = geo.pin(centre_rd, gkind, parts, radius_m), "exact"
+            regio = region_outside(gemeente, area_by_name)
+            if regio is None:
+                return None
+        # Outside the radius there is no circle to keep the pin in: the centre of the nearest part.
+        location, location_kind = geo.pin(centre_rd, gkind, parts, radius_m if regio == "kern" else float("inf")), "exact"
         place = _address_label(record) or next((lbl for lbl, _, _ in geometries if _useful_label(lbl)), None)
         if place is None and label and label.startswith("Perceel"):
             place = label
@@ -202,11 +220,14 @@ def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, re
             place, location = hit
             metres = geo.distance(centre_rd, "point", [[location]])
             if metres > radius_m:
-                return None
+                regio = region_outside(gemeente, area_by_name)
+                if regio is None:
+                    return None
             location_kind = "benaderd"
         else:
             metres = area_by_name[gemeente]["minKm"] * 1000
             location_kind = "gemeente"
+            regio = area_by_name[gemeente].get("regio", "kern")
     else:
         return None  # no location and not tied to a municipality in the area
 
@@ -226,6 +247,7 @@ def to_item(record, centre_rd, radius_m, area_by_name, geocode=geocode_title, re
         "datum": _text(record, "date"),
         "gemeente": gemeente,
         "plaats": place,
+        "regio": regio,
         "afstandKm": round(metres / 1000, 1),
         "locatieSoort": location_kind,
         "lat": lat_lon[0] if lat_lon else None,

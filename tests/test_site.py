@@ -508,7 +508,8 @@ class InDeBrowser(unittest.TestCase):
         if done.returncode:
             raise AssertionError(done.stderr)
         cls.seen = json.loads(done.stdout)
-        cls.items = cls.seen["data"]["berichten"]
+        # The app opens with the core: every expectation below is about the notices within the radius.
+        cls.items = [entry for entry in cls.seen["data"]["berichten"] if entry.get("regio", "kern") == "kern"]
         cls.locations = sorted([entry for entry in cls.items if entry["klasse"] == "ontwikkellocatie"], key=lambda entry: -entry["score"])
 
     def test_no_errors_and_nothing_wider_than_the_phone(self):
@@ -650,6 +651,169 @@ class InDeBrowser(unittest.TestCase):
     def test_nothing_new_shows_the_illustration(self):
         self.assertEqual(self.seen["emptyTitle"], "Niets nieuws sinds je vorige bezoek.")
         self.assertEqual(self.seen["emptyArt"], 1)
+
+    # --- The region choice on the tab "Gebied" (tests/js/regio_smoke.js), on the narrowest phone. The
+    # expectations are worked out from the data the page loaded, so they hold for any data.
+
+    def region(self):
+        seen = self.seen["regio"]
+        if not seen["start"]["buttons"]:
+            self.skipTest("de gegevens zijn van vóór de regio's: er is niets te kiezen")
+        return seen
+
+    @staticmethod
+    def shown(data, chosen):
+        return [entry for entry in data["berichten"] if entry["regio"] == "kern" or entry["regio"] in chosen]
+
+    def expected(self, data, chosen):
+        """What the tab Berichten shows for a choice of regions, as the texts on the page."""
+        shown = self.shown(data, chosen)
+        locations = sum(1 for entry in shown if entry["klasse"] == "ontwikkellocatie")
+        reach = max([data["straalKm"]] + [-(-entry["afstandKm"] // 1) for entry in shown if entry["afstandKm"] > data["straalKm"]])
+        return {"ranglijst": str(locations), "onzeker": str(sum(1 for entry in shown if entry["klasse"] == "onzeker")),
+                "removed": "(%d)" % sum(1 for entry in shown if entry["klasse"] == "weggefilterd"),
+                "count": ("Top 10 van %d ontwikkellocaties" % locations if locations > 10 else "%d ontwikkellocatie%s" % (locations, "" if locations == 1 else "s"))
+                + ", hoogste rang eerst", "kmMax": str(int(reach)), "locations": locations}
+
+    def assert_berichten(self, page, data, chosen):
+        want = self.expected(data, chosen)
+        self.assertEqual((page["tiles"][0], page["tiles"][2], page["removed"], page["count"], page["kmMax"]),
+                         (want["ranglijst"], want["onzeker"], want["removed"], want["count"], want["kmMax"]))
+        self.assertEqual(page["kmOut"], want["kmMax"] + " km")
+
+    def test_region_choice_is_offered_but_nothing_is_chosen_at_the_start(self):
+        seen = self.region()
+        data, start = seen["data"], seen["start"]
+        self.assertEqual([button["name"] for button in start["buttons"]], data["regios"])
+        self.assertEqual(data["inFiles"], [regio["berichten"] for regio in data["overview"]], "het overzicht klopt niet met de regiobestanden")
+        self.assertEqual(seen["askedByThePage"], [], "de app leest een regiobestand zonder dat een regio is gekozen")
+        self.assertEqual({button["pressed"] for button in start["buttons"]}, {"false"})
+        for button in start["buttons"]:
+            locations = sum(1 for entry in data["berichten"] if entry["regio"] == button["name"] and entry["klasse"] == "ontwikkellocatie")
+            self.assertEqual(button["sub"], "%d locatie%s" % (locations, "" if locations == 1 else "s"))
+        core = [g for g in data["gemeenten"] if g["regio"] == "kern"]
+        self.assertEqual([row["name"].replace(" (België)", "") for row in start["rows"]], [g["naam"] for g in core])
+        self.assertIn("Daarin liggen %d gemeenten" % len(core), start["intro"])
+        self.assertTrue(start["hint"].startswith("Kies een regio om die erbij te zien."), start["hint"])
+        # The morning screen is the core, whatever else the data holds.
+        self.assert_berichten(seen["morning"], data, [])
+        self.assertIsNone(seen["morning"]["line"])
+        self.assertEqual(seen["morning"]["brief"], self.seen["brief"])
+        self.assertEqual(seen["morning"]["tiles"], [self.seen["tiles"][name] for name in ("ranglijst", "nieuw", "onzeker")])
+        self.assertEqual(seen["errors"], [])
+
+    def test_region_choice_fits_the_narrowest_phone(self):
+        seen = self.region()
+        for moment in ("start", "one", "all", "backGebied"):
+            with self.subTest(moment=moment):
+                self.assertLessEqual(seen[moment]["overflow"], 0)
+                self.assertTrue(all(button["height"] >= 44 and button["left"] >= 0 and button["right"] <= 320 for button in seen[moment]["buttons"]), seen[moment]["buttons"])
+                self.assertTrue(all(row["right"] <= 320 for row in seen[moment]["rows"]))
+        self.assertLessEqual(seen["withOneOverflow"], 0)
+        self.assertLessEqual(seen["withOneAllOverflow"], 0)
+        self.assertGreaterEqual(seen["lineButton"]["height"], 30)
+        if seen["tapped"]:
+            self.assertLessEqual(seen["tap"]["overflow"], 0)
+
+    def test_a_chosen_region_is_shown_with_the_core(self):
+        seen = self.region()
+        data, first, one = seen["data"], seen["first"], seen["one"]
+        self.assertEqual({button["name"]: button["pressed"] for button in one["buttons"]},
+                         {button["name"]: str(button["name"] == first).lower() for button in one["buttons"]})
+        wanted = [g for g in data["gemeenten"] if g["regio"] in ("kern", first)]
+        self.assertEqual([row["name"].replace(" (België)", "") for row in one["rows"]], [g["naam"] for g in wanted])
+        by_name = {row["name"]: row for row in one["rows"]}
+        for gemeente in wanted:
+            row = by_name[gemeente["naam"] + (" (België)" if gemeente["land"] == "BE" else "")]
+            with self.subTest(gemeente=gemeente["naam"]):
+                if gemeente["regio"] == first:
+                    self.assertEqual(row["chip"], first)
+                    self.assertTrue(row["towns"].startswith("Hele gemeente, buiten de straal."), row["towns"])
+                    if gemeente["opmerking"]:
+                        self.assertIn(gemeente["opmerking"], row["towns"])
+                elif gemeente["buitenStraal"] == first and gemeente["dekking"] != "geheel":
+                    self.assertEqual(row["chip"], "Hele gemeente, met " + first)
+                shown = [e for e in self.shown(data, [first]) if e["gemeente"] == row["name"]]
+                self.assertEqual(row["counts"], "%d ontwikkellocaties, %d onzeker" % (sum(1 for e in shown if e["klasse"] == "ontwikkellocatie"),
+                                                                                    sum(1 for e in shown if e["klasse"] == "onzeker")))
+        self.assertTrue(one["hint"].startswith("Je ziet de kern met " + first + " erbij"), one["hint"])
+        self.assertEqual(one["dots"], seen["start"]["dots"], "het kaartje van de kern verandert door een regio")
+        file = next(regio["bestand"] for regio in data["overview"] if regio["naam"] == first)
+        self.assertEqual(seen["askedForOne"], [file], "kiezen van één regio leest precies dat ene bestand")
+        # On the tab Berichten: the core with the region, said in one line, and the morning line unchanged.
+        self.assert_berichten(seen["withOne"], data, [first])
+        self.assertEqual(seen["withOne"]["line"], "Met " + first + " erbij. Alleen de kern")
+        self.assertEqual(seen["withOne"]["brief"], seen["morning"]["brief"])
+        self.assertEqual(seen["withOne"]["tiles"][1], seen["morning"]["tiles"][1], "een regio telt mee als nieuw")
+        want = self.expected(data, [first])
+        self.assertEqual(seen["withOneAllRanks"], [str(n) for n in range(1, want["locations"] + 1)])
+
+    def test_tapping_a_municipality_of_a_region_shows_its_notices(self):
+        seen = self.region()
+        if not seen["tapped"]:
+            self.skipTest("de gekozen regio heeft geen eigen gemeenten")
+        data, name, tap = seen["data"], seen["tapped"], seen["tap"]
+        own = [e for e in data["berichten"] if e["gemeente"] == name and e["klasse"] == "ontwikkellocatie" and e["regio"] in ("kern", seen["first"])]
+        self.assertEqual(tap["hash"], "#berichten")
+        self.assertEqual(tap["cards"], len(own))
+        if own:
+            self.assertEqual(tap["filter"], name)
+            self.assertTrue(tap["count"].startswith("%d ontwikkellocatie" % len(own)), tap["count"])
+            self.assertTrue(all(" km" in distance or distance == "geen exacte locatie" for distance in tap["distances"]))
+
+    def test_back_to_the_core_and_every_region_at_once(self):
+        seen = self.region()
+        data = seen["data"]
+        self.assertEqual(seen["back"], seen["morning"])
+        self.assertEqual({button["pressed"] for button in seen["backGebied"]["buttons"]}, {"false"})
+        self.assertEqual(seen["backGebied"]["rows"], seen["start"]["rows"])
+        names = [button["name"] for button in seen["start"]["buttons"]]
+        self.assertEqual({button["pressed"] for button in seen["all"]["buttons"]}, {"true"})
+        self.assertEqual(len(seen["all"]["rows"]), sum(1 for g in data["gemeenten"] if g["regio"] == "kern" or g["regio"] in names))
+        self.assert_berichten(seen["withAll"], data, names)
+        sentence = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " en " + names[-1]
+        self.assertEqual(seen["withAll"]["line"], "Met " + sentence + " erbij. Alleen de kern")
+        self.assertEqual(sorted(seen["askedForAll"]), sorted(regio["bestand"] for regio in data["overview"]), "een regiobestand is twee keer gelezen")
+
+    def test_a_region_file_that_does_not_come_leaves_the_core(self):
+        seen = self.region()
+        down = seen["fileDown"]
+        self.assertEqual(down["message"], "De berichten van " + seen["first"] + " konden niet worden geladen. Controleer je verbinding en kies de regio opnieuw.")
+        self.assertEqual((down["pressed"], down["line"], down["errors"]), (0, False, []))
+        self.assertEqual(down["rows"], len(seen["start"]["rows"]))
+        self.assertEqual(down["count"], seen["morning"]["count"])
+        self.assertLessEqual(down["overflow"], 0)
+
+    def test_the_app_opens_with_the_core_again(self):
+        seen = self.region()
+        self.assertEqual(seen["storage"], ["tilburg-signalen.gezien"], "de keuze voor een regio wordt bewaard")
+        self.assertEqual({button["pressed"] for button in seen["reopenedGebied"]["buttons"]}, {"false"})
+        self.assertEqual(seen["reopenedGebied"]["rows"], seen["start"]["rows"])
+        reopened, morning = dict(seen["reopened"]), dict(seen["morning"])
+        # Opened a second time, the notices of the first visit are no longer "new"; the rest is the same.
+        for page in (reopened, morning):
+            page.pop("brief")
+            page["tiles"] = [page["tiles"][0], page["tiles"][2]]
+        self.assertEqual(reopened, morning)
+
+    def test_address_outside_the_core_finds_its_notices_while_the_app_shows_the_core(self):
+        outside = self.seen["adres"]["outside"]
+        self.assertEqual(outside["errors"], [])
+        self.assertEqual((outside["name"], outside["sub"]), ("Noordweg 402", "4333KK Middelburg"))
+        self.assertEqual(outside["bag"]["Bouwjaar"], "1622")
+        self.assertEqual(outside["parcels"], [{"Aanduiding": "Middelburg T 3010 (MDB01 T 3010)", "Grootte": "6.249 m², vastgesteld"}])
+        self.assertLessEqual(outside["overflow"], 0)
+        if "Zeeland" in outside["regios"]:
+            # The notices of Zeeland are in a file of their own; the tab read it for this address, once.
+            self.assertIn("test-regio-zeeland", outside["notices"]["groups"]["Dit adres"])
+            self.assertEqual(outside["notices"]["rows"]["test-regio-zeeland"]["meta"], "10-11-2026 · Middelburg · Vergunning, aanvraag")
+            self.assertEqual(outside["regionFile"], 1)
+            self.assertRegex(outside["searched"], r"^Doorzocht: [\d.]+ berichten die de app nu heeft, ook de weggefilterde en die van Zeeland\.")
+        # Nothing was chosen on the tab Gebied: the app itself still shows the core only.
+        self.assertFalse(outside["regionLine"])
+        self.assertEqual(outside["pressed"], 0)
+        self.assertEqual(outside["coreCount"], self.seen["count"])
+        self.assertEqual(outside["coreCards"], len(self.seen["first"]))
 
     # --- The tab "Adres". The registers of PDOK are played back by tests/js/adres_smoke.js, so these
     # tests do not depend on PDOK; the notices about the test address are added to what the page loads.

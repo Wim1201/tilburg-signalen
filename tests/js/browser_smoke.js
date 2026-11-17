@@ -70,7 +70,7 @@ var SEEN = "tilburg-signalen.gezien";
   result.data = await page.evaluate(function () {
     return fetch("data/berichten.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (d) {
       return { bijgewerkt: d.bijgewerkt, drempelPerceelM2: d.drempelPerceelM2, berichten: d.berichten.map(function (i) {
-        return { id: i.id, klasse: i.klasse, score: i.score, datum: i.datum, waarom: i.waarom, gemeente: i.gemeente };
+        return { id: i.id, klasse: i.klasse, score: i.score, datum: i.datum, waarom: i.waarom, gemeente: i.gemeente, regio: i.regio || "kern" };
       }) };
     });
   });
@@ -222,6 +222,9 @@ var SEEN = "tilburg-signalen.gezien";
 
   // --- The tab "Adres", with the registers played back (see adres_smoke.js).
   result.adres = await require("./adres_smoke.js")(browser, base);
+
+  // --- The region choice on the tab "Gebied" (see regio_smoke.js).
+  result.regio = await require("./regio_smoke.js")(browser, base);
 
   result.errors = errors;
   await browser.close();
