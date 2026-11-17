@@ -1,0 +1,6 @@
+{
+  "name": "tilburg-signalen-planner",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker die de workflow Dagelijkse verversing op GitHub start. Geen pakketten nodig."
+}

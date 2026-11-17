@@ -10,7 +10,8 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "dagelijks.yml"
 BROWSER = ROOT / ".github" / "actions" / "browser" / "action.yml"
-NOT_SCHEDULED = "if: github.event_name != 'schedule'"
+# Not on GitHub's own schedule, and not when the planner (tools/planner) starts the run in its place.
+NOT_SCHEDULED = "if: github.event_name != 'schedule' && !inputs.gepland"
 
 
 def section(text, name):
@@ -99,6 +100,11 @@ class Browsertests(unittest.TestCase):
         # Nothing else depends on how the run was started: the quick tests and the refresh always run.
         self.assertEqual(self.text.count(NOT_SCHEDULED), 2)
         self.assertNotIn("if:", step(self.build, "Tests"))
+
+    def test_a_run_started_by_the_planner_can_say_that_it_is_a_scheduled_one(self):
+        manual = section(self.text, "workflow_dispatch")
+        for name in ("volledig", "gepland"):
+            self.assertRegex(manual, r"(?m)^      %s:\n(?:        .*\n)*?        type: boolean\n        default: false$" % name)
 
     def test_the_step_runs_both_browser_classes_and_fails_when_playwright_is_missing(self):
         # Without Playwright these tests skip themselves; the step would be green and test nothing.
