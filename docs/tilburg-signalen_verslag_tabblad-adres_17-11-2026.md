@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 17-11-2026, 16:51 – 17:25 uur |
+| Datum | 17-11-2026, 16:51 – 17:25 uur; aangevuld 18:05 – 18:25 uur (regel over de periode, samenvoegen) |
 | Versie | versie 2 van de app plus het tabblad Adres, branch `claude/optimistic-gauss-sb0xpy`, gestart vanaf `main` op commit `68f4660` (na PR #14) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | `site/data/berichten.json` zoals het in de repo staat (bijgewerkt 16-11-2026, 15:37 uur, 1.116 berichten); antwoorden van PDOK van 17-11-2026 tussen 16:53 en 17:20 uur |
@@ -26,6 +26,7 @@ Chromium op 320 en 390 pixels breed.
 
 | Tijdstip | Wat |
 |---|---|
+| 17-11-2026, 18:22 uur | **Het tabblad is samengevoegd met `main` en staat live; "niet samengevoegd met `main` en staat niet live; er is geen pull request" onder "Stand" en "Buiten dit verslag" geldt niet meer.** Wim gaf akkoord op de samenvoeging. Pull request 15, run 16 volledig geslaagd, ook de controle van de live site. Zie "Samengevoegd en live". "De live site en GitHub" onder "Niet getest of nog open" is daarmee afgehandeld. |
 | 17-11-2026, 18:18 uur | **Bovenaan het blok met publicaties staat nu één regel over de periode; de zin daarover onderaan is vervallen.** Op verzoek van Wim. Waar dit verslag zegt dat het tabblad de bewaartermijn "onder de lijst" meldt, staat die nu bovenaan. Zie "Regel over de periode". |
 | 17-11-2026, 18:18 uur | **Het aantal tests is 290, niet 287.** Er zijn er drie bij voor die regel: twee voor de tekst en één in de browser. Waar dit verslag 287 noemt, gaat het om de stand van commit `8459af2`. |
 | 17-11-2026, 17:25 uur | **De app heeft vier tabbladen in plaats van drie.** Waar eerdere verslagen de tabbalk met Berichten, Gebied en Bronnen beschrijven, staat daar nu Adres naast. De drie bestaande tabbladen zijn zelf niet gewijzigd; op 320 pixels is elke tab 72 pixels breed (was 96). |
@@ -235,6 +236,47 @@ de regel is het eerste in het blok en staat er één keer, ook bij een adres zon
 daarna "Geen publicaties over … in de berichten van de app." volgt. Bekeken op een schermafbeelding
 van Heuvelring 67-12 in Tilburg (geen publicaties): de regel beslaat daar vijf regels tekst.
 
+## Samengevoegd en live (17-11-2026, 18:19 – 18:22 uur)
+
+Wim vroeg om de pull request en gaf akkoord op de samenvoeging.
+
+| Tijdstip | Handeling | Uitkomst |
+|---|---|---|
+| 18:19:06 uur | Pull request 15 gemaakt van `claude/optimistic-gauss-sb0xpy` naar `main` (twee commits: `8459af2` en `c75fd29`) | Zonder conflicten samen te voegen |
+| 18:19:21 uur | Samengevoegd met een gewone merge, zoals de eerdere pull requests | Commit `8dacbb9` op `main`. Niets geforceerd, geen geschiedenis gewijzigd |
+| 18:19:21 uur | De samenvoeging startte run 16 (aanleiding: push) | Geslaagd om 18:22:14 uur, 2 minuten en 53 seconden |
+
+### Run 16 op GitHub
+
+| Job | Stap | Duur | Uitkomst |
+|---|---|---|---|
+| bouwen | Tests | 10 s | Geslaagd |
+| bouwen | Browser klaarzetten | 16 s | Geslaagd; Chromium kwam uit de bewaarde map |
+| bouwen | Browsertests (met de tests van het tabblad Adres) | 31 s | Geslaagd |
+| bouwen | Gebied bijwerken | 7 s | Geslaagd |
+| bouwen | Berichten ophalen | 35 s | Geslaagd |
+| bouwen | Cache bewaren | minder dan 1 s | Geslaagd; er kwam geen nieuwe commit op `main` bij, de cache was dus ongewijzigd |
+| publiceren | Site op GitHub Pages zetten | 15 s | Geslaagd om 18:21:31 uur |
+| live-controleren | Paginatest tegen de live site | 20 s | **33 tests, alle geslaagd** (waren er 21 vóór het tabblad): de 12 tests van het tabblad draaien dus ook tegen de live site, met nagespeelde antwoorden van PDOK |
+
+De duur van de browsertests vóór het publiceren is gestegen door het tabblad; die stap bevat ook de
+droogloop van de video. De controle van de live site duurde 20 seconden, waarvan 12 het wachten op
+de bron die zwijgt.
+
+### De live site (18:21:32 uur, zelf opgevraagd vanuit de container)
+
+| Controle | Uitkomst |
+|---|---|
+| `index.html` bevat het tabblad, het scherm en het script van Adres | Ja |
+| `adres.js` bevat de regel over de periode | Ja |
+| `sw.js` | Opslag `tilburg-signalen-v8` |
+| `data/berichten.json` | Bijgewerkt 17-11-2026, 18:20 uur; 1.105 berichten; bewaartermijnen 42 en 180 dagen |
+
+**Niet gedaan:** het tabblad op de live site zelf bedienen tegen de echte bronnen. De proef met vijf
+echte adressen van 17:20 uur liep tegen dezelfde bestanden vanaf de container; op de live site
+is alleen de paginatest met nagespeelde bronnen gedraaid. De eerste echte proef daar is die van Wim
+op zijn telefoon.
+
 ## Gevonden tijdens het werk
 
 | Tijdstip | Wat | Wat ermee gedaan is |
@@ -269,7 +311,7 @@ vanuit de testbrowser niet te bekijken.
 
 ## Buiten dit verslag
 
-- **Niet samengevoegd, geen pull request.** Zo afgesproken: niets samenvoegen en niets forceren zonder
+- **Tot 18:19 uur: niet samengevoegd, geen pull request.** *Daarna op verzoek van Wim samengevoegd; zie "Samengevoegd en live".* Zo afgesproken: niets samenvoegen en niets forceren zonder
   eerst te vragen. De afspraak van 16-11 (geen force push of andere wijziging van de geschiedenis
   zonder het voor te leggen) is aangehouden; er is alleen gewoon gepusht naar de werkbranch.
 - **Het schema van de workflow is niet gewijzigd**; het hele bestand `.github/workflows/dagelijks.yml`
@@ -286,3 +328,7 @@ vanuit de testbrowser niet te bekijken.
   EP-Online.
 - **Geen subsessie** deze ronde. Er is ook niets met ElevenLabs gedaan.
 - **Schermafbeeldingen** van de vijf echte adressen zijn in de sessie gemaakt en staan niet in de repo.
+- **Dit stuk van het verslag ("Samengevoegd en live") is na de samenvoeging op de werkbranch
+  bijgeschreven en staat nog niet in `main`.** Een push die alleen `docs/` raakt, start geen run.
+- **Het bestemmingsplan is niet gebouwd.** Wim heeft dat uitdrukkelijk nog niet gevraagd; het
+  onderzoek staat hierboven.
