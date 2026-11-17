@@ -25,6 +25,8 @@ publiceren wordt de live site getest. Zie "Browsertests op GitHub (17-11-2026)".
 
 | Tijdstip | Wat |
 |---|---|
+| 17-11-2026, 09:07 uur | **Voorbereid, niet live: een planner op Cloudflare die de workflow start als GitHub dat zelf niet doet.** Op verzoek van Wim. Staat op de werkbranch, niet op `main`; er is niets bij Cloudflare geplaatst en er is geen token. Zie "Planner op Cloudflare (voorbereid)". |
+| 17-11-2026, 09:07 uur | **De workflow op de werkbranch heeft een tweede invoer bij de handmatige run: `gepland`.** Daarmee gedraagt een run die de planner start zich als een geplande run (geen browsertests vooraf). Het schema zelf is niet gewijzigd. Dit vult "Wat er nu staat" onder "Browsertests op GitHub" aan en geldt pas na samenvoegen. |
 | 17-11-2026, 08:45 uur | **Het plan voor de browsertests op GitHub is uitgevoerd; "Dit plan is niet uitgevoerd" onder "Plan voor later" geldt niet meer.** Wim koos mogelijkheid C. Zie "Browsertests op GitHub (17-11-2026)". |
 | 17-11-2026, 08:45 uur | **Mijn schatting van de extra duur klopte voor de helft, en de bewaarde browser maakt het niet sneller.** Geschat: 30 tot 60 seconden erbij zonder bewaarde browser, 15 tot 25 met. Gemeten zonder: 35 seconden erbij in de job bouwen. Met bewaarde browser duurde het terugzetten 13,5 seconden, tegen 5,3 en 6,4 seconden voor opnieuw downloaden. Zie "Gemeten duur". |
 | 17-11-2026, 08:45 uur | **Stap 5 van het plan noemde `OK (skipped=7)` in het logboek; bij mogelijkheid C staat dat er niet letterlijk.** De snelle stap Tests toont nog steeds `OK (skipped=31)`; de 24 browsertests draaien in een eigen stap, die `Ran 24 tests` en `OK` toont. Samen blijven dezelfde 7 tests over. Zie "Run 12 op GitHub". |
@@ -373,6 +375,39 @@ uitbreiding van een bestaande test.
 | Handmatige run vanaf een andere branch | Niet uitgeprobeerd: ik mag via de koppeling geen run starten. Dat publiceren dan wordt overgeslagen, is vastgelegd door een test op de tekst |
 | Verouderde versies van de actions | GitHub meldt bij elke run dat `actions/checkout@v4`, `setup-python@v5`, `setup-node@v4`, `cache@v4`, `configure-pages@v5` en `upload-artifact@v4` voor Node 20 zijn gemaakt en nu op Node 24 worden gedraaid. Het werkt; bijwerken is niet gedaan |
 | De film | Toont het bolletje nog op de oude plaats. Niet opnieuw gemaakt |
+
+## Planner op Cloudflare (voorbereid, 17-11-2026)
+
+Wim vroeg als voorbereiding de code voor een Cloudflare Worker met een cron-trigger die de workflow
+via de API van GitHub start, zonder iets live te zetten; het token maakt hij zelf aan. De
+handleiding met de stappen en het token staat in `tools/planner/README.md`.
+
+| Vraag | Antwoord |
+|---|---|
+| Wat staat er? | `tools/planner/` (de Worker en zijn instellingen), `tests/test_planner.py` (24 tests) en `tests/js/run_planner.mjs` (draait de Worker voor de tests) |
+| Is er iets live? | Nee. Niets geplaatst bij Cloudflare, geen token, niets op `main` |
+| Hoe weet hij de Nederlandse tijd? | Cloudflare kent alleen UTC. De Worker wordt elke vijf minuten aangeroepen en rekent zelf uit of het in Nederland een slot is. Voor heel 2027 doorgerekend: elk slot valt precies één keer op elk van zijn dagen, ook als de klok verspringt |
+| Blijft hij gelijk aan het schema? | Een test vergelijkt de slots in de Worker met `schedule` in de workflow |
+| Wat als GitHub zelf ook start? | Loopt of wacht er een run, of is er net een geslaagd, dan start de planner niets. Start GitHub later alsnog, dan komt er een extra verversing |
+| Wat is in de workflow gewijzigd? | Een invoer `gepland` bij de handmatige run, en de voorwaarde op de twee browserstappen in bouwen. Zonder die invoer zou elke run van de planner eerst de browsertests draaien, en dat was bij de keuze voor B en C juist niet de bedoeling. Het schema is niet aangeraakt |
+| Volgorde bij live zetten | Eerst de workflow met `gepland` op `main`, dan pas de Worker. Andersom weigert GitHub elke start (422) |
+
+### Gevonden bij het proberen
+
+| Nr. | Wat | Hersteld |
+|---|---|---|
+| 1 | **De runtime van Cloudflare weigerde de Worker te starten.** Het hoofdbestand exporteerde naast de aanroep ook het schema en een getal; Cloudflare accepteert daar alleen aanroepbare onderdelen. De droge run van wrangler (`deploy --dry-run`) merkte dat niet; het bleek pas bij lokaal draaien in de runtime | Ja: de logica staat in `src/planner.js`, het hoofdbestand exporteert alleen de aanroep. Test toegevoegd |
+| 2 | **Bij het lokaal proberen zijn drie echte verzoeken naar GitHub gegaan, die ik niet had bedoeld.** Wrangler las een omgevingsvariabele `GITHUB_TOKEN` uit de cloudsessie (een plaatshouder van 14 tekens, geen echt token) en gaf die aan de Worker. GitHub weigerde alle drie (401, "Bad credentials"). Het waren verzoeken om de lijst met runs; er is geen run gestart en er is niets gewijzigd | N.v.t. Het liet wel zien dat een geweigerd token wordt gemeld zoals bedoeld |
+
+### Getest en niet getest
+
+| Wat | Hoe | Uitkomst |
+|---|---|---|
+| Schema, klok, beslissing, verzoeken, foutafhandeling | 24 tests met een nagebootst GitHub | Geslaagd. Vijf opzettelijke fouten in de Worker (verkeerde tijdzone, lopende run negeren, invoer weglaten, eindeloos herhalen, token in het logboek) lieten elk tests falen |
+| Instellingen en bundel | `wrangler deploy --dry-run`, wrangler 4.163.0 | Geaccepteerd |
+| In de runtime van Cloudflare, lokaal | De cron-trigger nagebootst op vijf tijdstippen | Buiten een slot geen verzoek; op een slot in winter- en zomertijd en op zondag 04:30 uur wel |
+| Alle tests samen | `python -m unittest discover tests` | 223 (was 198), geslaagd, 6 overgeslagen |
+| **Niet getest** | Plaatsen bij Cloudflare, een echt token, een werkelijk gestarte run, de workflow met de invoer `gepland` op GitHub, en of Cloudflare de cron-trigger stipt afvuurt | |
 
 ## Plan voor later: de browsertests ook op GitHub
 

@@ -32,6 +32,12 @@ on:
         description: "Volledige verversing: cache negeren en alles opnieuw ophalen"
         type: boolean
         default: false
+      gepland:
+        # Voor de planner (tools/planner), die de run op de tijden van het schema start als GitHub
+        # dat zelf niet doet. Met de hand laat je dit uit.
+        description: "Gestart door de planner: gedraagt zich als een geplande run, zonder browsertests vooraf"
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # nodig om de cache terug te zetten in het repository
@@ -62,13 +68,14 @@ jobs:
         run: python -m unittest discover tests
       # De pagina in een echte browser. Alleen bij een push en bij een handmatige run: de pagina
       # verandert alleen door een push, en een hapering van de browser mag een geplande verversing niet
-      # tegenhouden. Vóór het ophalen: de droogloop rekent op de gegevens zoals ze in de repository staan.
+      # tegenhouden. Dat geldt ook voor een run die de planner start (invoer `gepland`).
+      # Vóór het ophalen: de droogloop rekent op de gegevens zoals ze in de repository staan.
       - name: Browser klaarzetten
-        if: github.event_name != 'schedule'
+        if: github.event_name != 'schedule' && !inputs.gepland
         timeout-minutes: 10
         uses: ./.github/actions/browser
       - name: Browsertests
-        if: github.event_name != 'schedule'
+        if: github.event_name != 'schedule' && !inputs.gepland
         timeout-minutes: 10
         run: |
           # Zonder Playwright slaan deze tests zichzelf over en zou de stap groen zijn zonder iets te testen.

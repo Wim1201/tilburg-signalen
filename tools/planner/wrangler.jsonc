@@ -1,0 +1,29 @@
+{
+  // Planner for Tilburg Signalen: a Cloudflare Worker that starts the workflow "Dagelijkse
+  // verversing" on GitHub at the Dutch times of its schedule. See README.md in this folder.
+  "name": "tilburg-signalen-planner",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-17",
+
+  // No public address: the Worker only runs on its cron trigger and has no fetch handler.
+  "workers_dev": false,
+  "preview_urls": false,
+
+  // Keep the logs, so that a run that was not started can be looked up afterwards.
+  "observability": { "enabled": true },
+
+  // One trigger, every five minutes, in UTC (Cloudflare has no time zones). The Worker itself
+  // decides whether that moment is a slot of the schedule in Dutch time, summer and winter alike.
+  // One trigger on purpose: the free plan allows five per account.
+  "triggers": { "crons": ["*/5 * * * *"] },
+
+  "vars": {
+    "GITHUB_REPO": "Wim1201/tilburg-signalen",
+    "WORKFLOW": "dagelijks.yml",
+    "REF": "main"
+  },
+
+  // The token is a secret, set with `wrangler secret put GITHUB_TOKEN`; it is never in this file.
+  // Deploying fails while the secret is missing.
+  "secrets": { "required": ["GITHUB_TOKEN"] }
+}

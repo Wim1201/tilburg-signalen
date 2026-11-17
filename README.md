@@ -33,6 +33,7 @@ De app gebruikt alleen openbare gegevens van overheden en heeft geen server of d
 | `.github/actions/browser/` | Zet voor die tests Node, Playwright en Chromium klaar op de GitHub-runner |
 | `package.json`, `package-lock.json` | Leggen Playwright op één versie vast. Alleen voor de tests in een echte browser; de app zelf heeft geen pakketten nodig |
 | `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
+| `tools/planner/` | Voorbereid, niet live: een Cloudflare Worker die de workflow op de tijden van het schema start als GitHub dat zelf niet doet. Zie `tools/planner/README.md` |
 | `tools/video/` | Maakt de video van de ochtendronde door de app zelf te bedienen. De film zelf staat niet in de repo; hij komt in `tools/video/uit/`, dat git overslaat. Zie het verslag over de video in `docs/` |
 
 ## Zelf draaien
