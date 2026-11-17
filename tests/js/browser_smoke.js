@@ -189,6 +189,16 @@ var SEEN = "tilburg-signalen.gezien";
       });
     }).length;
   });
+  // A count of three digits with new notices: the badge may not cover the number, whatever font the
+  // device falls back on. Set on the page itself, so that it does not depend on what the data holds.
+  await page.$eval("#tile-onzeker", function (tile) {
+    var mark = tile.querySelector(".badge");
+    tile.querySelector("b").textContent = "188";
+    mark.hidden = false;
+    mark.textContent = "+12";
+  });
+  result.threeDigitTileShapes = await tiles(page);
+  result.threeDigitOverflow = await overflow(page);
   await page.context().close();
 
   // --- Gaps in the data are reported.

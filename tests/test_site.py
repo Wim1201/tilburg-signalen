@@ -529,7 +529,9 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(self.seen["brief"], expected + " op de laatste publicatiedag.")
 
     def test_tiles_keep_their_label_on_one_line_and_the_same_height(self):
-        for name in ("tileShapes", "narrowTileShapes"):
+        # threeDigitTileShapes: the narrowest phone with a count of three digits and a badge of "+12".
+        self.assertLessEqual(self.seen["threeDigitOverflow"], 0)
+        for name in ("tileShapes", "narrowTileShapes", "threeDigitTileShapes"):
             shapes = self.seen[name]
             with self.subTest(breedte=name):
                 self.assertEqual([shape["label"] for shape in shapes], ["Ranglijst", "Nieuw", "Onzeker"])
