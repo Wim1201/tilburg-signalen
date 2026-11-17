@@ -12,6 +12,7 @@ import datetime
 import json
 import math
 import pathlib
+import time
 
 from . import geo, http
 
@@ -154,6 +155,9 @@ def load():
 
 def main():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    http.VERZOEKEN.clear()
+    http.GEWEIGERD.clear()
+    started = time.monotonic()
     area = build(config)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(area, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
@@ -161,6 +165,9 @@ def main():
         towns = ", ".join(w["naam"] for w in gemeente["woonplaatsen"])
         print(f'{gemeente["naam"]:20} {gemeente["land"]} {gemeente["minKm"]:5.1f}-{gemeente["maxKm"]:5.1f} km '
               f'{gemeente["dekking"]:12} {gemeente["regio"]:15} {towns}')
+    # The same line as the refresh prints, so the log of a run gives the figures of every step.
+    print(f'  gebied: {sum(http.VERZOEKEN.values())} verzoeken in {time.monotonic() - started:.0f} seconden, '
+          f'{sum(http.GEWEIGERD.values())} keer geweigerd (HTTP 429)')
 
 
 if __name__ == "__main__":
