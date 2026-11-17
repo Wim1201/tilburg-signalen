@@ -1,0 +1,8 @@
+{
+  "name": "tilburg-signalen",
+  "private": true,
+  "description": "Alleen voor de tests in een echte browser (tests/js/browser_smoke.js, tools/video/opname.js). De app zelf heeft geen pakketten nodig.",
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

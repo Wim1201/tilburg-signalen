@@ -60,6 +60,20 @@ jobs:
           python-version: "3.12"
       - name: Tests
         run: python -m unittest discover tests
+      # De pagina in een echte browser. Alleen bij een push en bij een handmatige run: de pagina
+      # verandert alleen door een push, en een hapering van de browser mag een geplande verversing niet
+      # tegenhouden. Vóór het ophalen: de droogloop rekent op de gegevens zoals ze in de repository staan.
+      - name: Browser klaarzetten
+        if: github.event_name != 'schedule'
+        timeout-minutes: 10
+        uses: ./.github/actions/browser
+      - name: Browsertests
+        if: github.event_name != 'schedule'
+        timeout-minutes: 10
+        run: |
+          # Zonder Playwright slaan deze tests zichzelf over en zou de stap groen zijn zonder iets te testen.
+          node -e "require('playwright')"
+          python -m unittest tests.test_site.InDeBrowser tests.test_video.Droogloop
       - name: Gebied bijwerken (gemeenten en plaatsen binnen de straal)
         run: python -m signalen.gebied || echo "::warning::Gebied niet bijgewerkt; bestaande lijst wordt gebruikt"
       - name: Berichten ophalen
@@ -97,6 +111,8 @@ jobs:
 
   publiceren:
     needs: bouwen
+    # Alleen vanaf main. Een handmatige run vanaf een andere branch test en bouwt, maar zet niets live.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -104,3 +120,32 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  # De pagina van de live site in een echte browser, met de gegevens die net zijn gepubliceerd. Draait
+  # na elk publiceren, ook bij de geplande runs, en houdt het publiceren niet tegen: de site staat dan
+  # al live. Faalt deze job, dan toont Actions een rood kruis bij de run. Is er niet gepubliceerd
+  # (mislukt, of een run vanaf een andere branch), dan wordt deze job overgeslagen.
+  live-controleren:
+    needs: publiceren
+    runs-on: ubuntu-latest
+    # Eén run tegelijk: een hangende controle mag de volgende verversing niet uren ophouden.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Dezelfde stand als bouwen: de test vergelijkt de live site met de huisstijl in de repository.
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Browser klaarzetten
+        uses: ./.github/actions/browser
+      - name: Paginatest tegen de live site
+        env:
+          TILBURG_SITE_URL: https://wim1201.github.io/tilburg-signalen
+        run: |
+          # Zonder Playwright slaan deze tests zichzelf over en zou de stap groen zijn zonder iets te testen.
+          node -e "require('playwright')"
+          python -m unittest tests.test_site.InDeBrowser
