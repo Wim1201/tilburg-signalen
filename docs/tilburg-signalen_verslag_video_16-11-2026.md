@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 16-11-2026, 20:00 – 22:20 uur |
+| Datum | 16-11-2026, 20:00 – 22:20 uur; aangevuld op 17-11-2026, 08:20 – 08:50 uur (browsertests op GitHub) |
 | Versie | versie 2 van de app, branch `claude/awesome-brown-i18j4o` |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | `site/data/berichten.json` zoals het in de repo staat (bijgewerkt 16-11-2026, 15:37 uur); vergeleken met de nieuwste run op de live app (17:38 uur) |
@@ -18,10 +18,19 @@ aan Wim geleverd. Opnieuw maken kan met `tools/video/` en kost geen credits.
 **Ik heb de video niet kunnen beluisteren.** Beeld, lengte, pauzes, volume en de gelijkloop van
 beeld en stem zijn gemeten. Uitspraak en klank zijn niet beoordeeld; dat moet Wim doen.
 
+**Aanvulling 17-11-2026:** de tests in een echte browser draaien nu ook op GitHub, en na elk
+publiceren wordt de live site getest. Zie "Browsertests op GitHub (17-11-2026)".
+
 ## Correcties en aanvullingen
 
 | Tijdstip | Wat |
 |---|---|
+| 17-11-2026, 08:45 uur | **Het plan voor de browsertests op GitHub is uitgevoerd; "Dit plan is niet uitgevoerd" onder "Plan voor later" geldt niet meer.** Wim koos mogelijkheid C. Zie "Browsertests op GitHub (17-11-2026)". |
+| 17-11-2026, 08:45 uur | **Mijn schatting van de extra duur klopte voor de helft, en de bewaarde browser maakt het niet sneller.** Geschat: 30 tot 60 seconden erbij zonder bewaarde browser, 15 tot 25 met. Gemeten zonder: 35 seconden erbij in de job bouwen. Met bewaarde browser duurde het terugzetten 13,5 seconden, tegen 5,3 en 6,4 seconden voor opnieuw downloaden. Zie "Gemeten duur". |
+| 17-11-2026, 08:45 uur | **Stap 5 van het plan noemde `OK (skipped=7)` in het logboek; bij mogelijkheid C staat dat er niet letterlijk.** De snelle stap Tests toont nog steeds `OK (skipped=31)`; de 24 browsertests draaien in een eigen stap, die `Ran 24 tests` en `OK` toont. Samen blijven dezelfde 7 tests over. Zie "Run 12 op GitHub". |
+| 17-11-2026, 08:45 uur | **Het bolletje "+1" op de tegel Onzeker staat nu op de bovenrand van de tegel, niet meer rechtsboven naast het getal.** De eerste run met browsertests op GitHub faalde erop. Door Wim gekozen aan de hand van een voor/na-beeld. Dit wijzigt punt 1 onder "Gevonden tijdens het opnemen"; de film toont nog de oude plaats. Zie "Run 11 mislukte". |
+| 17-11-2026, 08:45 uur | **Een handmatige run vanaf een andere branch dan `main` publiceert niet meer.** Voorheen probeerde de job publiceren dat wel. Met Wim afgestemd. |
+| 17-11-2026, 08:45 uur | **De geplande run van 06:45 uur is niet gestart.** Onder "Buiten dit verslag" stond dat dit vandaag te zien zou zijn. Om 08:43 uur stond er bij Actions geen enkele run met de aanleiding "schedule", ook niet van eerdere dagen. De live site stond tot 08:40 uur op de stand van 16-11-2026, 22:10 uur. Oorzaak niet onderzocht; het schema is niet gewijzigd. |
 | 16-11-2026, 22:12 uur | **Een push die alleen `docs/` raakt, start geen run meer; "een push naar `main` start een nieuwe run" onder "Buiten dit verslag" geldt daarvoor niet meer.** Op verzoek van Wim in de workflow gezet. Zie "Workflow: verslagen starten geen run". Of het op GitHub werkelijk zo werkt, blijkt pas bij de eerstvolgende push die alleen `docs/` raakt. |
 | 16-11-2026, 22:12 uur | **Het stuk "Samengevoegd en live" stond op de werkbranch en nog niet in `main`.** Wim vroeg het samen te voegen; dat gebeurt in dezelfde pull request als de wijziging van de workflow. |
 | 16-11-2026, 22:03 uur | **Versie 2 is samengevoegd met `main` en staat live; "Samenvoegen met `main` is niet gedaan en er is geen pull request" onder "Buiten dit verslag" geldt niet meer.** Wim keurde de film goed en vroeg om de pull request en het samenvoegen. Zie "Samengevoegd en live". |
@@ -215,7 +224,160 @@ nodig.
 | Test | `tests/test_workflow.py`, 5 tests: push naar `main` start een run; alleen `docs/**` is uitgezonderd; niets anders is uitgezonderd; geplande en handmatige runs ongemoeid; de run test nog steeds vóór het publiceren |
 | Niet getest | Of GitHub de run werkelijk overslaat. De pull request met deze wijziging raakt ook de workflow zelf en start dus wel een run; dat laat alleen zien dat het bestand geldig is. De eerste push die alleen `docs/` raakt, is de proef |
 
+## Browsertests op GitHub (17-11-2026)
+
+Uitvoering van het plan hieronder. Wim koos **mogelijkheid C**: browsertests bij een push en een
+handmatige run, en na elk publiceren een test van de live site.
+
+### Wat er nu staat
+
+| Onderdeel | Wat |
+|---|---|
+| `package.json`, `package-lock.json` | Playwright vast op 1.63.0. `node_modules/` staat in `.gitignore` |
+| `.github/actions/browser/action.yml` | Eén plek voor wat een job met browsertests nodig heeft: Node 22, `npm ci`, de browser bewaren tussen runs (`actions/cache`, sleutel `playwright-1.63.0-chromium-Linux`), `npx playwright install --with-deps chromium` |
+| Job `bouwen`, stappen "Browser klaarzetten" en "Browsertests" | Alleen bij een push en een handmatige run. Na de snelle tests en vóór het ophalen: de droogloop rekent op de gegevens zoals ze in de repo staan. De 21 tests van de pagina en de 3 van de droogloop. Faalt er een, dan wordt er niet opgehaald en niet gepubliceerd |
+| Job `publiceren` | Alleen vanaf `main` |
+| Job `live-controleren` (nieuw) | Na elk publiceren, ook bij geplande runs: de 21 tests van de pagina tegen `https://wim1201.github.io/tilburg-signalen`. Staat ná publiceren en houdt dat niet tegen. Faalt hij, dan staat de site al live en toont Actions een rood kruis bij de run |
+| Beveiliging tegen stil overslaan | Beide teststappen controleren eerst of Playwright te vinden is. Zonder die controle slaan de tests zichzelf over en is de stap groen zonder iets te testen |
+| Beveiliging tegen hangen | 10 minuten per browserstap en voor de hele job `live-controleren`. Er loopt één run tegelijk; een hangende stap zou anders de volgende verversingen ophouden |
+
+Niet gewijzigd: `signalen/`, `config.json`, `site/data/`, `cache/`, het schema van de geplande runs
+en `paths-ignore: "docs/**"`.
+
+### Verloop
+
+| Tijdstip | Handeling | Uitkomst |
+|---|---|---|
+| 08:26 uur | Stand bij Actions bekeken | Laatste run was run 10 van 16-11, 22:09 uur. Geen geplande run van 06:45 uur |
+| 08:31 uur | Lokaal: alle tests, en de paginatest tegen de live site | 198 tests geslaagd, 6 overgeslagen (de film staat niet in de repo); tegen de live site 21 geslaagd |
+| 08:32 uur | Handmatige run op de werkbranch proberen te starten | **Geweigerd (403):** via de koppeling mag ik geen run starten. Wim koos daarop voor een pull request |
+| 08:33 uur | Pull request [Wim1201/tilburg-signalen#10](https://github.com/Wim1201/tilburg-signalen/pull/10) gemaakt en samengevoegd (gewone merge) | Merge-commit `e334b1b` |
+| 08:33 – 08:34 uur | Run 11 | **Mislukt** op één browsertest. Niets opgehaald, niets gepubliceerd. Zie hieronder |
+| 08:35 – 08:39 uur | Fout lokaal nagemaakt, herstel gemaakt, voor/na-beeld aan Wim voorgelegd | Wim koos: bolletje op de bovenrand |
+| 08:39 uur | Pull request [Wim1201/tilburg-signalen#11](https://github.com/Wim1201/tilburg-signalen/pull/11) gemaakt en samengevoegd (gewone merge) | Merge-commit `78fe563` |
+| 08:39 – 08:42 uur | Run 12 | Geslaagd: bouwen, publiceren en live-controleren |
+| 08:41 uur | Live site | `bijgewerkt` 17-11-2026, 08:40:31 uur; de nieuwe opmaak van het bolletje staat in `styles.css` |
+
+### Run 11 mislukte: het bolletje over het getal
+
+| Vraag | Antwoord |
+|---|---|
+| Welke test? | `test_tiles_keep_their_label_on_one_line_and_the_same_height`, op de telefoon van 320 px breed: "het bolletje staat over het getal". De andere 23 browsertests slaagden |
+| Waarom op GitHub wel en in de cloudsessie niet? | De test blokkeert de webfonts, zodat hij niet van de fontdienst afhangt. De pagina valt dan terug op het lettertype van de machine. In de cloudsessie is dat Inter, op de GitHub-runner DejaVu Sans, en dat is breder: het getal "23" is 41,8 px breed in plaats van 38,7 px |
+| Hoeveel scheelde het? | Op 320 px was er met Inter 5,9 px ruimte tussen getal en bolletje; met DejaVu Sans overlapten ze 2,0 px |
+| Was het ook in de echte app mis? | Met het lettertype van de app zelf (Bricolage Grotesque) was er bij "23" op 320 px 9,7 px ruimte. Bij een getal van drie cijfers overlapten ze 8,9 px. Nu staan er 23 berichten onder Onzeker; het was dus nog niet te zien, maar de opmaak had geen marge |
+| Hoe nagemaakt? | Lokaal DejaVu Sans als terugvallettertype afgedwongen: dezelfde ene test faalde |
+| Wat is gedaan? | `site/styles.css`: het bolletje staat op de bovenrand van de tegel (17 px hoger). Het kan dan bij geen enkel lettertype of aantal cijfers over het getal staan |
+| Test erbij | De smalste telefoon wordt ook gemeten met het getal 188 en een bolletje "+12". Die meting faalt op de oude opmaak en slaagt op de nieuwe, met beide lettertypen |
+| Gevolg van de mislukte run | Tussen 08:33 en 08:41 uur is er niets gepubliceerd; de live site bleef op de stand van 16-11, 22:10 uur. Run 11 blijft als mislukt in de lijst bij Actions staan |
+
+De wijziging is samengevoegd met `main` voordat de browsertests één keer op de runner hadden
+gedraaid. Mijn voorstel was eerst een handmatige run op de werkbranch; die kon ik niet zelf starten,
+en bij de keuze voor de pull request had ik gemeld dat een fout dan op `main` zou staan. De schade
+bleef beperkt tot één mislukte run. Het laat zien waarvoor deze tests op GitHub dienen: de runner
+is een andere machine dan de cloudsessie.
+
+### Run 12 op GitHub
+
+| Job | Stap | Uitkomst |
+|---|---|---|
+| bouwen | Tests | `Ran 198 tests in 2.285s`, `OK (skipped=31)` |
+| bouwen | Browsertests | `Ran 24 tests in 15.261s`, `OK` |
+| bouwen | Berichten ophalen | 1.087 berichten geschreven; 31 verzoeken in 28 seconden, alles uit de cache, geen mislukte verzoeken |
+| bouwen | Cache bewaren | Gewijzigd; commit `d0cc81d` op `main` |
+| publiceren | | Geslaagd |
+| live-controleren | Paginatest tegen de live site | `Ran 21 tests in 5.314s`, `OK` |
+
+De snelle stap toont nog `skipped=31`, omdat Playwright op dat moment nog niet is geïnstalleerd.
+Van die 31 draaien er 24 daarna in de stap Browsertests. Er blijven er 7 over die op GitHub niet
+draaien: de 6 tests van de film (de film staat niet in de repo) en de ene test die ffmpeg nodig
+heeft. Dat is het aantal uit het plan.
+
+De paginatest tegen de live site begon 62 seconden nadat het publiceren klaar was. Hij bevat de
+nieuwe meting met drie cijfers, die op de oude opmaak faalt. Dat hij slaagde, laat zien dat de live
+site op dat moment de nieuwe versie gaf.
+
+### Gemeten duur
+
+| | Run 9 (16-11) | Run 10 (16-11) | Run 12 (17-11) |
+|---|---|---|---|
+| Job bouwen | 52 s | 41 s | 81 s |
+| Job publiceren | 12 s | 9 s | 8 s |
+| Job live-controleren | – | – | 71 s |
+| Van start tot de site live staat | 72 s | 58 s | 95 s |
+| Hele run | 72 s | 58 s | 169 s |
+
+De stappen die erbij zijn gekomen:
+
+| Stap | Run 11, bouwen (zonder bewaarde browser) | Run 12, bouwen (zonder bewaarde browser) | Run 12, live-controleren (met bewaarde browser) |
+|---|---|---|---|
+| Node klaarzetten | 0,5 s | 0,5 s | 4,4 s |
+| `npm ci` | 0,8 s | 0,8 s | 1,9 s |
+| Bewaarde browser zoeken of terugzetten | 0,2 s (niet gevonden) | 0,2 s (niet gevonden) | 13,5 s (271 MB teruggezet) |
+| Systeempakketten (`--with-deps`) | 9,0 s | 7,9 s | 29,6 s |
+| Browser downloaden | 5,3 s | 6,4 s | – (stond er al) |
+| **Stap "Browser klaarzetten" samen** | **16 s** | **16 s** | **49 s** |
+| De tests zelf | 17 s (24 tests, 1 mislukt) | 16 s (24 tests) | 8 s (21 tests) |
+| Browser bewaren na afloop | – (run mislukt) | 3,2 s | – (stond er al) |
+
+| Vraag | Antwoord |
+|---|---|
+| Hoeveel langer duurt bouwen bij een push of handmatige run? | 35 seconden (16 + 16 + 3), zonder bewaarde browser. De site staat daardoor ongeveer 35 seconden later live |
+| En met bewaarde browser? | **Niet als geheel gemeten in bouwen:** daarvoor is nog een push of handmatige run nodig. Uit de gemeten stappen afgeleid: ongeveer 40 seconden, dus niet korter. Terugzetten kostte 13,5 seconden, downloaden 5,3 en 6,4 seconden |
+| Hoeveel langer duurt een geplande run? | bouwen en publiceren blijven gelijk: de browserstappen worden overgeslagen en de site staat even snel live. Daarna komt de controle van de live site: 71 seconden in run 12. **Op een geplande run nog niet gemeten:** er is er nog geen gestart |
+| Waar zit de tijd? | In de systeempakketten: 8 tot 30 seconden, sterk wisselend per runner (in live-controleren duurde alleen het verversen van de pakketlijst al 16 seconden). Er worden daarbij 9 pakketten geïnstalleerd, alle lettertypen; de bibliotheken die Chromium nodig heeft, staan al op de runner |
+
+Elke meting hierboven is één run. De spreiding tussen runners is groot (Node klaarzetten 0,5 tegen
+4,4 seconden); de getallen zijn een indicatie, geen gemiddelde.
+
+### Mogelijke versnellingen (niet uitgevoerd, keuze aan Wim)
+
+| Mogelijkheid | Wat het scheelt | Nadeel |
+|---|---|---|
+| De bewaarde browser weglaten | Ongeveer 7 seconden per job waarin hij wordt teruggezet, en 3 seconden bij het bewaren | De run hangt dan elke keer af van de downloadserver van Playwright |
+| Alleen de browser zonder venster (`--only-shell`) | De download gaat van ruim 300 naar ruim 110 MiB (afgelezen uit het logboek van run 12; de optie zelf is niet uitgeprobeerd); ook het bewaren en terugzetten wordt kleiner | Wie op GitHub ooit een film wil opnemen, heeft de volledige browser nodig. Nu gebeurt dat daar niet |
+| `--with-deps` weglaten | 8 tot 30 seconden per job | Verandert de runner, dan kan Chromium op een dag niet starten. De terugvallettertypen kunnen ook anders uitvallen |
+
+### Tests
+
+| Test | Wat hij vastlegt |
+|---|---|
+| Playwright op één versie | `package.json` noemt een exacte versie; `package-lock.json` heeft dezelfde voor `playwright` en `playwright-core` |
+| Geïnstalleerde pakketten blijven buiten git | `node_modules/` in `.gitignore` en niets ervan in git |
+| Volgorde | Tests, Browser klaarzetten, Browsertests, Berichten ophalen, klaarzetten voor publiceren |
+| Een geplande run wacht niet op een browser | De twee browserstappen hebben de voorwaarde; de snelle tests en het verversen niet |
+| Beide klassen draaien, en de stap faalt zonder Playwright | De opdracht in de stap; de klassen bestaan |
+| Een hangende browser houdt de volgende runs niet op | Tijdslimiet op de stappen en op de job |
+| Node en Playwright uit het lockbestand, alleen Chromium | De inhoud van `.github/actions/browser/action.yml` |
+| De browser wordt bewaard onder de versie van Playwright | Map, sleutel en volgorde |
+| Alleen een run vanaf `main` publiceert | Voorwaarde op de job publiceren; bouwen heeft er geen |
+| De live site wordt na elk publiceren getest | `live-controleren` volgt op publiceren en heeft geen eigen voorwaarde |
+| De controle houdt het publiceren niet tegen | publiceren wacht alleen op bouwen; er zijn precies drie jobs |
+| De controle test het live adres en faalt zonder Playwright | `TILBURG_SITE_URL` en de opdracht |
+| Dezelfde browser en dezelfde stand van de repo als bouwen | De test vergelijkt de live site met de huisstijl in de repo |
+| De controle kan niet schrijven | Alleen leesrecht op de repo |
+| Drie cijfers op de smalste telefoon (in de browser) | Het bolletje staat niet over het getal, de tegels zijn even hoog, niets is breder dan het scherm |
+
+198 tests in totaal (was 184): 14 erbij voor de workflow; de meting met drie cijfers is een
+uitbreiding van een bestaande test.
+
+### Niet getest of nog open
+
+| Punt | Toelichting |
+|---|---|
+| Een geplande run met de nieuwe workflow | Nog niet gezien. Dat de browserstappen in bouwen dan worden overgeslagen en `live-controleren` wel draait, is alleen door de tests op de tekst van de workflow vastgelegd |
+| De geplande runs zelf | Er is er nog geen gestart (zie de correcties bovenaan). De eerstvolgende staan op 09:35 en 10:20 uur |
+| bouwen met bewaarde browser | Afgeleid, niet gemeten |
+| Vals alarm van `live-controleren` | De test begint zodra de job klaarstaat. Geeft GitHub Pages op dat moment nog de vorige versie en is in dezelfde push de pagina én een test gewijzigd, dan faalt de controle ten onrechte. In run 12 ging het goed (62 seconden na het publiceren) |
+| Een rood kruis moet iemand zien | GitHub kan bij een mislukte run een e-mail sturen; dat hangt af van de meldingsinstellingen van Wim. Of er na run 11 een is aangekomen, weet ik niet |
+| Handmatige run vanaf een andere branch | Niet uitgeprobeerd: ik mag via de koppeling geen run starten. Dat publiceren dan wordt overgeslagen, is vastgelegd door een test op de tekst |
+| Verouderde versies van de actions | GitHub meldt bij elke run dat `actions/checkout@v4`, `setup-python@v5`, `setup-node@v4`, `cache@v4`, `configure-pages@v5` en `upload-artifact@v4` voor Node 20 zijn gemaakt en nu op Node 24 worden gedraaid. Het werkt; bijwerken is niet gedaan |
+| De film | Toont het bolletje nog op de oude plaats. Niet opnieuw gemaakt |
+
 ## Plan voor later: de browsertests ook op GitHub
+
+**Uitgevoerd op 17-11-2026; zie "Browsertests op GitHub (17-11-2026)" hierboven.** De tekst hieronder
+is het plan zoals het op 16-11 is vastgelegd.
 
 Nu worden op GitHub 24 tests overgeslagen omdat Playwright daar ontbreekt: de 21 tests van de
 pagina in een echte browser en de 3 van de droogloop. Ze draaien alleen in een cloudsessie. Dit
@@ -408,7 +570,7 @@ in de app. De twee punten in de app (1 en 2) zijn opmaak.
 | Grootte | Film 5,2 MB; stem 1,0 MB; geluidjes samen 86 kB |
 | Tikken / scrollbewegingen | 5 / 3 |
 | Opnemen | 2.101 beelden, enkele minuten rekentijd (niet precies gemeten) |
-| Unittests | 184, alle geslaagd (was 139; 167 om 20:51 uur, 175 om 21:00 uur, 178 om 21:34 uur, 179 om 21:58 uur, daarna 5 erbij voor de workflow) |
+| Unittests | 198 op 17-11-2026 (zie "Browsertests op GitHub"); op 16-11: 184, alle geslaagd (was 139; 167 om 20:51 uur, 175 om 21:00 uur, 178 om 21:34 uur, 179 om 21:58 uur, daarna 5 erbij voor de workflow) |
 
 ## Getest
 
@@ -444,7 +606,7 @@ zonder ffmpeg worden de vijf tests die het nodig hebben overgeslagen. Dat is nie
 
 - **Pushnotificatie.** Verstuurd toen de video klaar was en gepusht.
 - **Samengevoegd met `main` om 21:59 uur** (zie "Samengevoegd en live"). Dit stuk van het verslag is daarna op de werkbranch bijgeschreven en staat nog niet in `main`; een push naar `main` start een nieuwe run.
-- **Morgen te zien, niet door mij te controleren:** of GitHub de geplande run van 06:45 uur start. Het tijdstip bovenaan de live app moet dan dinsdag 06:45 uur of later zijn.
+- **Morgen te zien, niet door mij te controleren:** of GitHub de geplande run van 06:45 uur start. Het tijdstip bovenaan de live app moet dan dinsdag 06:45 uur of later zijn. *Uitkomst 17-11-2026: niet gestart; zie de correcties bovenaan.*
 - **ElevenLabs opruimen** kan alleen Wim zelf, in de app (zie "Opruimen").
 - **Stem uit de bibliotheek.** "Daan" is een stem uit de openbare bibliotheek van ElevenLabs. De teller van stemplekken staat na afloop nog op 0 van 30. Onder welke voorwaarden zo'n stem in eigen materiaal gebruikt mag worden heb ik niet uitgezocht.
 - **Geen subsessie** deze ronde: het werk hing aan één stem en één opname en liet zich niet verdelen.
