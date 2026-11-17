@@ -203,8 +203,11 @@ var SEEN = "tilburg-signalen.gezien";
 
   // --- Gaps in the data are reported.
   page = await open(390, function (data) {
-    var latest = data.berichten.reduce(function (day, item) { return item.datum > day ? item.datum : day; }, "");
+    // The latest day that is in the list: on some days nothing that was published is a development location.
+    var latest = data.berichten.reduce(function (day, item) { return item.klasse === "ontwikkellocatie" && item.datum > day ? item.datum : day; }, "");
     data.onvolledigeDagen = [{ datum: latest, aantal: 4, verwacht: 2097 }];
+    // Exactly one source down, whatever the data itself says: on the live site a source may really be down.
+    data.bronnen.forEach(function (source) { if (source.status === "fout") source.status = "ok"; });
     data.bronnen[0].status = "fout";
     data.ophaalfouten = { tekst: 2, perceel: 1, insolventie: 3 };
     data.bijgewerkt = new Date(Date.now() - 30 * 3600 * 1000).toISOString(); // a refresh was skipped
