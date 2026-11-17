@@ -6,3 +6,4 @@ tools/video/uit/
 *.mp4
 *.webm
 *.mov
+node_modules/

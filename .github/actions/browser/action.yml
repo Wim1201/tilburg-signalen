@@ -1,0 +1,30 @@
+name: Browser klaarzetten
+description: Node, Playwright in de versie uit package-lock.json en Chromium, voor de tests in een echte browser.
+
+# Eén plek voor wat elke job met browsertests nodig heeft. De job moet de repository al hebben
+# opgehaald (actions/checkout): npm ci leest package-lock.json.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+    - name: Playwright installeren
+      shell: bash
+      # npm ci neemt precies de versies uit package-lock.json en faalt als package.json daarvan afwijkt.
+      run: npm ci
+    - name: Versie van Playwright
+      id: playwright
+      shell: bash
+      run: echo "versie=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+    - name: Chromium bewaren tussen runs
+      uses: actions/cache@v4
+      with:
+        # Elke versie van Playwright hoort bij één bouwnummer van Chromium: de versie is de sleutel.
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ steps.playwright.outputs.versie }}-chromium-${{ runner.os }}
+    - name: Chromium installeren
+      shell: bash
+      # Alleen Chromium. Staat de browser al in de bewaarde map, dan wordt hij niet opnieuw opgehaald;
+      # de systeempakketten (--with-deps) worden elke run nagelopen, want die zitten niet in die map.
+      run: npx playwright install --with-deps chromium

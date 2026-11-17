@@ -29,7 +29,9 @@ De app gebruikt alleen openbare gegevens van overheden en heeft geen server of d
 | `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
 | `site/logic.js` | Wat de app toont, zonder de pagina: rangorde, filters, "nieuw sinds vorig bezoek" en de inhoud van een kaart. `site/app.js` bouwt daar de pagina van |
 | `site/styles.css` | De huisstijl: kleuren, lettertypen en opmaak, licht en donker |
-| `.github/workflows/dagelijks.yml` | Ververst de gegevens op vaste tijden (werkdagen 06:45, 09:35, 10:20, 12:10 en 16:10 uur Nederlandse tijd) en publiceert de app op GitHub Pages |
+| `.github/workflows/dagelijks.yml` | Ververst de gegevens op vaste tijden (werkdagen 06:45, 09:35, 10:20, 12:10 en 16:10 uur Nederlandse tijd) en publiceert de app op GitHub Pages. Bij een push en een handmatige run draaien vooraf ook de tests in een echte browser; na elk publiceren test een eigen job de pagina op de live site |
+| `.github/actions/browser/` | Zet voor die tests Node, Playwright en Chromium klaar op de GitHub-runner |
+| `package.json`, `package-lock.json` | Leggen Playwright op één versie vast. Alleen voor de tests in een echte browser; de app zelf heeft geen pakketten nodig |
 | `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
 | `tools/video/` | Maakt de video van de ochtendronde door de app zelf te bedienen. De film zelf staat niet in de repo; hij komt in `tools/video/uit/`, dat git overslaat. Zie het verslag over de video in `docs/` |
 
@@ -63,7 +65,22 @@ python -m unittest discover tests
 ```
 
 De tests voor de app zelf (`tests/test_site.py`) draaien `site/logic.js` onder Node en worden
-overgeslagen als Node ontbreekt. De test in een echte browser heeft daarnaast Playwright nodig.
+overgeslagen als Node ontbreekt. De tests in een echte browser hebben daarnaast Playwright en
+Chromium nodig en worden zonder Playwright overgeslagen. Installeren, eenmalig:
+
+```bash
+npm ci
+```
+
+```bash
+npx playwright install chromium
+```
+
+De paginatest draait ook tegen de live site:
+
+```bash
+TILBURG_SITE_URL=https://wim1201.github.io/tilburg-signalen python -m unittest tests.test_site.InDeBrowser
+```
 
 ## Online zetten
 
