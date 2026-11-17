@@ -25,6 +25,8 @@ publiceren wordt de live site getest. Zie "Browsertests op GitHub (17-11-2026)".
 
 | Tijdstip | Wat |
 |---|---|
+| 17-11-2026, 11:48 uur | **Run 14 is geheel geslaagd, ook de controle van de live site; "dat herstel staat op de werkbranch en nog niet op `main`" hieronder geldt niet meer.** Het herstel van de test is samengevoegd met pull request [Wim1201/tilburg-signalen#14](https://github.com/Wim1201/tilburg-signalen/pull/14). De live site staat op 11:44 uur. Zie "Run 14". |
+| 17-11-2026, 11:48 uur | **De Vlaamse bron was ook in run 14 onbereikbaar vanaf GitHub; "De volgende geslaagde verversing zet de berichten terug" hieronder is dus nog niet gebeurd.** Twee runs achter elkaar kon de runner de naam `www.mercator.vlaanderen.be` niet vinden. Vanuit de cloudsessie antwoordde de dienst om 11:47 uur gewoon (HTTP 200). In run 12 (08:40 uur) lukte het vanaf GitHub nog wel. Oorzaak niet onderzocht. |
 | 17-11-2026, 11:42 uur | **Run 13 heeft gepubliceerd, maar staat als mislukt bij Actions: de controle van de live site faalde.** De site zelf is in orde en staat op 11:35 uur. De test rekende er niet op dat op de live site een bron echt onbereikbaar kan zijn, en ook niet op een dag zonder ontwikkellocaties. Beide zijn in de test hersteld; dat herstel staat op de werkbranch en nog niet op `main`. Zie "Run 13 (17-11-2026, 11:33 uur)". |
 | 17-11-2026, 11:42 uur | **De Vlaamse bron was tijdens run 13 onbereikbaar; de 9 Vlaamse berichten uit run 12 ontbreken nu op de live site.** De runner kon de naam `www.mercator.vlaanderen.be` niet vinden (vier pogingen). De app meldt het bovenaan. Vanuit de cloudsessie was de dienst om 11:40 uur wel bereikbaar. De volgende geslaagde verversing zet de berichten terug. |
 | 17-11-2026, 11:42 uur | **"bouwen met bewaarde browser" is nu gemeten; mijn afleiding van ongeveer 40 seconden was te laag voor deze run.** Run 13: 46 seconden erbij (27 s klaarzetten, 19 s testen). Het terugzetten van de browser kostte dit keer 4,5 en 5,1 seconden, in run 12 nog 13,5; het is dus ongeveer even snel als downloaden. Het verschil tussen runs zit in de systeempakketten (8 tot 30 seconden). |
@@ -438,6 +440,23 @@ Wat dit zegt over mogelijkheid C: de controle van de live site draait de tests t
 elke run anders zijn. Twee aannames zijn nu weg; er kunnen er meer zijn, en die tonen zich als een
 rood kruis op een ongewone dag. Dat een bron onbereikbaar is, maakt een run op zich niet rood: de
 stap Berichten ophalen geeft er een waarschuwing bij en de app meldt het.
+
+## Run 14 (17-11-2026, 11:43 uur)
+
+Gestart door het samenvoegen van pull request 14 (de herstelde test en het verslag van run 13).
+
+| Job | Uitkomst | Duur |
+|---|---|---|
+| bouwen | Geslaagd. Browser klaarzetten 26 s, Browsertests 19 s, Berichten ophalen 87 s (de Vlaamse bron weer onbereikbaar, vier pogingen) | 167 s |
+| publiceren | Geslaagd; de site stond om 11:46:18 uur live | 9 s |
+| live-controleren | **Geslaagd**, met de Vlaamse bron op de live site nog op "fout" en zonder ontwikkellocaties op de laatste publicatiedag: precies de twee omstandigheden waarop run 13 faalde. Browser klaarzetten 18 s, de test 4 s | 27 s |
+
+| De live site om 11:47 uur | |
+|---|---|
+| Bijgewerkt | 17-11-2026, 11:44:33 uur |
+| Berichten | 1.096: 77 ontwikkellocaties, 23 onzeker, 996 weggefilterd; alle uit de officiële bekendmakingen |
+| Publicaties van vandaag | 18, alle weggefilterd (ongewijzigd ten opzichte van run 13) |
+| Bronnen | Officiële bekendmakingen in orde (1.096), faillissementen in orde (0), Omgevingsloket Vlaanderen fout (0) |
 
 ## Planner op Cloudflare (voorbereid, 17-11-2026)
 
