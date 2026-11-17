@@ -25,6 +25,7 @@ publiceren wordt de live site getest. Zie "Browsertests op GitHub (17-11-2026)".
 
 | Tijdstip | Wat |
 |---|---|
+| 17-11-2026, 10:31 uur | **Controle van 10:30 uur: nog steeds geen enkele run met de aanleiding "schedule". Gemist vandaag: de slots van 06:45, 09:35 en 10:20 uur.** Het slot van 09:35 uur was bij de controle 55 minuten oud, dat van 10:20 uur 10 minuten. Er is sinds run 12 (08:39 uur, door een push) geen run bijgekomen. De live site staat daardoor nog op 08:40 uur: de publicaties van vandaag, die de bron tussen 09:00 en 09:21 uur plaatst, staan er niet op. De volgende slots zijn 12:10 en 16:10 uur. Het schema is niet gewijzigd; de oorzaak is niet onderzocht. |
 | 17-11-2026, 09:51 uur | **Controle van 09:50 uur: nog geen enkele run met de aanleiding "schedule". Gemist vandaag: de slots van 06:45 en 09:35 uur.** Het slot van 09:35 uur was bij de controle 16 minuten oud; GitHub start geplande runs soms later, dus dat slot kan nog komen. De laatste run is run 12 (08:39 uur, door een push); de live site staat op 08:40 uur. Het schema is niet gewijzigd. |
 | 17-11-2026, 09:51 uur | **Een push die alleen `docs/` raakt, start inderdaad geen run.** Pull request [Wim1201/tilburg-signalen#12](https://github.com/Wim1201/tilburg-signalen/pull/12) (alleen het verslag) is om 08:48 uur samengevoegd; een uur later was er geen run bijgekomen. Daarmee is beantwoord wat onder "Workflow: verslagen starten geen run" als niet getest stond. |
 | 17-11-2026, 09:07 uur | **Voorbereid, niet live: een planner op Cloudflare die de workflow start als GitHub dat zelf niet doet.** Op verzoek van Wim. Staat op de werkbranch, niet op `main`; er is niets bij Cloudflare geplaatst en er is geen token. Zie "Planner op Cloudflare (voorbereid)". |
@@ -370,7 +371,7 @@ uitbreiding van een bestaande test.
 | Punt | Toelichting |
 |---|---|
 | Een geplande run met de nieuwe workflow | Nog niet gezien. Dat de browserstappen in bouwen dan worden overgeslagen en `live-controleren` wel draait, is alleen door de tests op de tekst van de workflow vastgelegd |
-| De geplande runs zelf | Er is er nog geen gestart (zie de correcties bovenaan). Om 09:51 uur waren de slots van 06:45 en 09:35 uur gemist; de volgende controle is om 10:30 uur |
+| De geplande runs zelf | Er is er nog geen gestart (zie de correcties bovenaan). Om 10:31 uur waren de slots van 06:45, 09:35 en 10:20 uur gemist. Een handmatige run haalt de publicaties van vandaag wel op; die kan alleen Wim starten |
 | bouwen met bewaarde browser | Afgeleid, niet gemeten |
 | Vals alarm van `live-controleren` | De test begint zodra de job klaarstaat. Geeft GitHub Pages op dat moment nog de vorige versie en is in dezelfde push de pagina én een test gewijzigd, dan faalt de controle ten onrechte. In run 12 ging het goed (62 seconden na het publiceren) |
 | Een rood kruis moet iemand zien | GitHub kan bij een mislukte run een e-mail sturen; dat hangt af van de meldingsinstellingen van Wim. Of er na run 11 een is aangekomen, weet ik niet |
