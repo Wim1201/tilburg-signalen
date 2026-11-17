@@ -252,6 +252,8 @@
       box.appendChild(el("p", "stale", "De berichten van de app zijn niet geladen; er kan niet in worden gezocht."));
       return;
     }
+    // First of all the period the list covers, so that an empty list is not read as "never anything".
+    box.appendChild(el("p", "periode", A.periodLine(loaded.vensterDagen)));
     var result = A.findNotices(loaded.berichten, address, found);
     if (!result.adres.length && !result.mogelijk.length && !result.straat.length) {
       box.appendChild(el("p", null, "Geen publicaties over " + address.straat + " " + A.houseNumber(address) + " in de berichten van de app."));
@@ -268,10 +270,8 @@
       more.appendChild(list);
       box.appendChild(more);
     }
-    var windows = loaded.vensterDagen || {};
-    box.appendChild(el("p", "bronregel", "Doorzocht: " + result.doorzocht.toLocaleString("nl-NL") + " berichten die de app nu heeft, ook de weggefilterde" +
-      (windows.vergunning ? ". Vergunningen blijven " + windows.vergunning + " dagen in die lijst, planberichten " + windows.plan + " dagen; oudere publicaties staan er niet in" : "") +
-      ". De bronnen schrijven adressen niet in een vaste vorm: een bericht kan ontbreken."));
+    box.appendChild(el("p", "bronregel", "Doorzocht: " + result.doorzocht.toLocaleString("nl-NL") + " berichten die de app nu heeft, ook de weggefilterde. " +
+      "De bronnen schrijven adressen niet in een vaste vorm: een bericht kan ontbreken."));
     if (!withParcel) box.appendChild(el("p", "bronregel", "Berichten zonder dit adres in de tekst worden pas gekoppeld als het perceel bekend is."));
   }
 

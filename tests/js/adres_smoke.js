@@ -40,6 +40,14 @@ function addNotices(data) {
   ].concat(data.berichten);
 }
 
+/* The data without anything about the test address: nothing that names the square, nothing near it. */
+function removeNotices(data) {
+  data.berichten = data.berichten.filter(function (item) {
+    var near = typeof item.lat === "number" && Math.abs(item.lat - ADDRESS.lat) < 0.003 && Math.abs(item.lon - ADDRESS.lon) < 0.005;
+    return !near && !/mortelplein/i.test([item.titel, item.omschrijving, item.plaats].join(" "));
+  });
+}
+
 function part(url) {
   if (/\/locatieserver\//.test(url)) return "zoeker";
   if (/\/verblijfsobject\/items/.test(url)) return "adresobject";
@@ -63,7 +71,7 @@ module.exports = async function (browser, base) {
 
   /* `down` lists what does not answer: a part name fails to connect, "name:503" answers with an
      error, "name:stil" never answers. The list can be changed while the page is open. */
-  async function open(width, down) {
+  async function open(width, down, withoutNotices) {
     var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
     var page = await context.newPage(), seen = { errors: [], pdok: [], elsewhere: [] };
     page.on("pageerror", function (error) { seen.errors.push(error.message); });
@@ -78,7 +86,7 @@ module.exports = async function (browser, base) {
     await page.route(/^https:\/\/fonts\./, function (route) { route.fulfill({ status: 200, contentType: "text/css", body: "" }); });
     await page.route("**/data/berichten.json", async function (route) {
       var data = await (await route.fetch()).json();
-      addNotices(data);
+      if (withoutNotices) removeNotices(data); else addNotices(data);
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
     });
     await page.route(/^https:\/\/(api|service)\.pdok\.nl\//, function (route) {
@@ -187,6 +195,11 @@ module.exports = async function (browser, base) {
   });
   result.notices = await notices(page);
   result.noticesText = await text(page, "#adres-publicaties");
+  result.period = await page.evaluate(function () {
+    var box = document.getElementById("adres-publicaties"), line = box.querySelector(".periode");
+    return { text: line ? line.textContent : null, first: !!line && box.firstElementChild === line, lines: box.querySelectorAll(".periode").length,
+      windows: window.TilburgSignalenGegevens.vensterDagen };
+  });
   result.energy = { text: await text(page, "#adres-energie"), links: await page.$$eval("#adres-energie a", function (nodes) { return nodes.map(function (a) { return a.href; }); }) };
   result.plan = { text: await text(page, "#adres-plan"), links: await page.$$eval("#adres-plan a", function (nodes) { return nodes.map(function (a) { return a.href; }); }) };
   result.overflow = await overflow(page);
@@ -247,6 +260,17 @@ module.exports = async function (browser, base) {
   result.partsDown = {
     bag: (await facts(page, "#adres-bag"))[0], bagText: await text(page, "#adres-bag"),
     shapes: await page.$$eval(".kaartvlak .p-perceel", function (nodes) { return nodes.length; }), mapText: await text(page, ".perceelkaart"), errors: session.seen.errors,
+  };
+  await session.context.close();
+
+  // --- No notices about the address: the period comes first, then that nothing was found.
+  session = await open(320, [], true); page = session.page;
+  await page.click("#tab-adres");
+  await choose(page);
+  await page.waitForSelector("#adres-perceel .feiten");
+  result.noNotices = {
+    lines: await page.$$eval("#adres-publicaties > *", function (nodes) { return nodes.map(function (node) { return { cls: node.className, text: node.textContent }; }); }),
+    rows: await page.$$eval("#adres-publicaties .pub", function (nodes) { return nodes.length; }), overflow: await overflow(page), errors: session.seen.errors,
   };
   await session.context.close();
 

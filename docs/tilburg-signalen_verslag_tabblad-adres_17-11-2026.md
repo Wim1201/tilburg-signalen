@@ -26,6 +26,8 @@ Chromium op 320 en 390 pixels breed.
 
 | Tijdstip | Wat |
 |---|---|
+| 17-11-2026, 18:18 uur | **Bovenaan het blok met publicaties staat nu één regel over de periode; de zin daarover onderaan is vervallen.** Op verzoek van Wim. Waar dit verslag zegt dat het tabblad de bewaartermijn "onder de lijst" meldt, staat die nu bovenaan. Zie "Regel over de periode". |
+| 17-11-2026, 18:18 uur | **Het aantal tests is 290, niet 287.** Er zijn er drie bij voor die regel: twee voor de tekst en één in de browser. Waar dit verslag 287 noemt, gaat het om de stand van commit `8459af2`. |
 | 17-11-2026, 17:25 uur | **De app heeft vier tabbladen in plaats van drie.** Waar eerdere verslagen de tabbalk met Berichten, Gebied en Bronnen beschrijven, staat daar nu Adres naast. De drie bestaande tabbladen zijn zelf niet gewijzigd; op 320 pixels is elke tab 72 pixels breed (was 96). |
 | 17-11-2026, 17:25 uur | **De app vraagt nu zelf gegevens op bij een externe dienst, maar alleen op het tabblad Adres.** Tot nu toe haalde alleen de workflow gegevens op en las de app alleen zijn eigen bestanden. Het ochtendscherm doet dat nog steeds: een test bewaakt dat er bij het openen van de app nul verzoeken naar PDOK gaan. "De app heeft geen server of database" blijft gelden. |
 | 17-11-2026, 17:25 uur | **Het aantal tests is 287 (was 223).** Er zijn er 64 bij: 50 voor de logica en de pagina, 11 in de browser en 3 die alleen op verzoek tegen de echte bronnen draaien. Zes filmtests worden hier overgeslagen omdat de film in deze container niet is gemaakt; dat was al zo. |
@@ -173,7 +175,7 @@ Dit blijft de zwakste schakel. Een gemist bericht is in de app niet te zien.
 
 | Beperking | Gevolg |
 |---|---|
-| De lijst bevat alleen wat de app nu heeft: vergunningen 42 dagen, planberichten 180 dagen | Oudere publicaties over een adres staan er niet in. Het tabblad zegt dat onder de lijst |
+| De lijst bevat alleen wat de app nu heeft: vergunningen 42 dagen, planberichten 180 dagen | Oudere publicaties over een adres staan er niet in. Het tabblad zegt dat bovenaan het blok (tot 18:18 uur: onder de lijst) |
 | Een bericht dat het adres alleen als kadastraal perceel of als omschrijving noemt ("hoek X-straat en Y-laan") | Wordt alleen gevonden als de locatie van het bericht op het perceel ligt; 68 van de 1.116 berichten hebben geen exacte locatie |
 | Een straatnaam die in een langere straatnaam zit ("Vincent van den Heuvelstraat 5" tegenover "Heuvelstraat 5") | Wordt alleen uit elkaar gehouden door de postcode of de locatie van het bericht. Ontbreken beide, dan komt het bericht onterecht onder "Dit adres" |
 | Een straatnaam die ook een gewoon woord is ("Markt", "Heuvel") | Kan onterecht onder "Zelfde straat" verschijnen |
@@ -213,6 +215,25 @@ Bij alle vijf: het kaartbeeld geladen, het perceel getekend, niets breder dan he
 fouten, en alleen verzoeken naar `api.pdok.nl` en `service.pdok.nl`.
 
 De proef van 172 tegenover 172e laat zien dat een toevoeging haar eigen perceel krijgt.
+
+## Regel over de periode (toegevoegd 17-11-2026, 18:18 uur)
+
+Op verzoek van Wim staat bovenaan het blok "Publicaties over dit adres", vóór alles wat gevonden is:
+
+> Deze lijst beslaat alleen de laatste 42 dagen voor vergunningen en 180 dagen voor plannen. "Geen publicaties" betekent dus niet dat er nooit iets is geweest.
+
+| Punt | Hoe het is gedaan |
+|---|---|
+| De getallen | Komen uit het gegevensbestand zelf (`vensterDagen`), dat de verversing vult uit `config.json`. Wijzigt de bewaartermijn, dan wijzigt de regel mee |
+| Ontbreken de getallen | Dan staat er "Deze lijst beslaat alleen de recente berichten die de app nu heeft", met dezelfde tweede zin. De regel noemt nooit een periode die hij niet kent |
+| De regel onderaan | Die noemde de termijnen ook; dat stuk is geschrapt, zodat het er één keer staat. Onderaan staat nog hoeveel berichten zijn doorzocht en dat een bericht kan ontbreken |
+| Opmaak | Vet, in de kleur van de gewone tekst, als eerste in het vak |
+
+Tests: twee voor de tekst (de gebruikelijke getallen, andere getallen, ontbrekende getallen; en dat
+de getallen in het gegevensbestand die van `config.json` zijn) en één in de browser op 320 pixels:
+de regel is het eerste in het blok en staat er één keer, ook bij een adres zonder publicaties, waar
+daarna "Geen publicaties over … in de berichten van de app." volgt. Bekeken op een schermafbeelding
+van Heuvelring 67-12 in Tilburg (geen publicaties): de regel beslaat daar vijf regels tekst.
 
 ## Gevonden tijdens het werk
 

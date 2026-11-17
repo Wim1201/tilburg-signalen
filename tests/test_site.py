@@ -740,6 +740,24 @@ class InDeBrowser(unittest.TestCase):
         self.assertRegex(text, r"Doorzocht: [\d.]+ berichten die de app nu heeft, ook de weggefilterde")
         self.assertIn("een bericht kan ontbreken", text)
 
+    def test_address_tab_says_first_which_period_the_notices_cover(self):
+        period = self.seen["adres"]["period"]
+        windows = period["windows"]
+        line = ("Deze lijst beslaat alleen de laatste %d dagen voor vergunningen en %d dagen voor plannen. "
+                '"Geen publicaties" betekent dus niet dat er nooit iets is geweest.' % (windows["vergunning"], windows["plan"]))
+        self.assertEqual(period["text"], line)
+        self.assertTrue(period["first"], "de regel over de periode staat niet bovenaan het blok")
+        self.assertEqual(period["lines"], 1)
+        # Without any notice about the address: the same line first, then that nothing was found.
+        empty = self.seen["adres"]["noNotices"]
+        self.assertEqual(empty["errors"], [])
+        self.assertEqual(empty["rows"], 0)
+        self.assertLessEqual(empty["overflow"], 0)
+        self.assertEqual([entry["text"] for entry in empty["lines"][:2]],
+                         [line, "Geen publicaties over Burgemeester van de Mortelplein 118a in de berichten van de app."])
+        self.assertEqual(empty["lines"][0]["cls"], "periode")
+        self.assertEqual(len(empty["lines"]), 3)  # the period, nothing found, and what was searched
+
     def test_address_tab_marks_energy_label_and_plan_as_not_available_with_a_link(self):
         seen = self.seen["adres"]
         self.assertTrue(seen["energy"]["text"].startswith("Nog niet beschikbaar in de app."))

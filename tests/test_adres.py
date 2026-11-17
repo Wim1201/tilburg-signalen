@@ -427,6 +427,25 @@ class PublicatiesBijEenAdres(unittest.TestCase):
         self.assertEqual((plan["gemeente"], plan["soort"]), ("Noord-Brabant", "Omgevingsplan, ontwerp"))
         self.assertIsNone(unsafe["url"])
 
+    def test_one_line_says_which_period_the_list_covers(self):
+        usual, other, missing, partial = adres(["periodLine", {"vergunning": 42, "plan": 180, "faillissement": 28, "verkoop": 120}],
+                                               ["periodLine", {"vergunning": 30, "plan": 90}], ["periodLine", None], ["periodLine", {"vergunning": 42}])
+        closing = ' "Geen publicaties" betekent dus niet dat er nooit iets is geweest.'
+        self.assertEqual(usual, "Deze lijst beslaat alleen de laatste 42 dagen voor vergunningen en 180 dagen voor plannen." + closing)
+        self.assertEqual(other, "Deze lijst beslaat alleen de laatste 30 dagen voor vergunningen en 90 dagen voor plannen." + closing)
+        # Without the numbers the line still warns; it never names a period it does not know.
+        self.assertEqual(missing, "Deze lijst beslaat alleen de recente berichten die de app nu heeft." + closing)
+        self.assertEqual(partial, missing)
+        self.assertEqual(usual.count("."), 2)  # one line of two short sentences
+
+    def test_the_period_in_the_line_is_the_one_the_refresh_uses(self):
+        with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as handle:
+            config = json.load(handle)["venster_dagen"]
+        shown = json.loads(read("data", "berichten.json"))["vensterDagen"]
+        self.assertEqual((shown["vergunning"], shown["plan"]), (config["vergunning"], config["plan"]))
+        line, = adres(["periodLine", shown])
+        self.assertIn("laatste %d dagen voor vergunningen en %d dagen voor plannen" % (config["vergunning"], config["plan"]), line)
+
     def test_searching_leaves_the_notices_as_they_are(self):
         script = ("var A = require(process.argv[1]); var items = JSON.parse(process.argv[2]); var before = JSON.stringify(items);"
                   "A.findNotices(items, JSON.parse(process.argv[3]), []);"

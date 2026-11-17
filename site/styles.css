@@ -247,6 +247,8 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 .schaal { position: absolute; left: 8px; bottom: 8px; min-width: 30px; font: 500 10px/1.5 var(--font-data); color: #12163b; text-align: center; white-space: nowrap; background: rgb(255 255 255 / .85); border: solid #12163b; border-width: 0 1.5px 1.5px; }
 .dot-perceel { background: #f23d0c; margin-left: 0; }
 .dot-adres { background: #0c1049; outline: 1px solid var(--line); }
+/* The period the list covers: the first thing in the box, in the colour of the text itself. */
+.vak-inhoud .periode { font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .pubs { display: flex; flex-direction: column; }
 .pubs .day { margin-top: 4px; }
 .pub { display: flex; flex-direction: column; gap: 2px; padding: 8px 0 0; border-top: 1px solid var(--line); margin-top: 8px; }

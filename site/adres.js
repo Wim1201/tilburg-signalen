@@ -400,6 +400,17 @@
     return result;
   }
 
+  /* The one line above the notices: which period the list covers. `windows` is vensterDagen of the
+     data file (days a permit or a plan stays in the list). Without it the line still says that the
+     list is short. */
+  function periodLine(windows) {
+    var permits = windows && windows.vergunning, plans = windows && windows.plan;
+    var period = permits > 0 && plans > 0
+      ? "Deze lijst beslaat alleen de laatste " + permits + " dagen voor vergunningen en " + plans + " dagen voor plannen."
+      : "Deze lijst beslaat alleen de recente berichten die de app nu heeft.";
+    return period + " \"Geen publicaties\" betekent dus niet dat er nooit iets is geweest.";
+  }
+
   /* ---------- Not connected yet: plain links to public viewers ---------- */
 
   function viewerLinks(address) {
@@ -420,7 +431,7 @@
     vboUrl: vboUrl, pandUrls: pandUrls, bagModel: bagModel,
     perceelUrl: perceelUrl, perceelAtUrl: perceelAtUrl, parcelModel: parcelModel, parcels: parcels, parcelAt: parcelAt, contains: contains,
     mapModel: mapModel, m2: m2,
-    numbersAfter: numbersAfter, mentions: mentions, matchNotice: matchNotice, noticeRow: noticeRow, findNotices: findNotices,
+    numbersAfter: numbersAfter, mentions: mentions, matchNotice: matchNotice, noticeRow: noticeRow, findNotices: findNotices, periodLine: periodLine,
     viewerLinks: viewerLinks,
   };
 });
