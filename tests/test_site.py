@@ -422,7 +422,7 @@ class Pagina(unittest.TestCase):
     def test_every_element_the_app_looks_up_is_on_the_page(self):
         on_page = set(re.findall(r'\sid="([^"]+)"', self.html))
         wanted = set(re.findall(r'\$\("([\w-]+)"\)', self.app))
-        for prefix, names in (("view-", ["berichten", "gebied", "bronnen"]), ("tab-", ["berichten", "gebied", "bronnen"]),
+        for prefix, names in (("view-", ["berichten", "gebied", "bronnen", "adres"]), ("tab-", ["berichten", "gebied", "bronnen", "adres"]),
                               ("tile-", ["ranglijst", "nieuw", "onzeker"])):
             wanted |= {prefix + name for name in names}
         self.assertGreater(len(wanted), 25)
@@ -430,7 +430,8 @@ class Pagina(unittest.TestCase):
 
     def test_logic_is_loaded_before_the_app(self):
         scripts = re.findall(r'<script src="([^"]+)"', self.html)
-        self.assertEqual(scripts, ["logic.js", "app.js"])
+        # The tab "Adres" (adres.js, adres-app.js) comes after the app it is added to.
+        self.assertEqual(scripts, ["logic.js", "app.js", "adres.js", "adres-app.js"])
 
     def test_app_builds_text_not_markup(self):
         self.assertNotRegex(self.app, r"innerHTML|insertAdjacentHTML|document\.write")
@@ -649,6 +650,143 @@ class InDeBrowser(unittest.TestCase):
     def test_nothing_new_shows_the_illustration(self):
         self.assertEqual(self.seen["emptyTitle"], "Niets nieuws sinds je vorige bezoek.")
         self.assertEqual(self.seen["emptyArt"], 1)
+
+    # --- The tab "Adres". The registers of PDOK are played back by tests/js/adres_smoke.js, so these
+    # tests do not depend on PDOK; the notices about the test address are added to what the page loads.
+
+    def test_address_tab_is_compact_on_the_narrowest_phone(self):
+        seen = self.seen["adres"]
+        self.assertEqual(seen["errors"], [])
+        for moment in ("emptyOverflow", "suggestOverflow", "overflow", "streetOpenOverflow"):
+            with self.subTest(moment=moment):
+                self.assertLessEqual(seen[moment], 0)
+        self.assertLessEqual(seen["widest"], 320)
+        self.assertEqual(seen["brokenDates"], 0)
+        tabs = seen["tabs"]
+        self.assertEqual([tab["label"] for tab in tabs], ["Berichten", "Gebied", "Bronnen", "Adres"])
+        self.assertEqual([tab["lines"] for tab in tabs], [1, 1, 1, 1])
+        self.assertEqual(len({tab["width"] for tab in tabs}), 1, "de vier tabbladen zijn niet even breed")
+        self.assertTrue(all(tab["textWidth"] <= tab["width"] for tab in tabs), "een tabnaam past niet in zijn tab")
+        self.assertLessEqual(tabs[-1]["right"], 320)
+        self.assertEqual([tab["current"] for tab in tabs], [None, None, None, "page"])
+        self.assertLessEqual(seen["map"]["right"], 320)
+        self.assertEqual(seen["map"]["width"], seen["map"]["height"])
+        self.assertTrue(all(height >= 40 for height in seen["linkHeights"]), seen["linkHeights"])
+        self.assertTrue(all(option["height"] >= 44 and option["right"] <= 320 for option in seen["suggestions"]), seen["suggestions"])
+
+    def test_address_tab_leaves_the_morning_screen_alone(self):
+        seen = self.seen["adres"]
+        self.assertEqual(seen["requestsBeforeUse"], 0, "het ochtendscherm vraagt iets op bij PDOK")
+        self.assertEqual(seen["hash"], "#adres")
+        self.assertEqual(seen["views"], ["view-adres"])
+        self.assertTrue(seen["resultHiddenAtStart"])
+        self.assertEqual(seen["viewsAfter"], ["view-berichten"])
+        self.assertEqual(seen["morningAfter"], seen["morningBefore"])
+        self.assertEqual(seen["morningBefore"]["brief"], self.seen["brief"])
+
+    def test_address_search_suggests_while_typing_and_a_choice_fills_the_tab(self):
+        seen = self.seen["adres"]
+        self.assertEqual(seen["requestsForTwoLetters"], 0)
+        self.assertEqual([option["text"] for option in seen["suggestions"]], ["Burgemeester van de Mortelplein 118a, 5037PL Tilburg"])
+        self.assertIn("/bzk/locatieserver/search/v3_1/suggest?q=Burg.%20van%20de%20Mortelplein%20118a&fq=type%3Aadres", seen["suggestRequest"])
+        self.assertEqual(seen["name"], "Burgemeester van de Mortelplein 118a")
+        self.assertEqual(seen["sub"], "5037PL Tilburg")
+        self.assertEqual(seen["input"], "Burgemeester van de Mortelplein 118a, 5037PL Tilburg")
+
+    def test_address_tab_asks_only_pdok_and_without_a_key(self):
+        seen = self.seen["adres"]
+        self.assertEqual(sorted(seen["asked"]), ["adresobject", "kaart", "pand", "perceel", "perceel", "zoeker"])
+        self.assertEqual(seen["askedHosts"], ["api.pdok.nl", "service.pdok.nl"])
+        self.assertEqual(seen["keys"], 0)
+        self.assertEqual(seen["elsewhere"], [], "de app roept nog een andere dienst aan")
+        self.assertTrue(seen["newTabLinks"])
+
+    def test_address_tab_shows_the_building_from_the_bag(self):
+        seen = self.seen["adres"]
+        self.assertEqual(seen["bag"], {"Bouwjaar": "1962", "Gebruiksdoel": "gezondheidszorgfunctie", "Oppervlakte": "280 m²", "Pandstatus": "Verbouwing pand"})
+        self.assertIn("Bron: Basisregistratie Adressen en Gebouwen", seen["bagText"])
+
+    def test_address_tab_shows_the_parcel_with_the_warning_at_its_size(self):
+        seen = self.seen["adres"]
+        self.assertEqual(seen["parcels"], [{"Aanduiding": "Tilburg Q 4688 (TBG01 Q 4688)", "Grootte": "46 m², vastgesteld"},
+                                           {"Aanduiding": "Tilburg Q 4489 (TBG01 Q 4489)", "Grootte": "248 m², vastgesteld"}])
+        self.assertEqual(seen["parcelWarning"], "Let op: de kadastrale kaart geeft alleen een indicatie van de ligging en de grootte. Er zijn geen maten aan te ontlenen.")
+        self.assertTrue(seen["warningRightAfterSize"], "de waarschuwing staat niet direct onder de grootte")
+        self.assertIn("Dit adres is aan 2 percelen gekoppeld.", seen["parcelText"])
+        plan = seen["map"]
+        self.assertTrue(plan["image"], "de achtergrondkaart is niet geladen")
+        self.assertIn("https://service.pdok.nl/kadaster/kadastralekaart/wms/v5_0?", plan["src"])
+        self.assertEqual(plan["shapes"], [True, True])
+        self.assertTrue(plan["dot"])
+        self.assertEqual(plan["bar"], "20 m")
+        self.assertTrue(plan["barInside"])
+
+    def test_address_tab_lists_the_notices_about_the_address(self):
+        seen = self.seen["adres"]["notices"]
+        groups = {name: [entry for entry in ids if entry.startswith("test-")] for name, ids in seen["groups"].items()}
+        self.assertEqual(groups, {"Dit adres": ["test-adres-zelf"], "Mogelijk dit adres": ["test-adres-zonder", "test-adres-perceel"],
+                                  "Zelfde straat, zonder huisnummer": ["test-adres-straat"]})
+        shown = {entry for ids in seen["groups"].values() for entry in ids}
+        self.assertFalse({"test-adres-buren", "test-adres-elders"} & shown)
+        own = seen["rows"]["test-adres-zelf"]
+        self.assertEqual(own["meta"], "10-11-2026 · Tilburg · Vergunning, aanvraag")
+        self.assertEqual(own["titel"], "Aanvraag omgevingsvergunning, Burg. van de Mortelplein 118A, 5037 PL Tilburg")
+        self.assertEqual((own["link"], own["linkText"]), ("https://zoek.officielebekendmakingen.nl/test-adres-zelf.html", "Open bij de bron"))
+        self.assertEqual(own["reden"], ["In de ranglijst weggefilterd."])
+        self.assertEqual(seen["rows"]["test-adres-zonder"]["meta"], "03-11-2026 · Tilburg · Vergunning, verleend")
+        self.assertEqual(seen["rows"]["test-adres-zonder"]["reden"], ["Het bericht noemt huisnummer 118 zonder toevoeging."])
+        self.assertIn("De tekst noemt dit adres niet, maar de locatie van het bericht ligt op hetzelfde perceel.", seen["rows"]["test-adres-perceel"]["reden"])
+        text = self.seen["adres"]["noticesText"]
+        self.assertRegex(text, r"Doorzocht: [\d.]+ berichten die de app nu heeft, ook de weggefilterde")
+        self.assertIn("een bericht kan ontbreken", text)
+
+    def test_address_tab_marks_energy_label_and_plan_as_not_available_with_a_link(self):
+        seen = self.seen["adres"]
+        self.assertTrue(seen["energy"]["text"].startswith("Nog niet beschikbaar in de app."))
+        self.assertEqual(seen["energy"]["links"], ["https://www.ep-online.nl/Energylabel/Search"])
+        self.assertIn("Vul daar in: 5037PL 118 a.", seen["energy"]["text"])
+        self.assertTrue(seen["plan"]["text"].startswith("Nog niet beschikbaar in de app."))
+        self.assertEqual(seen["plan"]["links"], ["https://omgevingswet.overheid.nl/regels-op-de-kaart/documenten?locatie-stelsel=RD&locatie-x=132133&locatie-y=395880"])
+
+    def test_address_search_that_does_not_answer_gives_a_message_not_an_empty_page(self):
+        message = "De adreszoeker (PDOK Locatieserver) antwoordt niet. Controleer je verbinding of probeer het later opnieuw."
+        down = self.seen["adres"]["searchDown"]
+        self.assertEqual(down["message"], message)
+        self.assertEqual((down["input"], down["heading"], down["result"], down["suggestions"]), (True, "Adres", False, False))
+        self.assertEqual(down["errors"], [])
+        silent = self.seen["adres"]["searchSilent"]
+        self.assertEqual(silent["message"], message)
+        self.assertLess(silent["seconds"], 20, "de app blijft wachten op een bron die zwijgt")
+        self.assertEqual(silent["errors"], [])
+
+    def test_a_register_that_does_not_answer_leaves_a_message_in_its_own_box(self):
+        down = self.seen["adres"]["registersDown"]
+        self.assertTrue(down["bag"].startswith("De BAG (Kadaster, via PDOK) antwoordt niet."), down["bag"])
+        self.assertEqual(down["bagRetry"], ["Opnieuw proberen"])
+        self.assertTrue(down["parcel"].startswith("De kadastrale kaart (Kadaster, via PDOK) antwoordt niet."), down["parcel"])
+        self.assertEqual(down["parcelRetry"], 1)
+        self.assertLessEqual(down["overflow"], 0)
+        # What does not need those registers is simply there.
+        self.assertEqual(down["name"], "Burgemeester van de Mortelplein 118a")
+        self.assertIn("test-adres-zelf", down["notices"]["groups"]["Dit adres"])
+        self.assertNotIn("test-adres-perceel", down["notices"]["groups"]["Mogelijk dit adres"])
+        self.assertIn("worden pas gekoppeld als het perceel bekend is", down["noticesText"])
+        self.assertTrue(down["energy"].startswith("Nog niet beschikbaar in de app."))
+        self.assertTrue(down["plan"].startswith("Nog niet beschikbaar in de app."))
+        # Trying again once the registers are back fills the boxes.
+        again = self.seen["adres"]["afterRetry"]
+        self.assertEqual(again["bag"]["Bouwjaar"], "1962")
+        self.assertEqual(again["parcels"], 2)
+        self.assertIn("test-adres-perceel", again["notices"]["groups"]["Mogelijk dit adres"])
+        self.assertEqual(again["errors"], [])
+
+    def test_a_missing_building_or_background_map_leaves_the_rest(self):
+        parts = self.seen["adres"]["partsDown"]
+        self.assertEqual(parts["bag"], {"Bouwjaar": "niet bekend", "Gebruiksdoel": "gezondheidszorgfunctie", "Oppervlakte": "280 m²", "Pandstatus": "niet bekend"})
+        self.assertIn("Het pand zelf kon niet worden opgehaald; bouwjaar en pandstatus ontbreken daardoor.", parts["bagText"])
+        self.assertEqual(parts["shapes"], 2)
+        self.assertIn("De achtergrondkaart kon niet worden geladen; alleen de omtrek van het perceel is getekend.", parts["mapText"])
+        self.assertEqual(parts["errors"], [])
 
 
 if __name__ == "__main__":

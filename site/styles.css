@@ -219,9 +219,47 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 .status.is-fout { background: var(--warn-bg); color: var(--warn-ink); }
 .notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; max-width: 62ch; }
 
+/* Address view: search, then one box per subject */
+.suggesties { display: flex; flex-direction: column; margin-top: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.suggestie { font: inherit; color: var(--ink); background: transparent; border: 0; border-top: 1px solid var(--line); text-align: left; min-height: 44px; padding: 10px 12px; cursor: pointer; overflow-wrap: anywhere; }
+.suggestie:first-child { border-top: 0; }
+.suggesties .leeg { padding: 11px 12px; font-size: 13px; color: var(--muted); }
+.adres-uitkomst { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.adres-naam { font: 800 22px/1.15 var(--font-display); letter-spacing: -.01em; margin-top: 2px; overflow-wrap: anywhere; }
+.adres-sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.vak { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
+.vak h3 { margin: 0 0 8px; }
+.vak-inhoud { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.vak-inhoud .ghost { align-self: flex-start; }
+.vak-inhoud .links a { display: inline-block; }
+.bezig, .bronregel { color: var(--muted); }
+.bronregel { font-size: 12px; }
+.feiten { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 14px; font-size: 14px; }
+.feiten dt { color: var(--muted); }
+.feiten dd { margin: 0; font-weight: 600; }
+.feiten dd.is-leeg { font-weight: 400; color: var(--muted); }
+.perceelkaart { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+/* The map service draws black on white, so the map keeps a white ground in the dark theme too. */
+.kaartvlak { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; background: #ffffff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.kaartvlak img, .kaartvlak svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.kaartvlak .p-perceel { fill: #f23d0c; fill-opacity: .2; stroke: #f23d0c; stroke-width: 3; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.kaartvlak .p-adres { fill: #0c1049; stroke: #ffffff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.schaal { position: absolute; left: 8px; bottom: 8px; min-width: 30px; font: 500 10px/1.5 var(--font-data); color: #12163b; text-align: center; white-space: nowrap; background: rgb(255 255 255 / .85); border: solid #12163b; border-width: 0 1.5px 1.5px; }
+.dot-perceel { background: #f23d0c; margin-left: 0; }
+.dot-adres { background: #0c1049; outline: 1px solid var(--line); }
+.pubs { display: flex; flex-direction: column; }
+.pubs .day { margin-top: 4px; }
+.pub { display: flex; flex-direction: column; gap: 2px; padding: 8px 0 0; border-top: 1px solid var(--line); margin-top: 8px; }
+.pubs .day + .pub { border-top: 0; margin-top: 0; padding-top: 4px; }
+.pub-meta { font: 400 11.5px/1.4 var(--font-data); color: var(--muted); }
+.pub-datum { white-space: nowrap; color: var(--ink); }
+.pub-titel { font-size: 13.5px; }
+.pub-reden { font-size: 12px; color: var(--muted); }
+.pub .links a { padding: 10px 0 12px; }
+
 /* Tab bar */
 .tabs { position: fixed; inset: auto 0 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
-.tabs-inner { display: grid; grid-template-columns: repeat(3, 1fr); height: var(--tabs-height); }
+.tabs-inner { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); height: var(--tabs-height); }
 .tabs a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: var(--muted); font-size: 12px; font-weight: 600; border-top: 3px solid transparent; }
 .tabs svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tabs a[aria-current="page"] { color: var(--ink); border-top-color: var(--signal); }

@@ -11,6 +11,10 @@ tot Tilburg en de bron.
 
 De app gebruikt alleen openbare gegevens van overheden en heeft geen server of database nodig.
 
+Het tabblad **Adres** staat daar los van: typ een adres en zie het pand (BAG), het kadastrale perceel
+met een kaartje, en de publicaties over dat adres uit de berichten die de app al heeft. Het vraagt
+de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel.
+
 ## Hoe het werkt
 
 | Onderdeel | Wat het doet |
@@ -28,6 +32,7 @@ De app gebruikt alleen openbare gegevens van overheden en heeft geen server of d
 | `signalen/bronnen.json` | De bronnenlijst die de app toont (aangesloten en niet aangesloten) |
 | `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
 | `site/logic.js` | Wat de app toont, zonder de pagina: rangorde, filters, "nieuw sinds vorig bezoek" en de inhoud van een kaart. `site/app.js` bouwt daar de pagina van |
+| `site/adres.js` | Het tabblad Adres zonder de pagina: schrijfwijzen van adressen gelijktrekken, publicaties aan een adres koppelen, en wat de antwoorden van BAG en Kadaster betekenen. `site/adres-app.js` bouwt daar het tabblad van en vraagt de bronnen op |
 | `site/styles.css` | De huisstijl: kleuren, lettertypen en opmaak, licht en donker |
 | `.github/workflows/dagelijks.yml` | Ververst de gegevens op vaste tijden (werkdagen 06:45, 09:35, 10:20, 12:10 en 16:10 uur Nederlandse tijd) en publiceert de app op GitHub Pages. Bij een push en een handmatige run draaien vooraf ook de tests in een echte browser; na elk publiceren test een eigen job de pagina op de live site |
 | `.github/actions/browser/` | Zet voor die tests Node, Playwright en Chromium klaar op de GitHub-runner |
@@ -77,6 +82,14 @@ npm ci
 npx playwright install chromium
 ```
 
+Het tabblad Adres wordt in die browsertests getest met nagespeelde antwoorden van PDOK
+(`tests/js/adres_fixtures.json`), zodat de test niet van PDOK afhangt. Tegen de echte bronnen, met
+echte adressen in Tilburg, Dongen en Goirle, alleen op verzoek:
+
+```bash
+TILBURG_ADRES_LIVE=1 python -m unittest tests.test_adres.EchteBronnen
+```
+
 De paginatest draait ook tegen de live site:
 
 ```bash
@@ -91,6 +104,19 @@ TILBURG_SITE_URL=https://wim1201.github.io/tilburg-signalen python -m unittest t
 
 De app staat dan op `https://wim1201.github.io/tilburg-signalen/`. Op de telefoon: open die
 pagina en kies "Zet op beginscherm" om hem als app te installeren.
+
+## Tabblad Adres: bronnen
+
+| Onderdeel | Bron | Opmerking |
+|---|---|---|
+| Adres zoeken | PDOK Locatieserver | Suggesties tijdens het typen, dichtbij Tilburg eerst |
+| Pand | BAG (Kadaster, via PDOK) | Bouwjaar, gebruiksdoel, oppervlakte, pandstatus |
+| Perceel | Kadastrale kaart (Kadaster, via PDOK) | Het perceel dat het Kadaster aan het adres koppelt. De kaart geeft alleen een indicatie; er zijn geen maten aan te ontlenen |
+| Publicaties | `data/berichten.json`, zoals de app het al geladen heeft | Ook de weggefilterde berichten. Er wordt niets opgehaald en niets weggeschreven |
+| Energielabel, bestemmingsplan | Niet aangesloten | Alleen een link naar EP-Online en naar het Omgevingsloket |
+
+Geen sleutels, geen tussenserver. De keuzes en de beperkingen van het koppelen van publicaties staan
+in `docs/tilburg-signalen_verslag_tabblad-adres_17-11-2026.md`.
 
 ## Instellingen aanpassen
 

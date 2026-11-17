@@ -1,0 +1,164 @@
+{
+ "_toelichting": "Echte antwoorden van PDOK voor Burgemeester van de Mortelplein 118a in Tilburg, opgehaald op 17-11-2026 en ingekort tot wat de app leest. De browsertest speelt ze na, zodat de test niet van PDOK afhangt.",
+ "suggest": {
+  "response": {
+   "numFound": 1,
+   "docs": [
+    {
+     "woonplaatsnaam": "Tilburg",
+     "weergavenaam": "Burgemeester van de Mortelplein 118a, 5037PL Tilburg",
+     "id": "adr-5c387e4f6ed832c4cc6d8f35b1be1ded",
+     "gekoppeld_perceel": [
+      "TBG01-Q-4688",
+      "TBG01-Q-4489"
+     ],
+     "gemeentenaam": "Tilburg",
+     "huisletter": "a",
+     "postcode": "5037PL",
+     "centroide_ll": "POINT(5.05750626 51.55141136)",
+     "adresseerbaarobject_id": "0855010000010053",
+     "huisnummer": 118,
+     "centroide_rd": "POINT(132133.035 395879.872)",
+     "straatnaam": "Burgemeester van de Mortelplein"
+    }
+   ]
+  }
+ },
+ "vbo": {
+  "type": "FeatureCollection",
+  "features": [
+   {
+    "type": "Feature",
+    "properties": {
+     "gebruiksdoel": "gezondheidszorgfunctie",
+     "huisletter": "a",
+     "huisnummer": 118,
+     "identificatie": "0855010000010053",
+     "oppervlakte": 280,
+     "pand.href": [
+      "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items/aae4c55c-740b-5668-a606-bb94819604dc"
+     ],
+     "postcode": "5037PL",
+     "status": "Verbouwing verblijfsobject",
+     "toevoeging": null,
+     "openbare_ruimte_naam": "Burgemeester van de Mortelplein",
+     "woonplaats_naam": "Tilburg"
+    },
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      5.057506262323178,
+      51.55141135664328
+     ]
+    }
+   }
+  ]
+ },
+ "pand": {
+  "aae4c55c-740b-5668-a606-bb94819604dc": {
+   "type": "Feature",
+   "properties": {
+    "bouwjaar": 1962,
+    "status": "Verbouwing pand",
+    "identificatie": "0855100000292831",
+    "aantal_verblijfsobjecten": 2
+   }
+  }
+ },
+ "perceel": {
+  "4688": {
+   "type": "FeatureCollection",
+   "features": [
+    {
+     "type": "Feature",
+     "properties": {
+      "akr_kadastrale_gemeente_code_waarde": "TBG01",
+      "kadastrale_gemeente_waarde": "Tilburg",
+      "sectie": "Q",
+      "perceelnummer": 4688,
+      "kadastrale_grootte_waarde": 46,
+      "soort_grootte_waarde": "Vastgesteld"
+     },
+     "geometry": {
+      "type": "MultiPolygon",
+      "coordinates": [
+       [
+        [
+         [
+          5.057576721768891,
+          51.55157653333167
+         ],
+         [
+          5.057716478263838,
+          51.55152057730619
+         ],
+         [
+          5.0577476470481715,
+          51.55155083111041
+         ],
+         [
+          5.057607847179776,
+          51.551606796039515
+         ],
+         [
+          5.057576721768891,
+          51.55157653333167
+         ]
+        ]
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  "4489": {
+   "type": "FeatureCollection",
+   "features": [
+    {
+     "type": "Feature",
+     "properties": {
+      "akr_kadastrale_gemeente_code_waarde": "TBG01",
+      "kadastrale_gemeente_waarde": "Tilburg",
+      "sectie": "Q",
+      "perceelnummer": 4489,
+      "kadastrale_grootte_waarde": 248,
+      "soort_grootte_waarde": "Vastgesteld"
+     },
+     "geometry": {
+      "type": "MultiPolygon",
+      "coordinates": [
+       [
+        [
+         [
+          5.057408782450244,
+          51.551413283939326
+         ],
+         [
+          5.057551536614163,
+          51.5513554759123
+         ],
+         [
+          5.057716478263838,
+          51.55152057730619
+         ],
+         [
+          5.057576721768891,
+          51.55157653333167
+         ],
+         [
+          5.057417157920735,
+          51.551421424331906
+         ],
+         [
+          5.057408782450244,
+          51.551413283939326
+         ]
+        ]
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ }
+}
