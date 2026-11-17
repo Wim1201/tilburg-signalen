@@ -91,12 +91,12 @@ die nu ontbreken. De opmerking "Aanvragen ontbreken" bij Roosendaal kan dan weg.
 
 | | Nu | Met variant A |
 |---|---:|---:|
-| Gewone run | 35 | 36: één zoekvraag erbij (218 berichten passen in één blad van 500) |
+| Gewone run | 35 | 36: één zoekvraag erbij (ook de 218 berichten van de breedste zoekvraag passen in één blad van 500) |
 | Volledige run | 2.047 | ongeveer 2.055: de zoekvraag, 5 teksten en een paar percelen |
 | Nieuwe teksten per dag | | Vrijwel geen: 78 van de 83 berichten hebben een omschrijving bij de bron |
 
 De zoekvraag vraagt de bron om op een woord in de titel te zoeken. Dat doet de app al voor
-verkoopvoornemens; het duurde in de proef minder dan twee seconden.
+verkoopvoornemens. De hele proef, met 40 verzoeken, duurde 7 seconden.
 
 ## Wat het betekent voor de berichten die we nu al tonen
 
@@ -108,7 +108,7 @@ verkoopvoornemens; het duurde in de proef minder dan twee seconden.
 | Top 10 van het ochtendscherm | Verandert in dit venster niet |
 | Weggefilterd in de kern | 13 erbij (1.015 in plaats van 1.002) |
 | Soort op de kaart | De berichten krijgen het label "Vergunning", ook de zeven van Dongen die geen omgevingsvergunning zijn. Ze staan onder weggefilterd met de gewone reden; aan de titel is te zien wat het is |
-| Stand (aanvraag, verleend, enzovoort) | Wordt voor deze titels goed afgeleid: "Ingediende aanvraag" wordt Aanvraag, "Verlengen beslistermijn" wordt Beslistermijn verlengd, "Intrekken" wordt Ingetrokken. Nagekeken op alle 83 |
+| Stand (aanvraag, verleend, enzovoort) | Wordt voor deze titels goed afgeleid: "Ingediende aanvraag" wordt Aanvraag, "Verlengen beslistermijn" wordt Beslistermijn verlengd, "Intrekken" wordt Ingetrokken. Nagekeken op de verdeling over de standen en op de titels van de kern, Roosendaal en Etten-Leur; niet elk van de 83 berichten is afzonderlijk bekeken |
 | Hetzelfde dossier twee keer | Bij 14 van de 58 berichten van Roosendaal staat op dezelfde plek al een later bericht (de verleende vergunning). Dat is zoals het bij elke andere gemeente gaat: aanvraag en besluit zijn twee berichten |
 | Tabblad Adres | Vindt deze berichten vanzelf, in de kern en in de regio's |
 | "Nieuw sinds je vorige bezoek" | Bij de eerste run na het inbouwen is het bericht van Dongen van 27-10 voor de app nieuw, al is het drie weken oud. Het telt dan één keer mee in de ochtendzin |
