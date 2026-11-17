@@ -220,6 +220,9 @@ var SEEN = "tilburg-signalen.gezien";
   result.gapHead = await page.$eval("#list .day", function (node) { return node.textContent; });
   await page.context().close();
 
+  // --- The tab "Adres", with the registers played back (see adres_smoke.js).
+  result.adres = await require("./adres_smoke.js")(browser, base);
+
   result.errors = errors;
   await browser.close();
   process.stdout.write(JSON.stringify(result));

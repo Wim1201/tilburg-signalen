@@ -1,12 +1,13 @@
 /* Tilburg Signalen: reads data/berichten.json and data/gebied.json and renders three views.
-   What to show is decided in logic.js; this file only builds the page from it. */
+   What to show is decided in logic.js; this file only builds the page from it. The fourth view,
+   "adres", is built by adres-app.js; this file only switches to it. */
 (function () {
   "use strict";
 
   var L = window.TilburgSignalen;
   var REMOVED_PAGE = 60;
   var STORE_KEY = "tilburg-signalen.gezien";
-  var VIEWS = ["berichten", "gebied", "bronnen"];
+  var VIEWS = ["berichten", "gebied", "bronnen", "adres"];
   var LISTS = ["ranglijst", "nieuw", "onzeker"];
   var state = {
     data: null, area: null, view: "ranglijst", expanded: false, toonWeg: false, removedLimit: REMOVED_PAGE,
@@ -454,6 +455,7 @@
 
   function start(data, area) {
     state.data = data; state.area = area;
+    window.TilburgSignalenGegevens = data; // the address tab searches these notices; it never changes them
     state.maxKm = data.straalKm;
     state.latestDay = L.latestDay(data.berichten);
     state.ranks = L.rankMap(data.berichten);

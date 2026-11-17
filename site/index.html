@@ -118,6 +118,42 @@
     <h3>Goed om te weten</h3>
     <ul class="notes" id="notes"></ul>
   </section>
+  <section id="view-adres" class="view" hidden aria-labelledby="tab-adres">
+    <h2>Adres</h2>
+    <p class="lede">Typ een adres en zie wat openbare bronnen over het pand en het perceel weten.</p>
+    <div class="adres-zoek">
+      <input type="search" id="adres-zoek" placeholder="Straat, huisnummer en plaats" aria-label="Adres zoeken" autocomplete="off" enterkeyhint="search">
+      <div id="adres-suggesties" class="suggesties" role="group" aria-label="Gevonden adressen" hidden></div>
+    </div>
+    <p class="stale" id="adres-melding" role="status" hidden></p>
+    <div id="adres-uitkomst" class="adres-uitkomst" hidden>
+      <div class="adres-kop">
+        <p class="eyebrow">Gekozen adres</p>
+        <p class="adres-naam" id="adres-naam"></p>
+        <p class="adres-sub" id="adres-sub"></p>
+      </div>
+      <section class="vak" aria-labelledby="kop-adres-bag">
+        <h3 id="kop-adres-bag">Pand (BAG)</h3>
+        <div class="vak-inhoud" id="adres-bag"></div>
+      </section>
+      <section class="vak" aria-labelledby="kop-adres-perceel">
+        <h3 id="kop-adres-perceel">Kadastraal perceel</h3>
+        <div class="vak-inhoud" id="adres-perceel"></div>
+      </section>
+      <section class="vak" aria-labelledby="kop-adres-publicaties">
+        <h3 id="kop-adres-publicaties">Publicaties over dit adres</h3>
+        <div class="vak-inhoud" id="adres-publicaties"></div>
+      </section>
+      <section class="vak" aria-labelledby="kop-adres-energie">
+        <h3 id="kop-adres-energie">Energielabel</h3>
+        <div class="vak-inhoud" id="adres-energie"></div>
+      </section>
+      <section class="vak" aria-labelledby="kop-adres-plan">
+        <h3 id="kop-adres-plan">Bestemmingsplan en omgevingsplan</h3>
+        <div class="vak-inhoud" id="adres-plan"></div>
+      </section>
+    </div>
+  </section>
 </main>
 
 <nav class="tabs" aria-label="Onderdelen">
@@ -128,10 +164,14 @@
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/></svg>Gebied</a>
     <a href="#bronnen" id="tab-bronnen">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 4h9l3 3v13H6zM9 10h6M9 14h6"/></svg>Bronnen</a>
+    <a href="#adres" id="tab-adres">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 11.5 12 4l8 7.5M6.5 10v9.5h11V10M10 19.5v-5h4v5"/></svg>Adres</a>
   </div>
 </nav>
 <!-- app:end -->
 <script src="logic.js"></script>
 <script src="app.js"></script>
+<script src="adres.js"></script>
+<script src="adres-app.js"></script>
 </body>
 </html>
