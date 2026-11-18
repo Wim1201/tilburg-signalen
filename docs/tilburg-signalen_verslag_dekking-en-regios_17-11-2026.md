@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) |
+| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) en 09:30 – 09:29 uur (run 23 op GitHub) |
 | Versie | versie 2 van de app met het tabblad Adres, branch `claude/optimistic-gauss-sb0xpy`, gestart vanaf `main` op commit `edf4150` (na PR #16) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | officielebekendmakingen.nl (zoekdienst SRU), opgevraagd 17-11-2026 tussen 20:25 en 20:37 uur; gemeente-indeling van het CBS, "Gebieden in Nederland 2026" (tabel 86247NED) |
@@ -27,6 +27,7 @@ gemeten; zie "Open punten".
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 09:29 uur | **De grens is op GitHub gemeten; "Op GitHub nog niet gemeten" onder "Open punten bij dit onderdeel" is daarmee afgehandeld voor een gewone run.** Run 23 (handmatig, vanaf de werkbranch) duurde 6 minuten en 9 seconden; de stap "Berichten ophalen" 4 minuten en 23 seconden, met 613 verzoeken en 89 weigeringen. De melding voor het ochtendscherm staat op nul en de kern is gelijk aan die van run 22, plus de 21 berichten van vandaag. Zie "Run 23 op GitHub". De wekelijkse volledige run is op GitHub nog niet gedraaid. |
 | 18-11-2026, 09:05 uur | **De drie voorstellen uit "Run 22 op GitHub" zijn gebouwd; "Voorstel (niet doorgevoerd)" daar is achterhaald voor de punten 1, 2 en 4.** Grens van 300 nieuwe regioteksten per run, telling per regio en de wekelijkse volledige run in delen. Zie "Grens, telling per regio en wekelijkse beurt". Niet samengevoegd. |
 | 18-11-2026, 09:05 uur | **De volledige verversing leest niet meer alles opnieuw.** `--volledig` leest de kern en de regio van de week opnieuw en de rest uit de cache. Wat eerdere verslagen over "cache negeren en alles opnieuw ophalen" zeggen, geldt alleen nog voor de nieuwe optie `--alles`, die de workflow niet gebruikt. **De toelichting in de workflow zelf zegt nog "cache negeren"; dat bestand heb ik niet aangeraakt.** |
 | 18-11-2026, 09:05 uur | **De vier ontbrekende teksten uit run 22 zijn verklaard; "Ik vond er 31 terug" was dus geen telfout.** Bij vier berichten besliste de titel al over de uitkomst, waardoor niets in het bericht liet zien dat de tekst ontbrak. Zie "Waar de vier teksten bleven". |
@@ -489,6 +490,58 @@ handmatige run.
 | Op GitHub nog niet gemeten | De cijfers hierboven komen uit de container, waar de bron niets weigert. De volgende handmatige run laat zien wat 334 verzoeken aan de bron daar doen |
 | Een wachtend bericht verbergt wat de titel al zegt | Zo afgesproken: elk wachtend regiobericht staat onder Onzeker. Een aanvraag met "12 woningen" in de titel staat dus hooguit een paar runs te laag. Het gaat om de oudste berichten eerst |
 | Vier runs voor de eerste vulling | 300, 300, 300 en 81 teksten. Met vijf runs per werkdag is dat binnen een dag rond |
+
+# Run 23 op GitHub (18-11-2026, 09:13 – 09:19 uur)
+
+De tweede handmatige run vanaf de werkbranch (commit `2548356`), zonder "volledig", door Wim gestart.
+Dezelfde beginstand als run 22: de cache van `main` zonder regio's. Nu met de grens van 300.
+
+| Stap | Duur | Verzoeken | Weigeringen (HTTP 429) | Uitkomst |
+|---|---:|---:|---:|---|
+| Tests | 14 s | geen | | 361 tests geslaagd; 56 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 28 s | | | Geslaagd |
+| Browsertests | 37 s | geen naar de bronnen | | 45 tests geslaagd |
+| Gebied bijwerken | 15 s | 29 | 0 | Geslaagd |
+| **Berichten ophalen** | **4 min 23 s** | **613** | **89** | Geslaagd, met één waarschuwing: 1 tekst in Zeeland niet opgehaald |
+| Cache bewaren, publiceren, live-controleren | | | | Overgeslagen: alleen vanaf `main` |
+| **Hele run** | **6 min 9 s** | **642** | **89** | **Geslaagd (groen), niets gepubliceerd, geen cache geschreven** |
+
+| Run 22 en run 23 naast elkaar | Run 22 (zonder grens) | Run 23 (grens 300) |
+|---|---:|---:|
+| Duur van "Berichten ophalen" | 12 min 49 s | 4 min 23 s |
+| Verzoeken in die stap | 1.404 | 613 |
+| waarvan aan de bron | 1.191 | 451 |
+| Weigeringen | 173 | 89 |
+| Teksten definitief niet opgehaald | 35 | 1 |
+| Regioteksten gelezen | 946 (alles in één keer) | 300 |
+| Regioberichten die nog wachten | 0 | 713 |
+
+### Wat het resultaat laat zien
+
+Het resultaat van de run is opgehaald en nagelezen.
+
+| Vraag | Antwoord |
+|---|---|
+| Staat de melding op het ochtendscherm op nul? | **Ja.** `ophaalfouten` is 0 teksten, 0 percelen, 0 rechtbankpublicaties; geen onvolledige dagen; alle drie de bronnen in orde |
+| Hoeveel regioberichten wachten nog? | **713**: West-Brabant 415, Zeeland 243, Midden-Brabant 55. Ze staan alle onder Onzeker met "Tekst nog niet gelezen"; het aantal in het overzicht is gelijk aan het aantal in elk regiobestand |
+| Welke wachten? | De oudste: alles tot en met 02-11-2026. Wat daarna gepubliceerd is, is gelezen |
+| Is de kern gelijk aan die van run 22? | **Ja.** Alle 1.080 berichten van run 22 staan erin met dezelfde inhoud. Er zijn er 21 bij, alle van vandaag (18-11-2026) en alle weggefilterd: de publicaties van 9 uur. De kern telt nu 1.101 berichten, 80 ontwikkellocaties en 22 onzeker, zoals in run 22 |
+| Heeft de kern iets gemist? | Nee: 0 mislukt, 0 wachtend, geen bericht met het label of met de zin over een niet-opgehaalde tekst |
+| De ene tekst die niet kwam | Hoort bij Zeeland en is daar geteld (`mislukt: 1`); het log meldt het bij Zeeland. De volgende run probeert het opnieuw |
+
+De teksten: 800 gevraagd, waarvan 480 uit de cache; 319 opgehaald (300 van de regio's en 19 nieuwe
+van de kern van vandaag). In de eerste ronde mislukten er 23 (21 door een weigering, 2 doordat het
+netwerk van de runner even onbereikbaar was); 22 lukten bij herhaling.
+
+### Wat dit betekent
+
+| Punt | Toelichting |
+|---|---|
+| De tien minuten | Gehaald: ruim zes minuten voor de hele run |
+| Weigeringen | Die blijven er op GitHub zodra een run een paar honderd teksten leest: 89 op 451 verzoeken aan de bron. Bij herhaling komt bijna alles binnen. De gewone dagelijkse run van `main` doet rond de 34 verzoeken en krijgt er geen |
+| De vulling | Nog drie runs van deze omvang (300, 300 en 113 teksten). Vanaf een branch telt dat niet door, omdat de cache daar niet bewaard wordt; na samenvoegen gebeurt het vanzelf, in de eerste vier runs |
+| Daarna | Per run alleen de nieuwe teksten van die dag: voor de regio's naar schatting 20 tot 30 per dag, ver onder de grens |
+| De wekelijkse volledige run | Niet in deze run gemeten. Zie "Open punten bij dit onderdeel": de week van West-Brabant blijft de zwaarste |
 
 # De Vlaamse bron
 
