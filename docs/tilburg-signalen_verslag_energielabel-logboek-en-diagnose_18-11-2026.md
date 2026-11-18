@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 22:30 – 22:47 uur |
+| Datum | 18-11-2026, 22:30 – 22:47 uur; aangevuld 22:50 uur (testrun op de pull request) |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, gelijk aan `main` op commit `33c3d11` (na PR 27) bij de start |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen`; Node 22, wrangler 4.164.0, Chromium via Playwright |
 | Brondata | De documentatie van EP-Online (`public.ep-online.nl/swagger/v5/swagger.json`, opnieuw opgehaald 22:31 uur) en vijf verzoeken aan EP-Online **zonder sleutel** (22:31 uur); de documentatie van Cloudflare over Workers Logs, Real-time logs en de instellingen van wrangler (gelezen 22:30 – 22:36 uur); de melding van Wim over de geplaatste Worker |
@@ -28,6 +28,7 @@ is niet samengevoegd.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 22:50 uur | **De tests hebben op GitHub gedraaid, op de pull request (PR 28), en zijn geslaagd.** Zie "De testrun op de pull request". |
 | 18-11-2026, 22:44 uur | **"Het logboek: geen adres, geen sleutel, geen IP-adres" (verslag energielabel en de README van de Worker) klopte niet.** Het gold voor de regel die de Worker zelf schrijft. Cloudflare bewaarde daarnaast per verzoek een eigen regel met de hele vraag. Ik had bij het bouwen `observability` aangezet zonder na te lezen wat Cloudflare dan zelf vastlegt, en de bewering alleen getest op de regel van de Worker. De correctie staat ook bovenaan het eerdere verslag. |
 | 18-11-2026, 22:44 uur | **"Niets geplaatst, geen sleutel" is achterhaald:** Wim heeft de Worker geplaatst met een echte sleutel. |
 | 18-11-2026, 22:44 uur | **De vraag aan de Worker is nu een `POST` met het adres in de inhoud**, geen `GET` met het adres in het webadres. De oude vorm geeft na het opnieuw plaatsen `405`. |
@@ -199,6 +200,18 @@ het schema, de scores.
 | De instellingen | `wrangler deploy --dry-run` (plaatst niets) | Geaccepteerd |
 
 De testrun op de pull request staat onderaan, onder "De testrun op de pull request".
+
+## De testrun op de pull request (PR 28, 22:46 – 22:48 uur)
+
+Run 6 van "Tests bij een pull request", voor commit `49616dd`: **groen**.
+
+| Stap | Uitkomst |
+|---|---|
+| Tests | 513 tests, geslaagd, 82 overgeslagen (de browsertests, die in de volgende stap draaien) |
+| Browsertests | 71 tests, geslaagd |
+
+Geen regel met een fout in het log. Eén regel `FOUT bij bron officielebekendmakingen: 503` hoort bij
+een test die een bron nabootst die niet antwoordt; die stond er ook bij eerdere runs.
 
 ## Niet getest of nog open
 
