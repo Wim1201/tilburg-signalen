@@ -732,7 +732,8 @@ class Energielabel(unittest.TestCase):
             self.assertEqual(json.load(handle)["energielabel_worker"], "")
         app = read("app.js")
         self.assertIn('shared.energielabelWorker = data.energielabelWorker || "";', app)
-        self.assertIn('"energielabelWorker": worker_adres(config.get("energielabel_worker")),', open(os.path.join(ROOT, "signalen", "update.py"), encoding="utf-8").read())
+        with open(os.path.join(ROOT, "signalen", "update.py"), encoding="utf-8") as handle:
+            self.assertIn('"energielabelWorker": worker_adres(config.get("energielabel_worker")),', handle.read())
 
 
 if __name__ == "__main__":

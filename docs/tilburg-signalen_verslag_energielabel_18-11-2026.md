@@ -23,6 +23,7 @@ documentatie en uit een nagebootst EP-Online.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 16:10 uur | **De nieuwe tests hebben op GitHub gedraaid, op de pull request (PR 26), en zijn geslaagd; "De nieuwe tests op GitHub" onder "Niet getest of nog open" is daarmee afgehandeld.** Zie "De testrun op de pull request". |
 | 18-11-2026, 16:07 uur | **"Geen sleutels, geen tussenserver" uit het verslag van het tabblad Adres geldt niet meer voor het energielabel.** Wim vroeg op 17-11 om een tabblad zonder sleutels, tokens of Worker, en vraagt nu om het energielabel via een Worker met een sleutel. Voor adres, pand, perceel en publicaties blijft de oude afspraak gelden: die gaan rechtstreeks vanuit de browser naar open bronnen. De twee tests die de oude afspraak bewaakten, zijn daarop aangepast; zie "Tests". |
 | 18-11-2026, 16:07 uur | **De planner is niet gewijzigd.** De nieuwe Worker staat in een eigen map met een eigen naam; een test bewaakt dat de instellingen van de planner hem niet noemen. |
 | 18-11-2026, 16:07 uur | **Het aantal tests is 503 (was 440).** Er zijn er 63 bij: 50 voor de Worker, 8 voor de logica van het vak en 5 in de browser. |
@@ -146,6 +147,21 @@ twee, de registers van PDOK en de Worker, en de test eist dat beide een kale vra
 sturen. De andere zocht "Nog niet beschikbaar in de app." twee keer in één functie; het energielabel heeft
 nu een eigen functie.
 
+### De testrun op de pull request (GitHub, 18-11-2026, 16:07 – 16:09 uur)
+
+Run van "Tests bij een pull request" op PR 26, op de samenvoeging van de pull request met `main`.
+
+| Stap | Duur | Uitkomst |
+|---|---:|---|
+| Tests | 21 s | 503 tests geslaagd; 82 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 23 s | Geslaagd |
+| Browsertests | 50 s | 71 tests geslaagd, geen overgeslagen |
+| **Hele run** | **1 min 41 s** | **Groen** |
+
+De 50 tests van de Worker hebben daar echt gedraaid: ze hebben Node nodig, en de 82 overgeslagen tests
+zijn precies de 77 van vóór deze pull request plus de 5 nieuwe browsertests. Het log liet één
+slordigheid van mij zien: een nieuwe test sloot een bestand niet. Hersteld.
+
 ### In de runtime van Cloudflare, op deze machine (15:50 – 15:58 uur)
 
 Niet onderdeel van de vaste tests: `npx wrangler dev` draait de Worker in de echte runtime van Cloudflare,
@@ -183,7 +199,6 @@ veel verzoeken" (melding, knop, link). In de sessie gemaakt; niet in de repo.
 | Een korte toevoeging | Zie "Wat de documentatie zegt" |
 | Het plaatsen bij Cloudflare | Niet gedaan. De teller is lokaal in de runtime geprobeerd, niet in het netwerk van Cloudflare |
 | De voorwaarden van RVO | Niet gelezen |
-| De nieuwe tests op GitHub | Draaien op de pull request; de uitkomst staat in het bericht aan Wim en komt bij het samenvoegen in dit verslag |
 | Op een echte telefoon | Niet te doen vanuit deze container |
 | Het vak na een verversing bij terugkeer | Het label wordt dan niet opnieuw opgevraagd; het blijft staan zoals het was |
 
