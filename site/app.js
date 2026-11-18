@@ -14,7 +14,7 @@
     data: null, area: null, kern: [], regios: [], regioBerichten: {}, regioFout: "", kmMax: 15, view: "ranglijst", expanded: false, toonWeg: false, removedLimit: REMOVED_PAGE,
     zoek: "", type: "", gemeente: "", fase: "", signaal: "", dagen: 0, sort: "relevantie", maxKm: 15,
     nieuw: {}, ranks: {}, firstVisit: false, latestDay: "",
-    geladen: 0, bezig: false, regioOud: {},
+    geladen: 0, bezig: false, regioOud: {}, toon: "samen",
   };
 
   function $(id) { return document.getElementById(id); }
@@ -49,6 +49,12 @@
     return { centre: state.data.centrum, nieuw: state.nieuw, ranks: state.ranks, latestDay: state.latestDay, today: today };
   }
 
+  /* What the lists on the tab Berichten show: the core with the chosen regions, or one part of it
+     (see setToon). Without a chosen region this is the core. */
+  function inView() {
+    return L.toonItems(state.kern, state.regioBerichten, state.regios, state.toon);
+  }
+
   function ofClass(klasse) {
     return state.data.berichten.filter(function (item) { return item.klasse === klasse; });
   }
@@ -75,10 +81,11 @@
 
   /* The morning line: greeting and date, how many locations are new, and the three lists. */
   function renderBrief() {
-    var now = new Date(), counts = L.counts(state.data.berichten, state.nieuw);
+    // The morning line is about the core, whatever the lists below it show; the tiles count the lists.
+    var now = new Date(), counts = L.counts(inView(), state.nieuw), core = L.counts(state.kern, state.nieuw);
     $("brief-day").textContent = L.greeting(now.getHours()) + " · " + dayFormat.format(now);
-    $("brief-title").textContent = L.briefing(counts.nieuw, state.firstVisit);
-    $("brief-sub").textContent = (L.alsoNewLine(counts.onzekerNieuw) + " Laatste publicatiedag: " +
+    $("brief-title").textContent = L.briefing(core.nieuw, state.firstVisit);
+    $("brief-sub").textContent = (L.alsoNewLine(core.onzekerNieuw) + " Laatste publicatiedag: " +
       (state.latestDay ? dayLabel(state.latestDay).toLowerCase() : "nog geen berichten") + ".").trim();
     $("tile-ranglijst").querySelector("b").textContent = counts.locaties;
     $("tile-nieuw").querySelector("b").textContent = counts.nieuw;
@@ -93,16 +100,24 @@
     box.textContent = "";
     notices().forEach(function (text) { box.appendChild(el("p", "stale", text)); });
 
-    // Only when a region was chosen on the area tab: say so here, with the way back to the core.
+    // Only when a region was chosen on the area tab: say so here, with the choice of what the lists
+    // show: everything together, the core alone or one region alone. The regions stay chosen.
     var line = $("regio-regel");
     line.textContent = "";
     line.hidden = !state.regios.length;
     if (state.regios.length) {
-      line.appendChild(el("span", null, "Met " + L.nameList(state.regios) + " erbij. "));
-      var back = el("button", "ghost", "Alleen de kern");
-      back.type = "button";
-      back.addEventListener("click", function () { setRegios([]); });
-      line.appendChild(back);
+      line.appendChild(el("span", null, "Met " + L.nameList(inOrder(state.regios)) + " erbij. "));
+      var choices = el("span", "keuzes");
+      choices.setAttribute("role", "group");
+      choices.setAttribute("aria-label", "Wat de lijsten tonen");
+      L.toonKeuzes(inOrder(state.regios)).forEach(function (choice) {
+        var button = el("button", "ghost", choice.label);
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(choice.id === L.toonOf(state.regios, state.toon)));
+        button.addEventListener("click", function () { setToon(choice.id); });
+        choices.appendChild(button);
+      });
+      line.appendChild(choices);
     }
   }
 
@@ -126,7 +141,10 @@
         "Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw.");
     }
     // A chosen region reports what it still misses itself; without a region these lines are not there.
-    L.regioMeldingen(state.data.regios, state.regios).forEach(function (line) { lines.push(line); });
+    // What a region still misses is said when that region is in the lists, not with the core alone.
+    var choice = L.toonOf(state.regios, state.toon);
+    var inLists = choice === L.SAMEN ? state.regios : state.regios.filter(function (name) { return name === choice; });
+    L.regioMeldingen(state.data.regios, inLists).forEach(function (line) { lines.push(line); });
     if (failed.insolventie) {
       lines.push("Bij de laatste verversing konden " + failed.insolventie + " rechtbankpublicaties over faillissementen niet worden gelezen. " +
         "De volgende verversing probeert het opnieuw.");
@@ -237,7 +255,7 @@
   }
 
   function renderList() {
-    var ctx = context(), selection = L.select(state.data.berichten, state, ctx);
+    var ctx = context(), selection = L.select(inView(), state, ctx);
     var main = selection.main, removed = selection.removed, alsoNew = selection.alsoNew;
     var open = {};
     [].forEach.call(document.querySelectorAll("#view-berichten .card:has(details[open])"), function (node) { open[node.getAttribute("data-id")] = true; });
@@ -353,7 +371,7 @@
 
   /* Under the name of the app: the core, or the core with the regions that are chosen. */
   function renderScope() {
-    $("scope").textContent = L.scopeLine(state.data.straalKm, state.data.centrum.naam, inOrder(state.regios));
+    $("scope").textContent = L.scopeLine(state.data.straalKm, state.data.centrum.naam, inOrder(state.regios), state.toon);
   }
 
   function gemeenteKey(gemeente) { return gemeente.land === "BE" ? gemeente.naam + " (België)" : gemeente.naam; }
@@ -487,11 +505,50 @@
 
   /* The choices in the filter panel follow the notices that are shown. */
   function fillFilters() {
-    var relevant = state.data.berichten.filter(function (item) { return item.klasse !== "weggefilterd"; });
+    var relevant = inView().filter(function (item) { return item.klasse !== "weggefilterd"; });
     fillSelect($("f-type"), countBy(relevant, "type"), L.TYPE_LABEL, state.type);
     fillSelect($("f-gemeente"), countBy(relevant, "gemeente"), null, state.gemeente);
-    fillSelect($("f-fase"), countBy(relevant, "fase"), null, state.fase);
+    fillFase($("f-fase"), relevant, state.fase);
     fillSelect($("f-signaal"), countBy(relevant, "signalen"), null, state.signaal);
+  }
+
+  /* The filter "Fase": first the three steps (early, middle, late), then every phase by itself. */
+  function fillFase(select, items, chosen) {
+    var choices = L.faseKeuzes(items);
+    while (select.children.length > 1) select.removeChild(select.lastChild); // the first option is "all"
+    if (chosen && chosen.indexOf("trede:") !== 0 && !choices.fasen.some(function (c) { return c.value === chosen; })) choices.fasen.push({ value: chosen, label: chosen + " (0)" });
+    [["Trede", choices.treden], ["Stand", choices.fasen]].forEach(function (part) {
+      var group = document.createElement("optgroup");
+      group.label = part[0];
+      part[1].forEach(function (choice) {
+        var option = el("option", null, choice.label);
+        option.value = choice.value;
+        group.appendChild(option);
+      });
+      select.appendChild(group);
+    });
+    select.value = chosen || "";
+  }
+
+  /* After the choice of what the lists show changed: the ranking counts within what is shown, and
+     the distance filter reaches as far as those notices lie. `atMax`: the filter stood at its end. */
+  function follow(atMax) {
+    var items = inView();
+    state.ranks = L.rankMap(items);
+    state.kmMax = L.reachKm(items, state.data.straalKm);
+    state.maxKm = atMax ? state.kmMax : Math.min(state.maxKm, state.kmMax);
+    $("f-km").max = state.kmMax; $("f-km").value = state.maxKm; $("f-km-out").textContent = state.maxKm + " km";
+  }
+
+  /* Show everything together, the core alone or one region alone. The regions stay chosen, and so
+     do the search and the filters. */
+  function setToon(choice) {
+    var atMax = state.maxKm >= state.kmMax;
+    state.toon = L.toonOf(state.regios, choice);
+    state.expanded = false; state.removedLimit = REMOVED_PAGE;
+    follow(atMax);
+    fillFilters();
+    renderScope(); renderBrief(); renderList();
   }
 
   /* The notices of one region, read once from its own file. */
@@ -521,6 +578,7 @@
       var shown = loaded.filter(function (entry) { return entry.items; });
       state.regioFout = missing.length ? "De berichten van " + L.nameList(missing) + " konden niet worden geladen. Controleer je verbinding en kies de regio opnieuw." : "";
       state.regios = shown.map(function (entry) { return entry.name; });
+      state.toon = L.SAMEN; // a new choice of regions starts with everything together
       state.data.berichten = L.merged(state.kern, shown.map(function (entry) { return entry.items; }));
       state.ranks = L.rankMap(state.data.berichten);
       state.kmMax = L.reachKm(state.data.berichten, state.data.straalKm);
@@ -605,12 +663,10 @@
       // A region that is no longer on offer falls away; one whose file did not come keeps what it had.
       var kept = chosen.filter(function (name, index) { return lists[index]; });
       state.regios = kept;
+      state.toon = L.toonOf(kept, state.toon); // what the lists showed stays, unless that region fell away
       state.data.berichten = L.merged(state.kern, kept.map(function (name) { return state.regioBerichten[name]; }));
       state.latestDay = L.latestDay(state.kern);
-      state.ranks = L.rankMap(state.data.berichten);
-      state.kmMax = L.reachKm(state.data.berichten, data.straalKm);
-      state.maxKm = atMax ? state.kmMax : Math.min(state.maxKm, state.kmMax); // the distance filter stays where it was set
-      $("f-km").max = state.kmMax; $("f-km").value = state.maxKm; $("f-km-out").textContent = state.maxKm + " km";
+      follow(atMax); // the distance filter stays where it was set
       state.nieuw = rememberSeen(state.kern).nieuw; // what came in just now is new; firstVisit keeps its answer
       renderScope();
       $("updated").textContent = "Bijgewerkt " + stampFormat.format(new Date(data.bijgewerkt));
@@ -658,7 +714,8 @@
 
   Promise.all([fetchJson("data/berichten.json"), fetchJson("data/gebied.json")]).then(function (results) {
     start(results[0], results[1]);
-  }).catch(function () {
+  }).catch(function (error) {
+    if (window.console && console.error) console.error(error); // also a fault in the app itself ends here
     var box = $("load-error");
     box.textContent = "De berichten konden niet worden geladen. Controleer je verbinding en open de app opnieuw.";
     box.hidden = false;

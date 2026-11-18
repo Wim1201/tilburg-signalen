@@ -11,7 +11,7 @@
 var fixture = require("./regio_ongelezen.json");
 var adres = require("./adres_smoke.js");
 
-var LATER = ["2026-12-31T23:57:00+01:00", "2026-12-31T23:58:00+01:00", "2026-12-31T23:59:00+01:00"];
+var LATER = ["2026-12-31T23:56:00+01:00", "2026-12-31T23:57:00+01:00", "2026-12-31T23:58:00+01:00", "2026-12-31T23:59:00+01:00"];
 var REGION = "Zeeland", REGION_FILE = "regio-zeeland.json";
 
 module.exports = async function (browser, base) {
@@ -72,7 +72,8 @@ module.exports = async function (browser, base) {
         count: text("result-count"), cards: [].map.call(document.querySelectorAll("#list .card"), function (node) { return node.getAttribute("data-id"); }),
         open: [].map.call(document.querySelectorAll("#list .card:has(details[open])"), function (node) { return node.getAttribute("data-id"); }),
         zoek: document.getElementById("zoek").value, type: document.getElementById("f-type").value, filtersOpen: !document.getElementById("filters").hidden,
-        line: document.getElementById("regio-regel").hidden ? null : text("regio-regel"),
+        line: document.getElementById("regio-regel").hidden ? null : document.getElementById("regio-regel").firstChild.textContent.trim(),
+        toon: [].map.call(document.querySelectorAll('#regio-regel .keuzes button[aria-pressed="true"]'), function (node) { return node.textContent; }),
         pressed: [].map.call(document.querySelectorAll('#regios .regio[aria-pressed="true"]'), function (node) { return node.firstChild.textContent; }),
         adres: text("adres-naam"), adresVisible: !document.getElementById("adres-uitkomst").hidden,
         bag: text("adres-bag"), perceel: text("adres-perceel"),
@@ -149,6 +150,14 @@ module.exports = async function (browser, base) {
   await page.click("#tab-berichten");
   await page.waitForSelector("#view-berichten:not([hidden])");
   result.end = await show();
+
+  // --- The lists show the region alone, and a later run comes in: that choice stays as well.
+  await page.click('#regio-regel .keuzes button:text-is("Alleen ' + REGION + '")');
+  await page.waitForSelector('#regio-regel .keuzes button[aria-pressed="true"]:text-is("Alleen ' + REGION + '")');
+  result.regionAlone = { state: await show(), requests: requests() };
+  await forward(16);
+  served.version = 4;
+  result.regionAloneLater = await backInView(true);
   result.later = LATER;
   result.errors = errors;
   await context.close();

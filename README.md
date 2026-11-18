@@ -15,6 +15,15 @@ Rond die kern liggen drie **regio's**: Midden-Brabant, West-Brabant en Zeeland (
 De app haalt hun berichten ook op, maar opent altijd met alleen de kern. Op het tabblad Gebied kies
 je een regio erbij; bij een volgend bezoek staat de app weer op de kern.
 
+Met een regio erbij kies je op het tabblad Berichten wat de lijsten tonen: **Samen** (de standaard),
+**Alleen de kern** of **Alleen** die regio. De rang telt binnen wat je ziet. De ochtendregel bovenaan
+blijft over de kern gaan.
+
+De ranglijst zet de hoogste score bovenaan. Bij een gelijke score gaat het bericht met de meeste
+woningen voor, daarna het nieuwste. Het filter **Fase** kent drie treden: vroeg (voornemen, aanvraag),
+midden (ontwerp, bekendmaking, besluit) en laat (vastgesteld, verleend, herstelbesluit). Die indeling
+is een keuze van deze app en komt niet uit de bronnen.
+
 Het tabblad **Adres** staat daar los van: typ een adres en zie het pand (BAG), het kadastrale perceel
 met een kaartje, en de publicaties over dat adres uit de berichten die de app al heeft. Het vraagt
 de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel.

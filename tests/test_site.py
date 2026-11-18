@@ -291,6 +291,120 @@ class Verversen(unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class VolgordeBijGelijkeScore(unittest.TestCase):
+    """With equal scores: the most dwellings first, then the newest notice, then the nearest. The
+    phase and the kind of location play no part, and a score is never changed (site/logic.js)."""
+
+    def order(self, *items):
+        return [entry["id"] for entry in logic(["sorted", list(items), "relevantie"])[0]]
+
+    def test_a_higher_score_always_wins(self):
+        self.assertEqual(self.order(item("veel", score=107, woningen=500, datum="2026-11-17"), item("hoog", score=108, woningen=2, datum="2026-10-01")), ["hoog", "veel"])
+
+    def test_with_equal_scores_the_most_dwellings_come_first(self):
+        # The case of 18-11-2026: a plan of 141 dwellings of 6 October and one of 100 of 27 October, both 108.
+        bellini = item("bellinistraat", score=108, woningen=141, datum="2026-10-06", fase="Vastgesteld", km=3.3)
+        tholen = item("tholen", score=108, woningen=100, datum="2026-10-27", fase="Voornemen", km=59.3, locatieSoort="gemeente")
+        self.assertEqual(self.order(tholen, bellini), ["bellinistraat", "tholen"])
+
+    def test_with_equal_scores_and_dwellings_the_newest_comes_first_then_the_nearest(self):
+        old = item("oud", score=100, woningen=None, datum="2026-10-01", km=1.0)
+        new_far = item("nieuw-ver", score=100, woningen=None, datum="2026-11-10", km=9.0)
+        new_near = item("nieuw-dichtbij", score=100, woningen=None, datum="2026-11-10", km=2.0)
+        self.assertEqual(self.order(old, new_far, new_near), ["nieuw-dichtbij", "nieuw-ver", "oud"])
+
+    def test_no_number_of_dwellings_counts_as_none(self):
+        self.assertEqual(self.order(item("zonder", score=100, woningen=None, datum="2026-11-17"), item("twee", score=100, woningen=2, datum="2026-10-01")), ["twee", "zonder"])
+
+    def test_the_phase_and_the_kind_of_location_play_no_part(self):
+        early = item("voornemen", score=100, woningen=10, datum="2026-11-10", fase="Voornemen", locatieSoort="gemeente")
+        late = item("vastgesteld", score=100, woningen=10, datum="2026-11-01", fase="Vastgesteld", locatieSoort="exact")
+        self.assertEqual(self.order(late, early), ["voornemen", "vastgesteld"], "bij gelijke score en gelijke woningen beslist de datum, niet de fase")
+
+    def test_the_rank_numbers_follow_the_same_order_and_no_score_is_changed(self):
+        items = [item("a", score=108, woningen=100, datum="2026-10-27"), item("b", score=108, woningen=141, datum="2026-10-06"), item("c", score=107, woningen=70)]
+        ranks, same = logic(["rankMap", items], ["sorted", items, "relevantie"])
+        self.assertEqual(ranks, {"b": 1, "a": 2, "c": 3})
+        self.assertEqual(sorted((entry["id"], entry["score"]) for entry in same), [("a", 108), ("b", 108), ("c", 107)])
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class FaseTreden(unittest.TestCase):
+    """The filter "Fase" has three steps. The grouping is a choice made in this app, not something
+    the sources give (site/logic.js, FASE_TREDEN)."""
+
+    def test_the_three_steps_are_these_eight_phases(self):
+        steps = logic(["FASE_TREDEN"])[0]
+        self.assertEqual([(step["id"], step["naam"], step["fasen"]) for step in steps],
+                         [("vroeg", "Vroeg", ["Voornemen", "Aanvraag"]), ("midden", "Midden", ["Ontwerp", "Bekendmaking", "Besluit"]),
+                          ("laat", "Laat", ["Vastgesteld", "Verleend", "Herstelbesluit"])])
+
+    def test_a_phase_outside_the_three_steps_belongs_to_none(self):
+        calls = [["faseTrede", fase] for fase in ("Aanvraag", "Besluit", "Herstelbesluit", "Voornemen tot verkoop", "Beslistermijn verlengd", "Geweigerd", "Ontwerpbesluit", "Onherroepelijk", None)]
+        self.assertEqual(logic(*calls), ["vroeg", "midden", "laat", None, None, None, None, None, None])
+
+    def test_the_filter_takes_a_step_or_one_phase(self):
+        notices = [item("a", fase="Aanvraag"), item("b", fase="Voornemen"), item("c", fase="Vastgesteld"), item("d", fase="Voornemen tot verkoop"), item("e", fase="Besluit")]
+
+        def found(fase):
+            return sorted(entry["id"] for entry in logic(["select", notices, state(fase=fase), {"nieuw": {}, "latestDay": "2026-11-10", "today": TODAY}])[0]["main"])
+
+        self.assertEqual(found("trede:vroeg"), ["a", "b"])
+        self.assertEqual(found("trede:midden"), ["e"])
+        self.assertEqual(found("trede:laat"), ["c"])
+        self.assertEqual(found("Voornemen tot verkoop"), ["d"])
+        self.assertEqual(found("Aanvraag"), ["a"])
+        self.assertEqual(found(""), ["a", "b", "c", "d", "e"])
+
+    def test_the_choices_show_the_steps_always_and_every_phase_that_occurs(self):
+        notices = [item("a", fase="Aanvraag"), item("b", fase="Aanvraag"), item("c", fase="Vastgesteld"), item("d", fase="Voornemen tot verkoop")]
+        choices = logic(["faseKeuzes", notices], ["faseKeuzes", []])
+        self.assertEqual([(c["value"], c["label"]) for c in choices[0]["treden"]],
+                         [("trede:vroeg", "Vroeg: voornemen, aanvraag (2)"), ("trede:midden", "Midden: ontwerp, bekendmaking, besluit (0)"), ("trede:laat", "Laat: vastgesteld, verleend, herstelbesluit (1)")])
+        self.assertEqual([(c["value"], c["label"]) for c in choices[0]["fasen"]],
+                         [("Aanvraag", "Aanvraag (2)"), ("Vastgesteld", "Vastgesteld (1)"), ("Voornemen tot verkoop", "Voornemen tot verkoop (1)")])
+        self.assertEqual(([c["value"] for c in choices[1]["treden"]], choices[1]["fasen"]), (["trede:vroeg", "trede:midden", "trede:laat"], []))
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class WatDeLijstenTonen(unittest.TestCase):
+    """With regions chosen the lists show everything together, the core alone or one region alone."""
+
+    CORE = [item("k1", regio="kern"), item("k2", regio="kern", datum="2026-11-12")]
+    LISTS = {"Zeeland": [item("z1", regio="Zeeland", km=80.0)], "West-Brabant": [item("w1", regio="West-Brabant", km=30.0), item("w2", regio="West-Brabant", km=31.0)]}
+
+    def ids(self, regios, toon):
+        return sorted(entry["id"] for entry in logic(["toonItems", self.CORE, self.LISTS, regios, toon])[0])
+
+    def test_without_a_region_there_is_nothing_to_choose(self):
+        self.assertEqual(logic(["toonKeuzes", []], ["toonOf", [], "kern"], ["toonOf", [], "Zeeland"]), [[], "samen", "samen"])
+        self.assertEqual(self.ids([], "Zeeland"), ["k1", "k2"])
+
+    def test_the_choices_are_together_the_core_and_every_chosen_region(self):
+        self.assertEqual([(c["id"], c["label"]) for c in logic(["toonKeuzes", ["West-Brabant", "Zeeland"]])[0]],
+                         [("samen", "Samen"), ("kern", "Alleen de kern"), ("West-Brabant", "Alleen West-Brabant"), ("Zeeland", "Alleen Zeeland")])
+
+    def test_together_is_the_default_and_what_an_unknown_choice_falls_back_to(self):
+        chosen = ["West-Brabant", "Zeeland"]
+        self.assertEqual(logic(["toonOf", chosen, "samen"], ["toonOf", chosen, None], ["toonOf", chosen, "Midden-Brabant"], ["toonOf", chosen, "kern"], ["toonOf", chosen, "Zeeland"]),
+                         ["samen", "samen", "samen", "kern", "Zeeland"])
+        self.assertEqual(self.ids(chosen, "Midden-Brabant"), ["k1", "k2", "w1", "w2", "z1"])
+
+    def test_every_choice_shows_its_own_notices(self):
+        chosen = ["West-Brabant", "Zeeland"]
+        self.assertEqual(self.ids(chosen, "samen"), ["k1", "k2", "w1", "w2", "z1"])
+        self.assertEqual(self.ids(chosen, "kern"), ["k1", "k2"])
+        self.assertEqual(self.ids(chosen, "Zeeland"), ["z1"])
+        self.assertEqual(self.ids(["Zeeland"], "samen"), ["k1", "k2", "z1"])
+
+    def test_the_line_under_the_name_follows_the_choice(self):
+        centre = "De Heuvel, Tilburg-centrum"
+        self.assertEqual(logic(["scopeLine", 15, centre, ["Zeeland"], "samen"], ["scopeLine", 15, centre, ["Zeeland"], "kern"], ["scopeLine", 15, centre, ["Zeeland"], "Zeeland"],
+                               ["scopeLine", 15, centre, [], "kern"], ["scopeLine", 15, centre, ["Zeeland"], "West-Brabant"]),
+                         ["Kern en Zeeland", "Alleen de kern", "Alleen Zeeland", "Kern: binnen 15 km van De Heuvel, Tilburg-centrum", "Kern en Zeeland"])
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
 class OndertitelEnInleiding(unittest.TestCase):
     """The line under the name of the app and the introduction on the tab Gebied follow what is
     shown: the core, or the core with the chosen regions (site/logic.js)."""
@@ -815,12 +929,15 @@ class InDeBrowser(unittest.TestCase):
             return json.load(handle), self.seen["regioOngelezen"]
 
     @staticmethod
-    def shown(data, chosen):
+    def shown(data, chosen, only=None):
+        """The notices in the lists: the core with the chosen regions, or `only` one part of it."""
+        if only:
+            return [entry for entry in data["berichten"] if entry["regio"] == only]
         return [entry for entry in data["berichten"] if entry["regio"] == "kern" or entry["regio"] in chosen]
 
-    def expected(self, data, chosen):
+    def expected(self, data, chosen, only=None):
         """What the tab Berichten shows for a choice of regions, as the texts on the page."""
-        shown = self.shown(data, chosen)
+        shown = self.shown(data, chosen, only)
         locations = sum(1 for entry in shown if entry["klasse"] == "ontwikkellocatie")
         reach = max([data["straalKm"]] + [-(-entry["afstandKm"] // 1) for entry in shown if entry["afstandKm"] > data["straalKm"]])
         return {"ranglijst": str(locations), "onzeker": str(sum(1 for entry in shown if entry["klasse"] == "onzeker")),
@@ -828,8 +945,8 @@ class InDeBrowser(unittest.TestCase):
                 "count": ("Top 10 van %d ontwikkellocaties" % locations if locations > 10 else "%d ontwikkellocatie%s" % (locations, "" if locations == 1 else "s"))
                 + ", hoogste rang eerst", "kmMax": str(int(reach)), "locations": locations}
 
-    def assert_berichten(self, page, data, chosen):
-        want = self.expected(data, chosen)
+    def assert_berichten(self, page, data, chosen, only=None):
+        want = self.expected(data, chosen, only)
         self.assertEqual((page["tiles"][0], page["tiles"][2], page["removed"], page["count"], page["kmMax"]),
                          (want["ranglijst"], want["onzeker"], want["removed"], want["count"], want["kmMax"]))
         self.assertEqual(page["kmOut"], want["kmMax"] + " km")
@@ -872,7 +989,12 @@ class InDeBrowser(unittest.TestCase):
                 self.assertTrue(all(row["right"] <= 320 for row in seen[moment]["rows"]))
         self.assertLessEqual(seen["withOneOverflow"], 0)
         self.assertLessEqual(seen["withOneAllOverflow"], 0)
-        self.assertGreaterEqual(seen["lineButton"]["height"], 30)
+        for moment in ("withOne", "onlyRegion", "onlyCore", "together", "withAll"):
+            with self.subTest(keuze=moment):
+                self.assertTrue(seen[moment]["toon"], "de keuze van wat de lijsten tonen ontbreekt")
+                self.assertTrue(all(button["height"] >= 30 and button["right"] <= 320 for button in seen[moment]["toon"]), seen[moment]["toon"])
+        for moment in ("onlyRegion", "onlyCore", "together"):
+            self.assertLessEqual(seen[moment]["overflow"], 0)
         if seen["tapped"]:
             self.assertLessEqual(seen["tap"]["overflow"], 0)
 
@@ -905,7 +1027,7 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(seen["askedForOne"], [file], "kiezen van één regio leest precies dat ene bestand")
         # On the tab Berichten: the core with the region, said in one line, and the morning line unchanged.
         self.assert_berichten(seen["withOne"], data, [first])
-        self.assertEqual(seen["withOne"]["line"], "Met " + first + " erbij. Alleen de kern")
+        self.assertEqual(seen["withOne"]["line"], "Met " + first + " erbij.")
         self.assertEqual(seen["withOne"]["brief"], seen["morning"]["brief"])
         self.assertEqual(seen["withOne"]["tiles"][1], seen["morning"]["tiles"][1], "een regio telt mee als nieuw")
         want = self.expected(data, [first])
@@ -939,8 +1061,104 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(len(seen["all"]["rows"]), sum(1 for g in data["gemeenten"] if g["regio"] == "kern" or g["regio"] in names))
         self.assert_berichten(seen["withAll"], data, names)
         sentence = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " en " + names[-1]
-        self.assertEqual(seen["withAll"]["line"], "Met " + sentence + " erbij. Alleen de kern")
+        self.assertEqual(seen["withAll"]["line"], "Met " + sentence + " erbij.")
         self.assertEqual(sorted(seen["askedForAll"]), sorted(regio["bestand"] for regio in data["overview"]), "een regiobestand is twee keer gelezen")
+
+    # --- What the lists show with a region chosen: together, the core alone or one region alone.
+
+    @staticmethod
+    def order_key(entry):
+        """Highest score first; with equal scores the most dwellings, then the newest, then the nearest."""
+        return (-entry["score"], -(entry["woningen"] or 0), tuple(-ord(c) for c in entry["datum"]), entry["afstandKm"])
+
+    def test_the_lists_show_together_the_core_alone_or_one_region_alone(self):
+        self.in_both(self.check_the_lists_show_together_the_core_alone_or_one_region_alone)
+
+    def check_the_lists_show_together_the_core_alone_or_one_region_alone(self, seen):
+        data, first, morning = seen["data"], seen["first"], seen["morning"]
+        names = [button["name"] for button in seen["start"]["buttons"]]
+
+        def choice(moment):
+            return [button["label"] for button in seen[moment]["toon"]], [button["label"] for button in seen[moment]["toon"] if button["pressed"]]
+
+        self.assertEqual(morning["toon"], [], "zonder gekozen regio valt er niets te kiezen")
+        labels = ["Samen", "Alleen de kern", "Alleen " + first]
+        self.assertEqual(choice("withOne"), (labels, ["Samen"]), "Samen is de standaard")
+        # The region alone: the tiles, the count and the ranking are about the region; the morning line stays the core.
+        alone = seen["onlyRegion"]
+        self.assertEqual(choice("onlyRegion"), (labels, ["Alleen " + first]))
+        self.assert_berichten(alone, data, [first], only=first)
+        self.assertEqual((alone["scope"], alone["line"]), ("Alleen " + first, "Met " + first + " erbij."))
+        self.assertEqual(alone["brief"], morning["brief"], "het ochtendscherm blijft de kern")
+        self.assertEqual(alone["tiles"][1], "0", "Nieuw telt de kern; in een regio alleen is niets nieuw")
+        in_region = [e for e in self.shown(data, [first], only=first) if e["klasse"] == "ontwikkellocatie"]
+        self.assertEqual(alone["ranks"], [str(n) for n in range(1, len(in_region) + 1)], "de rang telt binnen wat de lijst toont")
+        self.assertEqual(sorted(alone["ids"]), sorted(e["id"] for e in in_region))
+        # The core alone: as the app opens, with the region still chosen.
+        core = seen["onlyCore"]
+        self.assertEqual(choice("onlyCore"), (labels, ["Alleen de kern"]))
+        self.assertEqual((core["tiles"], core["count"], core["removed"], core["kmMax"], core["brief"]),
+                         (morning["tiles"], morning["count"], morning["removed"], morning["kmMax"], morning["brief"]))
+        self.assertEqual((core["scope"], core["line"]), ("Alleen de kern", "Met " + first + " erbij."))
+        # Together again: as before the choice.
+        together = seen["together"]
+        self.assertEqual(choice("together"), (labels, ["Samen"]))
+        for key in ("tiles", "count", "removed", "kmMax", "scope", "line", "brief"):
+            self.assertEqual(together[key], seen["withOne"][key], key)
+        self.assertEqual(together["ids"], seen["withOneAllIds"])
+        # The choice is one of the tab Berichten: the tab Gebied keeps the region chosen all along.
+        self.assertEqual([button["pressed"] for button in seen["oneAfterChoice"]["buttons"]], [button["pressed"] for button in seen["one"]["buttons"]])
+        self.assertEqual(seen["oneAfterChoice"]["rows"], seen["one"]["rows"])
+        # Another choice of regions starts with everything together.
+        self.assertEqual(choice("withAll"), (["Samen", "Alleen de kern"] + ["Alleen " + name for name in names], ["Samen"]))
+
+    def test_with_equal_scores_the_most_dwellings_come_first_then_the_newest(self):
+        self.in_both(self.check_with_equal_scores_the_most_dwellings_come_first_then_the_newest)
+
+    def check_with_equal_scores_the_most_dwellings_come_first_then_the_newest(self, seen):
+        by_id = {entry["id"]: entry for entry in seen["data"]["berichten"]}
+        for moment, ids in (("samen", seen["withOneAllIds"]), ("alleen de regio", seen["onlyRegion"]["ids"]), ("alleen de kern", seen["onlyCore"]["ids"])):
+            with self.subTest(lijst=moment):
+                keys = [self.order_key(by_id[identifier]) for identifier in ids]
+                self.assertEqual(keys, sorted(keys))
+                self.assertGreater(len(ids), 0)
+
+    FASEN = {"trede:vroeg": ("Vroeg", ["Voornemen", "Aanvraag"]), "trede:midden": ("Midden", ["Ontwerp", "Bekendmaking", "Besluit"]),
+             "trede:laat": ("Laat", ["Vastgesteld", "Verleend", "Herstelbesluit"])}
+
+    def test_the_filter_fase_has_three_steps_and_every_phase(self):
+        seen = self.region()
+        fase, data = seen["fase"], seen["data"]
+        core = [entry for entry in data["berichten"] if entry["regio"] == "kern"]
+        relevant = [entry for entry in core if entry["klasse"] != "weggefilterd"]
+        self.assertEqual(fase["label"], "Fase")
+        self.assertEqual([group["label"] for group in fase["groups"]], ["Trede", "Stand"])
+        steps, phases = fase["groups"]
+        self.assertEqual([option["value"] for option in steps["options"]], list(self.FASEN))
+        for option in steps["options"]:
+            name, members = self.FASEN[option["value"]]
+            with self.subTest(trede=name):
+                count = sum(1 for entry in relevant if entry["fase"] in members)
+                self.assertEqual(option["label"], "%s: %s (%d)" % (name, ", ".join(members).lower(), count))
+                locations = [entry for entry in core if entry["klasse"] == "ontwikkellocatie" and entry["fase"] in members]
+                self.assertTrue(fase["counts"][option["value"]].startswith(
+                    ("Top 10 van %d ontwikkellocaties" % len(locations)) if len(locations) > 10 else "%d ontwikkellocatie" % len(locations)), fase["counts"][option["value"]])
+                self.assertEqual(sorted(fase["cards"][option["value"]]), sorted(entry["id"] for entry in locations))
+        present = sorted({entry["fase"] for entry in relevant if entry["fase"]})
+        self.assertEqual(sorted(option["value"] for option in phases["options"]), present)
+        self.assertLessEqual(fase["overflow"], 0)
+        self.assertEqual(seen["afterFase"], seen["morning"], "na wissen staat de lijst niet meer zoals bij het openen")
+
+    def test_in_the_fixed_situation_the_choice_reads_as_written_here(self):
+        _, seen = self.fixed()
+        self.assertEqual([button["label"] for button in seen["withOne"]["toon"]], ["Samen", "Alleen de kern", "Alleen Zeeland"])
+        self.assertEqual([button["label"] for button in seen["withAll"]["toon"]], ["Samen", "Alleen de kern", "Alleen Midden-Brabant", "Alleen West-Brabant", "Alleen Zeeland"])
+        alone = seen["onlyRegion"]
+        self.assertEqual((alone["scope"], alone["count"], alone["tiles"]), ("Alleen Zeeland", "3 ontwikkellocaties, hoogste rang eerst", ["3", "0", "2"]))
+        # A search stays when the choice changes: "Goes" finds one location in Zeeland and none in the core.
+        self.assertEqual(seen["searchTogether"], {"zoek": "Goes", "count": "1 ontwikkellocatie, hoogste rang eerst"})
+        self.assertEqual(seen["searchOnlyRegion"], {"zoek": "Goes", "count": "1 ontwikkellocatie, hoogste rang eerst"})
+        self.assertEqual(seen["searchOnlyCore"], {"zoek": "Goes", "count": "0 ontwikkellocaties, hoogste rang eerst"})
 
     # --- The line under the name of the app and the introduction on the tab Gebied follow the choice.
 
@@ -1060,7 +1278,7 @@ class InDeBrowser(unittest.TestCase):
     # --- Coming back to the app after a while (tests/js/verversen_smoke.js, 375 px). The page had a
     # region chosen, a search and a filter set, a card opened and an address looked up.
 
-    KEPT = ("hash", "zoek", "type", "filtersOpen", "line", "pressed", "open", "adres", "adresVisible", "bag", "perceel", "scope")
+    KEPT = ("hash", "zoek", "type", "filtersOpen", "line", "toon", "pressed", "open", "adres", "adresVisible", "bag", "perceel", "scope")
 
     def kept(self, moment):
         return {key: self.seen["verversen"][moment]["state"][key] for key in self.KEPT}
@@ -1075,7 +1293,7 @@ class InDeBrowser(unittest.TestCase):
         seen = self.seen["verversen"]
         before, after = seen["before"], seen["after"]
         self.assertNotEqual(after["state"]["updated"], before["state"]["updated"])
-        self.assertTrue(after["state"]["updated"].startswith("Bijgewerkt ") and after["state"]["updated"].endswith("23:57"), after["state"]["updated"])
+        self.assertTrue(after["state"]["updated"].startswith("Bijgewerkt ") and after["state"]["updated"].endswith("23:56"), after["state"]["updated"])
         # One fetch of each data file and of the file of the chosen region; no register is asked again.
         self.assertEqual((after["requests"]["berichten"], after["requests"]["gebied"]), (before["requests"]["berichten"] + 1, before["requests"]["gebied"] + 1))
         self.assertEqual(after["requests"]["regio"], before["requests"]["regio"] + ["regio-zeeland.json"])
@@ -1087,8 +1305,8 @@ class InDeBrowser(unittest.TestCase):
     def test_a_refresh_keeps_the_region_the_search_the_filter_and_the_opened_card(self):
         seen = self.seen["verversen"]
         before = self.kept("before")
-        self.assertEqual((before["pressed"], before["line"], before["zoek"], before["type"], before["filtersOpen"], len(before["open"]), before["scope"]),
-                         (["Zeeland"], "Met Zeeland erbij. Alleen de kern", "Goes", "vergunning", True, 1, "Kern en Zeeland"))
+        self.assertEqual((before["pressed"], before["line"], before["toon"], before["zoek"], before["type"], before["filtersOpen"], len(before["open"]), before["scope"]),
+                         (["Zeeland"], "Met Zeeland erbij.", ["Samen"], "Goes", "vergunning", True, 1, "Kern en Zeeland"))
         for moment in ("after", "sameRun", "noConnection", "connectionBack", "regionDown"):
             with self.subTest(moment=moment):
                 self.assertEqual(self.kept(moment), before)
@@ -1108,6 +1326,14 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(after["pubs"], ["test-ververst-adres"] + before["pubs"])
         self.assertNotEqual(after["searched"], before["searched"], "het aantal doorzochte berichten is niet bijgewerkt")
 
+    def test_a_refresh_keeps_the_choice_of_what_the_lists_show(self):
+        seen = self.seen["verversen"]
+        alone, later = seen["regionAlone"]["state"], seen["regionAloneLater"]["state"]
+        self.assertEqual((alone["toon"], alone["scope"]), (["Alleen Zeeland"], "Alleen Zeeland"))
+        self.assertTrue(later["updated"].endswith("23:59"), later["updated"])
+        self.assertEqual((later["toon"], later["scope"], later["pressed"], later["zoek"], later["type"]), (alone["toon"], alone["scope"], alone["pressed"], alone["zoek"], alone["type"]))
+        self.assertEqual(later["count"], alone["count"])
+
     def test_the_same_run_again_changes_nothing(self):
         seen = self.seen["verversen"]
         self.assertEqual(seen["sameRun"]["state"], seen["after"]["state"])
@@ -1120,12 +1346,12 @@ class InDeBrowser(unittest.TestCase):
         self.assertFalse(seen["noConnection"]["state"]["loadError"])
         # No waiting of fifteen minutes after a failure: back in view, it fetches at once.
         self.assertEqual(seen["connectionBack"]["requests"]["berichten"], seen["noConnection"]["requests"]["berichten"] + 1)
-        self.assertTrue(seen["connectionBack"]["state"]["updated"].endswith("23:58"), seen["connectionBack"]["state"]["updated"])
+        self.assertTrue(seen["connectionBack"]["state"]["updated"].endswith("23:57"), seen["connectionBack"]["state"]["updated"])
 
     def test_a_region_file_that_does_not_come_at_a_refresh_keeps_what_the_region_had(self):
         seen = self.seen["verversen"]
         down, back = seen["regionDown"]["state"], seen["connectionBack"]["state"]
-        self.assertTrue(down["updated"].endswith("23:59"), down["updated"])
+        self.assertTrue(down["updated"].endswith("23:58"), down["updated"])
         self.assertEqual((down["pressed"], down["line"], down["count"], down["tiles"]), (back["pressed"], back["line"], back["count"], back["tiles"]))
         self.assertEqual(seen["regionDown"]["requests"]["regio"][-1], "regio-zeeland.json")
 
@@ -1179,6 +1405,7 @@ class InDeBrowser(unittest.TestCase):
         self.assertFalse([line for line in missing["morning"] if "gelezen" in line], missing["morning"])
         self.assertEqual([line for line in missing["chosen"] if "gelezen" in line], [unread, failed])
         self.assertEqual(missing["back"], missing["morning"])
+        self.assertFalse([line for line in missing["onlyCore"] if "gelezen" in line], "met alleen de kern in de lijst hoort de melding van de regio er niet te staan")
         subs = {button["name"]: button["sub"] for button in missing["buttons"]}
         self.assertTrue(subs[first].endswith(" · 146 ongelezen"), subs[first])
         self.assertFalse([sub for name, sub in subs.items() if name != first and "ongelezen" in sub])
