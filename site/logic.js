@@ -267,6 +267,23 @@
     return names.length > 1 ? names.slice(0, -1).join(", ") + " en " + names[names.length - 1] : names.join("");
   }
 
+  /* The line under the name of the app: what the app shows now. The core alone with its radius; with
+     regions only the names, so that the line stays short on a narrow phone. */
+  function scopeLine(straalKm, centrum, regios) {
+    return regios && regios.length ? nameList(["Kern"].concat(regios)) : "Kern: binnen " + straalKm + " km van " + centrum;
+  }
+
+  /* The introduction on the tab Gebied, for the same choice. `kern` is the number of municipalities
+     of the core, `totaal` the number on the list with the chosen regions. */
+  function gebiedIntro(straalKm, centrum, kern, regios, totaal) {
+    var core = "alles binnen " + straalKm + " km hemelsbreed van " + centrum;
+    if (!regios || !regios.length) {
+      return "Kern: " + core + ". Daarin liggen " + kern + " gemeenten, waarvan de meeste maar voor een deel. Een bericht telt mee als de locatie zelf binnen de straal valt.";
+    }
+    return nameList(["Kern"].concat(regios)) + ". De kern is " + core + ": " + kern + " gemeenten, waarvan de meeste maar voor een deel. Van " +
+      (regios.length === 1 ? regios[0] : "de gekozen regio's") + " telt elke gemeente in haar geheel mee. Samen staan er nu " + totaal + " gemeenten op de lijst.";
+  }
+
   /* Whether what the app shows was fetched long enough ago to fetch it again (both in milliseconds). */
   function stale(loadedAt, now, minutes) {
     return now - loadedAt >= minutes * 60000;
@@ -338,7 +355,7 @@
   }
 
   return {
-    stale: stale, radarLabels: radarLabels,
+    stale: stale, radarLabels: radarLabels, scopeLine: scopeLine, gebiedIntro: gebiedIntro,
     KERN: KERN, regioOf: regioOf, gemeentenIn: gemeentenIn, regios: regios, regioMeldingen: regioMeldingen, regiosFor: regiosFor, merged: merged, reachKm: reachKm, nameList: nameList,
     NEW_HOURS: NEW_HOURS, TOP: TOP, TYPE_LABEL: TYPE_LABEL,
     isoDay: isoDay, daysAgoIso: daysAgoIso, shortDate: shortDate, km: km, safeUrl: safeUrl, hasPoint: hasPoint,

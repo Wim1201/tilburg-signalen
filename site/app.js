@@ -346,6 +346,16 @@
     labels.towns.forEach(function (label) { text(label, "town", label.naam); });
   }
 
+  /* The chosen regions in the order of the buttons, whatever the order in which they were chosen. */
+  function inOrder(chosen) {
+    return L.regios(state.area, state.data.regios).map(function (regio) { return regio.naam; }).filter(function (name) { return chosen.indexOf(name) !== -1; });
+  }
+
+  /* Under the name of the app: the core, or the core with the regions that are chosen. */
+  function renderScope() {
+    $("scope").textContent = L.scopeLine(state.data.straalKm, state.data.centrum.naam, inOrder(state.regios));
+  }
+
   function gemeenteKey(gemeente) { return gemeente.land === "BE" ? gemeente.naam + " (België)" : gemeente.naam; }
 
   /* The regions that can be shown with the core. Nothing is chosen when the app opens. */
@@ -375,8 +385,7 @@
   function renderGebied() {
     var area = state.area, box = $("gemeenten"), core = L.gemeentenIn(area, []);
     var counts = countBy(ofClass("ontwikkellocatie"), "gemeente"), unsure = countBy(ofClass("onzeker"), "gemeente");
-    $("gebied-intro").textContent = "Alles binnen " + area.straalKm + " km hemelsbreed van " + area.centrum.naam +
-      ". Daarin liggen " + core.length + " gemeenten, waarvan de meeste maar voor een deel. Een bericht telt mee als de locatie zelf binnen de straal valt.";
+    $("gebied-intro").textContent = L.gebiedIntro(area.straalKm, area.centrum.naam, core.length, inOrder(state.regios), L.gemeentenIn(area, state.regios).length);
     renderRegios();
     renderRadar();
     box.textContent = "";
@@ -517,7 +526,7 @@
       state.kmMax = L.reachKm(state.data.berichten, state.data.straalKm);
       resetFilters();
       fillFilters();
-      renderBrief(); renderList(); renderGebied();
+      renderScope(); renderBrief(); renderList(); renderGebied();
     });
   }
 
@@ -603,7 +612,7 @@
       state.maxKm = atMax ? state.kmMax : Math.min(state.maxKm, state.kmMax); // the distance filter stays where it was set
       $("f-km").max = state.kmMax; $("f-km").value = state.maxKm; $("f-km-out").textContent = state.maxKm + " km";
       state.nieuw = rememberSeen(state.kern).nieuw; // what came in just now is new; firstVisit keeps its answer
-      $("scope").textContent = "Binnen " + data.straalKm + " km van " + data.centrum.naam;
+      renderScope();
       $("updated").textContent = "Bijgewerkt " + stampFormat.format(new Date(data.bijgewerkt));
       fillFilters();
       renderBrief(); renderList(); renderGebied(); renderBronnen();
@@ -632,7 +641,7 @@
     var seen = rememberSeen(data.berichten);
     state.nieuw = seen.nieuw; state.firstVisit = seen.firstVisit;
     state.toonWeg = $("toon-weg").checked;
-    $("scope").textContent = "Binnen " + data.straalKm + " km van " + data.centrum.naam;
+    renderScope();
     $("updated").textContent = "Bijgewerkt " + stampFormat.format(new Date(data.bijgewerkt));
     $("f-km").max = data.straalKm; $("f-km").value = data.straalKm; $("f-km-out").textContent = data.straalKm + " km";
     fillFilters();
