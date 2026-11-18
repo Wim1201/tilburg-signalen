@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       volledig:
-        description: "Volledige verversing: cache negeren en alles opnieuw ophalen"
+        description: "Volledige verversing: de kern en de regio van de week opnieuw lezen, de rest uit de cache"
         type: boolean
         default: false
       gepland:
@@ -85,7 +85,8 @@ jobs:
         run: python -m signalen.gebied || echo "::warning::Gebied niet bijgewerkt; bestaande lijst wordt gebruikt"
       - name: Berichten ophalen
         # Gewone run: alleen nieuwe publicaties ophalen, de rest komt uit cache/ophaalcache.json.
-        # Wekelijks en op verzoek: alles opnieuw, zodat wijzigingen en intrekkingen binnenkomen.
+        # Wekelijks en op verzoek: de kern en één regio opnieuw (bij toerbeurt per week), zodat wijzigingen en
+        # intrekkingen binnenkomen. De andere regio's komen die week uit de cache.
         run: |
           # De wekelijkse run is de enige geplande run op zondag vóór 9 uur (de andere is 12:10 uur).
           # Op de klok herkend en niet op de cron-regel, zodat een wijziging van het schema dit niet breekt.
