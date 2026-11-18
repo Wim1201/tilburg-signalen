@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 10:44 – 10:55 uur; aangevuld 11:03 – 11:12 uur (PR 18 samengevoegd, run 27, vaste testsituatie in PR 19) |
+| Datum | 18-11-2026, 10:44 – 10:55 uur; aangevuld 11:03 – 11:12 uur (PR 18 samengevoegd, run 27, vaste testsituatie in PR 19) en 12:26 – 12:35 uur (PR 19 samengevoegd, run 29) |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, opnieuw gestart vanaf `main` op commit `80e974b` (na PR 17) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | Geen nieuwe opvraging bij de bronnen. Voor de proef: de cache met alle regio's van 17-11-2026, 20:36 uur (922 kB) en de berichten van de run van 20:31 uur |
@@ -24,6 +24,9 @@ gebouwd, zoals besloten.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 12:35 uur | **PR 19 is samengevoegd op verzoek van Wim (12:26 uur, merge-commit `08096ac`) en run 29 is groen; "PR 19 (open)", "PR 19 is niet samengevoegd" en "PR 19 heeft op GitHub nog niet gedraaid" zijn daarmee achterhaald.** De vaste situatie draaide in de browsertests vóór het publiceren (49 tests, was 45) en in de controle van de live site (46 tests, was 42). Zie "Run 29 op GitHub". |
+| 18-11-2026, 12:35 uur | **De regio's zijn gevuld: er wacht geen enkel regiobericht meer; "Nog twee runs" onder "Run 27 op GitHub" is daarmee afgehandeld.** Run 28 (door Wim gestart, 12:10 uur) las 300 teksten, run 29 de laatste 129. |
+| 18-11-2026, 12:35 uur | **De cache is nu 963 kB (64 procent van 1,5 MB), iets boven de 922 kB die ik uit de proef van 17-11 verwachtte.** Er zijn sinds die proef twee dagen publicaties bijgekomen. Geen waarschuwing: die komt vanaf 1.200 kB. |
 | 18-11-2026, 11:12 uur | **PR 18 is samengevoegd op verzoek van Wim (11:03 uur, merge-commit `32cd758`); "open blijft en niet is samengevoegd" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Wim gaf ook akkoord op de volgorde bij het weglaten (eerst wat het eerst uit het venster valt). |
 | 18-11-2026, 11:12 uur | **Run 27, de run na het samenvoegen, is groen, ook de controle van de live site; "Run 26 is rood en de volgende runs worden het ook" onder "Niet getest of nog open" is daarmee afgehandeld.** De live site had op dat moment 429 wachtende regioberichten, dus de herstelde test is tegen de echte situatie gedraaid. Zie "Run 27 op GitHub". |
 | 18-11-2026, 11:12 uur | **Het vangnet heeft nu op GitHub gedraaid, voor het deel dat altijd draait:** het log van run 27 meldt "cache: 630 kB bewaard, 42 procent". Weggelaten is er niets; daar is de cache te klein voor. |
@@ -206,6 +209,31 @@ Daarna is de herstelde verwachting teruggezet.
 385 tests geslaagd in de container (was 377; 10 overgeslagen). Er zijn er 8 bij: 4 in de browser en 4
 voor het bestand. Zes bestaande browsertests draaien nu in beide situaties. Alleen tests zijn
 gewijzigd; de app en de workflow niet.
+
+## Run 29 op GitHub, na het samenvoegen van PR 19 (18-11-2026, 12:26 – 12:31 uur)
+
+| Stap | Duur | Verzoeken | Weigeringen (HTTP 429) | Uitkomst |
+|---|---:|---:|---:|---|
+| Tests | 13 s | geen | | 385 tests geslaagd; 60 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 20 s | | | Geslaagd |
+| **Browsertests** | 39 s | geen naar de bronnen | | **49 tests geslaagd** (was 45): de vier nieuwe draaien mee, en de wandeling draait in beide situaties |
+| Gebied bijwerken | 21 s | 29 | 0 | Geslaagd |
+| **Berichten ophalen** | **1 min 29 s** | **207** | **31** | Geslaagd, zonder waarschuwing: 4 teksten mislukten in de eerste ronde en lukten bij herhaling |
+| Cache bewaren | 1 s | | | Cache teruggezet in `main` (commit `20f69d6`) |
+| Publiceren | 9 s | | | Geslaagd |
+| **Controle van de live site** | 27 s | | | **46 tests geslaagd** (was 42) |
+| **Hele run** | **4 min 23 s** | **236** | **31** | **Groen** |
+
+| Wat | Waarde |
+|---|---|
+| Berichten | 3.888, waarvan 1.140 in de kern |
+| Regioteksten gelezen | 129, de laatste. **Er wacht niets meer**: het log heeft geen regel "teksten nog niet gelezen" |
+| Onzeker over alles | 75 berichten (was 480 in run 27): gelezen teksten maken van een wachtend bericht een ontwikkellocatie of filteren het weg |
+| Cache op `main` | 963 kB, 64 procent van 1,5 MB (log: "cache: 963 kB bewaard, 64 procent") |
+| Melding voor het ochtendscherm | Geen waarschuwing in het log; 0 teksten definitief mislukt |
+
+De controle van de live site zag nu geen wachtende berichten meer op de live site zelf. Dat pad komt
+vanaf nu uit de vaste situatie, in elke run.
 
 ## Niet getest of nog open
 
