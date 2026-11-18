@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 10:44 – 10:55 uur |
+| Datum | 18-11-2026, 10:44 – 10:55 uur; aangevuld 11:03 – 11:12 uur (PR 18 samengevoegd, run 27, vaste testsituatie in PR 19) |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, opnieuw gestart vanaf `main` op commit `80e974b` (na PR 17) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | Geen nieuwe opvraging bij de bronnen. Voor de proef: de cache met alle regio's van 17-11-2026, 20:36 uur (922 kB) en de berichten van de run van 20:31 uur |
@@ -24,6 +24,11 @@ gebouwd, zoals besloten.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 11:12 uur | **PR 18 is samengevoegd op verzoek van Wim (11:03 uur, merge-commit `32cd758`); "open blijft en niet is samengevoegd" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Wim gaf ook akkoord op de volgorde bij het weglaten (eerst wat het eerst uit het venster valt). |
+| 18-11-2026, 11:12 uur | **Run 27, de run na het samenvoegen, is groen, ook de controle van de live site; "Run 26 is rood en de volgende runs worden het ook" onder "Niet getest of nog open" is daarmee afgehandeld.** De live site had op dat moment 429 wachtende regioberichten, dus de herstelde test is tegen de echte situatie gedraaid. Zie "Run 27 op GitHub". |
+| 18-11-2026, 11:12 uur | **Het vangnet heeft nu op GitHub gedraaid, voor het deel dat altijd draait:** het log van run 27 meldt "cache: 630 kB bewaard, 42 procent". Weggelaten is er niets; daar is de cache te klein voor. |
+| 18-11-2026, 11:12 uur | **De stap "Berichten ophalen" duurde in run 27 langer dan in run 26, met minder verzoeken:** 5 minuten en 35 seconden voor 449 verzoeken, tegen 3 minuten en 54 seconden voor 568. De hele run duurde 8 minuten en 17 seconden: onder de tien minuten, maar dichterbij dan run 23 en 26. Zie "Run 27 op GitHub". |
+| 18-11-2026, 11:12 uur | **Er is een vaste testsituatie met ongelezen regioberichten bijgekomen, in PR 19 (open, niet samengevoegd). Het aantal tests is daarmee 385 (was 377).** Zie "Vaste testsituatie met ongelezen regioberichten". |
 | 18-11-2026, 10:55 uur | **Gevonden gebrek in PR 17, van mij: een test van de live-controle klopte niet met de app zodra een regio ongelezen berichten heeft. Run 26 eindigde daardoor rood.** De app toont op de regioknop terecht "9 locaties · 56 ongelezen"; de test verwachtte alleen "9 locaties". In de repo staat een momentopname zonder ongelezen berichten, dus daar slaagde de test, ook in run 23. Hersteld in PR 18 (alleen de test); niet samengevoegd. **Tot dat is samengevoegd eindigt elke run vanaf `main` rood zolang er regioberichten wachten**, naar verwachting de runs van 12:10 en 16:10 uur vandaag. De verversing en het publiceren gaan wel door: de controle komt daarna. |
 | 18-11-2026, 10:55 uur | **"De browsertests op 320 pixels slagen" en "361 tests geslaagd" in het vorige verslag en in PR 17 waren waar voor de momentopname in de repo, niet voor de live gegevens.** De controle tegen de live site kon ik vóór het samenvoegen niet draaien; dat had ik als risico moeten noemen. |
 | 18-11-2026, 10:55 uur | **Afwijking van het voorstel waarvoor akkoord is gegeven: niet "de oudste regioteksten" gaan eerst, maar de regioteksten die het eerst uit het venster vallen.** Een plan blijft 180 dagen in de lijst en een vergunning 42 dagen. "Oudste eerst" zou daardoor vooral plannen van mei en juni weglaten, die nog weken tot maanden blijven staan en dus bij elke run opnieuw opgehaald zouden worden. Zie "Gemaakte keuzes". Zeg het als je toch "oudste eerst" wilt; dat is één regel. |
@@ -143,11 +148,72 @@ drie regio's staan in het overzicht met dezelfde aantallen als in het log.
 | Nagelopen | De vijf gegevensbestanden van de live site zijn in een kopie van de site gezet en de 42 tests van de controle zijn daartegen gedraaid: met het herstel slagen alle 42, zonder het herstel faalt dezelfde test met dezelfde melding. Dat is dezelfde code en dezelfde gegevens als de live site, maar niet de live site zelf |
 | Tot het herstel in `main` staat | Elke run vanaf `main` eindigt rood zolang er regioberichten wachten: naar verwachting 12:10 uur (dan wachten er nog ongeveer 429) en 16:10 uur (ongeveer 129). De run van morgen 06:45 uur leest de laatste en zou vanzelf groen zijn. GitHub stuurt bij een rode run een bericht |
 
+## Run 27 op GitHub, na het samenvoegen van PR 18 (18-11-2026, 11:03 – 11:11 uur)
+
+Gestart door het samenvoegen, vanaf `main`, met het vangnet en de herstelde test.
+
+| Stap | Duur | Verzoeken | Weigeringen (HTTP 429) | Uitkomst |
+|---|---:|---:|---:|---|
+| Tests | 14 s | geen | | Geslaagd |
+| Browser klaarzetten en browsertests | 22 s en 36 s | geen naar de bronnen | | Geslaagd |
+| Gebied bijwerken | 19 s | 29 | 0 | Geslaagd |
+| **Berichten ophalen** | **5 min 35 s** | **449** | **58** | Geslaagd, zonder waarschuwing: 26 teksten mislukten in de eerste ronde en lukten alle bij herhaling |
+| Cache bewaren | 1 s | | | Cache teruggezet in `main` (commit `dc87079`) |
+| Publiceren | 11 s | | | Geslaagd |
+| **Controle van de live site** | 22 s | | | **Geslaagd, alle 42 tests** |
+| **Hele run** | **8 min 17 s** | **478** | **58** | **Groen** |
+
+| Wat | Waarde |
+|---|---|
+| Berichten | 3.888, waarvan 1.140 in de kern (gelijk aan run 26: er zijn geen nieuwe publicaties bijgekomen) |
+| Melding voor het ochtendscherm | Op nul; geen onvolledige dagen; de drie bronnen in orde |
+| Regioteksten gelezen | 300; nog 429 wachten: West-Brabant 253, Zeeland 145, Midden-Brabant 31 |
+| Vulling | Nog twee runs (300 en 129), als er geen nieuwe bijkomen |
+| Locaties in de regio's | Midden-Brabant 14 (was 9), West-Brabant 75 (was 56), Zeeland 80 (was 65): gelezen teksten maken van "Onzeker" een ontwikkellocatie of filteren het bericht weg |
+| Cache op `main` | 630 kB (was 482 kB): 148 kB erbij. Het log meldt het zelf: "cache: 630 kB bewaard, 42 procent van de 1.500 kB die een bestand in de repository mag zijn" |
+| De controle van de live site | Draaide tegen de live gegevens van 11:04 uur, met ongelezen berichten in alle drie de regio's. De test die run 26 afkeurde, slaagt nu daar |
+
+**Over de duur (feit en vermoeden).** Feit: de stap deed minder verzoeken dan in run 26 en duurde ruim
+anderhalve minuut langer. In de eerste ronde mislukten 26 teksten: 11 door een weigering, 8 door de
+tijdslimiet en 7 doordat het netwerk van de runner even onbereikbaar was; in run 26 waren dat er 5.
+Vermoeden: de bron of het netwerk van de runner was trager, en het wachten en herhalen kostte de tijd.
+Het vangnet is het niet: het bewaren van de cache kost milliseconden. De stopregel van tien minuten is
+niet geraakt, maar een vulrun met 300 teksten kan er dus dichtbij komen.
+
+## Vaste testsituatie met ongelezen regioberichten (PR 19, open)
+
+**Opdracht van Wim:** een vaste testsituatie met een regio die ongelezen berichten heeft, zodat de
+browsertests vóór het publiceren dit pad raken en niet alleen de controle achteraf. In een aparte pull
+request die open blijft.
+
+| Onderdeel | Wat het is |
+|---|---|
+| Het bestand | `tests/js/regio_ongelezen.json` (25 kB): drie kleine regiobestanden en het overzicht dat erbij hoort. Een vaste keuze van 21 berichten uit de uitkomst van run 23, ongewijzigd overgenomen |
+| De situatie | Midden-Brabant: 6 berichten, 2 locaties, geen wachtende. West-Brabant: 9 berichten, 1 locatie, 4 wachtende (2 vergunningen, 1 plan, 1 verkoop). Zeeland: 6 berichten, 3 locaties, 1 wachtende |
+| Hoe het draait | De browser krijgt de kern van de site zelf; alleen het overzicht van de regio's en de regiobestanden komen uit het vaste bestand |
+| De wandeling, twee keer | Alle controles van de regiokeuze draaien met de regio's zoals de site ze levert én in de vaste situatie: beginstand, 320 pixels, één regio erbij, een gemeente aantikken, terug naar de kern, alle regio's tegelijk, opnieuw openen |
+| Uitgeschreven controles | De regel op elke knop ("2 locaties", "1 locatie · 4 ongelezen", "3 locaties · 1 ongelezen"); de wachtende berichten onder Onzeker met "Tekst nog niet gelezen", bij één en bij alle regio's; de melding per gekozen regio in enkelvoud en meervoud; een aangetikte gemeente toont haar locatie |
+| Controles van het bestand zelf | Zonder browser: het overzicht is wat een run voor deze bestanden schrijft, een wachtend bericht ziet eruit zoals de run het maakt, en elk bericht ligt in een gemeente van zijn regio |
+
+**Waarom uitgeschreven.** De test die in run 26 faalde, rekende zijn verwachting uit op dezelfde manier
+als de app. Zo'n test volgt de app in elke vergissing. De regel op de knop staat daarom nu ook
+letterlijk in een test.
+
+**Bewijs dat het pad nu vóór het publiceren geraakt wordt.** Met de oude verwachting, die van vóór het
+herstel, faalt de test nu lokaal, in de vaste situatie: "'1 locatie · 4 ongelezen' != '1 locatie'".
+Daarna is de herstelde verwachting teruggezet.
+
+385 tests geslaagd in de container (was 377; 10 overgeslagen). Er zijn er 8 bij: 4 in de browser en 4
+voor het bestand. Zes bestaande browsertests draaien nu in beide situaties. Alleen tests zijn
+gewijzigd; de app en de workflow niet.
+
 ## Niet getest of nog open
 
 | Punt | Toelichting |
 |---|---|
 | **Run 26 is rood en de volgende runs worden het ook** | Tot PR 18 is samengevoegd, of tot alle regioteksten gelezen zijn. Zie "De rode controle van de live site". Het herstel is niet tegen de live site zelf gedraaid; dat doet de eerste run na het samenvoegen |
+| PR 19 heeft op GitHub nog niet gedraaid | Een pull request start hier geen run. De eerste run na het samenvoegen draait de vaste situatie in de browsertests vóór het publiceren en in de controle van de live site |
+| De vaste situatie dekt alleen ongelezen regioberichten | Andere verschillen tussen de momentopname in de repo en de live site zijn er niet mee afgedekt, bijvoorbeeld een regio met mislukte teksten. De meldingen daarvoor hebben wel een eigen test |
 | Het vangnet heeft op GitHub nog niet gedraaid | De eerste run na het samenvoegen van deze pull request laat de regel met de grootte in het log zien. Het weglaten zelf komt pas in beeld als de cache boven 1,4 MB komt; volgens de meting is dat bij het verloop van het afgelopen jaar niet het geval (hoogstens rond 1,2 MB) |
 | De waarschuwing kan zich in het voorjaar melden | De schatting voor de tweede helft van april is 1,20 MB, precies de drempel. Een waarschuwing betekent dan: nog 200 kB ruimte |
 | Herhaald ophalen zolang de cache te groot blijft | Wat weggelaten is, haalt elke run opnieuw op tot het uit het venster valt of er ruimte komt. Dat zijn extra verzoeken aan de bron, hoogstens 300 per run. Niet gemeten, omdat het zich niet voordoet |
@@ -164,5 +230,6 @@ drie regio's staan in het overzicht met dezelfde aantallen als in het log.
 - **`cache/ophaalcache.json` is niet gecommit** en niets is geforceerd. De werkbranch is na het
   samenvoegen van PR 17 opnieuw gestart vanaf `main`; dat was vooruitspoelen, geen herschrijving.
 - **B en C zijn niet gebouwd.** De opmerking achter de cron-regel van zondag is blijven staan.
+- **PR 19 is niet samengevoegd** en blijft open tot Wim het zegt.
 - **De bronnen zijn voor dit onderdeel niet belast.**
 - **Geen subsessie**, en niets met ElevenLabs.
