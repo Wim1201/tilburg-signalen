@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 15:35 – 16:07 uur |
+| Datum | 18-11-2026, 15:35 – 16:07 uur; aangevuld 16:17 – 16:24 uur (PR 26 samengevoegd, run 36) |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, gelijk aan `main` op commit `a435e03` (na PR 25) bij de start |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen`; Node 22, wrangler 4.164.0, Chromium via Playwright |
 | Brondata | De documentatie van de openbare API van EP-Online, versie 5 (`public.ep-online.nl/swagger/v5/swagger.json`), gelezen op 18-11-2026, 15:36 uur. **EP-Online zelf is niet aangeroepen: er is geen sleutel** |
@@ -23,10 +23,39 @@ documentatie en uit een nagebootst EP-Online.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 16:24 uur | **PR 26 is samengevoegd op verzoek van Wim (16:17 uur, merge-commit `132d044`) en run 36 is groen; "open blijft en niet is samengevoegd" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Zie "Run 36 op GitHub". |
+| 18-11-2026, 16:24 uur | **De Worker is nog steeds niet geplaatst en er is geen sleutel.** Samenvoegen heeft alleen de code en de lege instelling in `main` gezet. Op de live site staat het vak Energielabel zoals het was. |
 | 18-11-2026, 16:10 uur | **De nieuwe tests hebben op GitHub gedraaid, op de pull request (PR 26), en zijn geslaagd; "De nieuwe tests op GitHub" onder "Niet getest of nog open" is daarmee afgehandeld.** Zie "De testrun op de pull request". |
 | 18-11-2026, 16:07 uur | **"Geen sleutels, geen tussenserver" uit het verslag van het tabblad Adres geldt niet meer voor het energielabel.** Wim vroeg op 17-11 om een tabblad zonder sleutels, tokens of Worker, en vraagt nu om het energielabel via een Worker met een sleutel. Voor adres, pand, perceel en publicaties blijft de oude afspraak gelden: die gaan rechtstreeks vanuit de browser naar open bronnen. De twee tests die de oude afspraak bewaakten, zijn daarop aangepast; zie "Tests". |
 | 18-11-2026, 16:07 uur | **De planner is niet gewijzigd.** De nieuwe Worker staat in een eigen map met een eigen naam; een test bewaakt dat de instellingen van de planner hem niet noemen. |
 | 18-11-2026, 16:07 uur | **Het aantal tests is 503 (was 440).** Er zijn er 63 bij: 50 voor de Worker, 8 voor de logica van het vak en 5 in de browser. |
+
+## Run 36 op GitHub, na het samenvoegen van PR 26 (18-11-2026, 16:17 – 16:21 uur)
+
+**Vóór het samenvoegen:** Wim vroeg te wachten tot de run van 16:10 uur klaar was. Dat was run 35
+(gestart 16:10 uur, klaar 16:14 uur, groen). `main` was daarna niet veranderd. De testrun op de pull
+request was groen voor de laatste commit (`7aea446`): run 5 van "Tests bij een pull request", 16:11 –
+16:12 uur.
+
+| Stap | Duur | Verzoeken | Weigeringen (HTTP 429) | Uitkomst |
+|---|---:|---:|---:|---|
+| Tests | 22 s | geen | | 503 tests geslaagd; 82 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 14 s | | | Geslaagd |
+| Browsertests | 49 s | geen naar de bronnen | | 71 tests geslaagd, geen overgeslagen |
+| Gebied bijwerken | 13 s | 29 | 0 | Geslaagd |
+| Berichten ophalen | 44 s | 38 | 0 | Geslaagd, zonder waarschuwing; niets mislukt |
+| Cache bewaren | minder dan 1 s | | | "Cache ongewijzigd" |
+| Publiceren | 7 s | | | Geslaagd |
+| Controle van de live site | 39 s | | | 68 tests geslaagd, geen overgeslagen (was 63) |
+| **Hele run** | **3 min 56 s** | **67** | **0** | **Groen** |
+
+| Wat | Waarde |
+|---|---|
+| Berichten | 3.889, waarvan 1.140 in de kern |
+| Cache | 963 kB, 64 procent van 1,5 MB |
+| De instelling op de live site | Nagekeken om 16:24 uur: `energielabelWorker` staat in het gegevensbestand en is leeg. De nieuwe code van het tabblad staat live |
+| Het vak Energielabel op de live site | Zoals het was: "Nog niet beschikbaar in de app." met de link naar EP-Online. De controle van de live site test dat |
+| De Worker | Niet geplaatst. Door het samenvoegen is er niets naar Cloudflare gegaan |
 
 ## Opdracht
 
