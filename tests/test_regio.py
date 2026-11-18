@@ -696,7 +696,7 @@ class WekelijkseBeurt(unittest.TestCase):
                     "bronnen": [{"id": "officielebekendmakingen", "status": "ok", "aantal": 0}, {"id": "staatscourant-insolventies", "status": "ok", "aantal": 0}]}
 
         output = pathlib.Path(self.map.name) / "data" / "berichten.json"
-        cache = mock.MagicMock()
+        cache = mock.MagicMock(**{"return_value.bewaar.return_value": {"bytes": 0, "weggelaten": 0}})
         with mock.patch.object(update, "OUTPUT", output), mock.patch.object(update, "run", fake_run), \
                 mock.patch.object(update.cachemodule, "Cache", cache), mock.patch("builtins.print"):
             update.main(argv)

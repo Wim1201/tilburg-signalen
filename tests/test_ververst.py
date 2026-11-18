@@ -63,7 +63,7 @@ class GeschrevenBestand(unittest.TestCase):
             output = pathlib.Path(folder) / "berichten.json"
             output.write_text(json.dumps(self.OLD), encoding="utf-8")
             with unittest.mock.patch.object(update, "OUTPUT", output), unittest.mock.patch.object(update, "run", fake_run), \
-                    unittest.mock.patch.object(update.cachemodule, "Cache", unittest.mock.MagicMock()), \
+                    unittest.mock.patch.object(update.cachemodule, "Cache", unittest.mock.MagicMock(**{"return_value.bewaar.return_value": {"bytes": 0, "weggelaten": 0}})), \
                     unittest.mock.patch("builtins.print"):
                 try:
                     update.main([])

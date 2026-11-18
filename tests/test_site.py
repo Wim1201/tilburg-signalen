@@ -688,9 +688,13 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(data["inFiles"], [regio["berichten"] for regio in data["overview"]], "het overzicht klopt niet met de regiobestanden")
         self.assertEqual(seen["askedByThePage"], [], "de app leest een regiobestand zonder dat een regio is gekozen")
         self.assertEqual({button["pressed"] for button in start["buttons"]}, {"false"})
+        # On the live site a region can have notices whose text still waits; the button then says so.
+        # The snapshot in the repository has none, so there the line is the number of locations only.
+        unread = {regio["naam"]: regio.get("ongelezen", 0) for regio in data["overview"]}
         for button in start["buttons"]:
             locations = sum(1 for entry in data["berichten"] if entry["regio"] == button["name"] and entry["klasse"] == "ontwikkellocatie")
-            self.assertEqual(button["sub"], "%d locatie%s" % (locations, "" if locations == 1 else "s"))
+            waiting = " · %d ongelezen" % unread[button["name"]] if unread[button["name"]] else ""
+            self.assertEqual(button["sub"], "%d locatie%s" % (locations, "" if locations == 1 else "s") + waiting)
         core = [g for g in data["gemeenten"] if g["regio"] == "kern"]
         self.assertEqual([row["name"].replace(" (België)", "") for row in start["rows"]], [g["naam"] for g in core])
         self.assertIn("Daarin liggen %d gemeenten" % len(core), start["intro"])
