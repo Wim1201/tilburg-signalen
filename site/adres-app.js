@@ -305,13 +305,60 @@
     if (!current.withParcel) box.appendChild(el("p", "bronregel", "Berichten zonder dit adres in de tekst worden pas gekoppeld als het perceel bekend is."));
   }
 
-  function renderLinks(address) {
-    var links = A.viewerLinks(address);
-    var energy = $("adres-energie"), plan = $("adres-plan"), row;
-    energy.textContent = ""; plan.textContent = "";
-    energy.appendChild(el("p", null, "Nog niet beschikbaar in de app."));
+  /* The box "Energielabel". `fill` puts the label, or what is known about it, in the box; under it
+     the link to EP-Online always stays, so that the register itself is one tap away. */
+  function renderEnergy(address, fill) {
+    var links = A.viewerLinks(address), energy = $("adres-energie"), row;
+    energy.textContent = "";
+    fill(energy);
     row = el("p", "links"); row.appendChild(link(links.energielabel.url, links.energielabel.label)); energy.appendChild(row);
     energy.appendChild(el("p", "bronregel", "De link opent het zoekscherm van EP-Online (Rijksdienst voor Ondernemend Nederland). Vul daar in: " + links.energielabel.zoekwaarde + "."));
+  }
+
+  /* Ask the energy label Worker, when its address is set (config.json, energielabel_worker).
+     Without that setting the box stays as it was before the Worker existed. */
+  function loadLabel(address, mine) {
+    var loaded = data(), url = A.energielabelUrl(loaded && loaded.energielabelWorker, address);
+    if (!url) {
+      renderEnergy(address, function (box) { box.appendChild(el("p", null, "Nog niet beschikbaar in de app.")); });
+      return;
+    }
+    renderEnergy(address, function (box) { box.appendChild(el("p", "bezig", "Energielabel wordt opgezocht bij EP-Online ...")); });
+    var controller = typeof AbortController === "function" ? new AbortController() : null;
+    var clock = setTimeout(function () { if (controller) controller.abort(); }, TIMEOUT);
+    fetch(url, controller ? { signal: controller.signal } : {}).then(function (response) {
+      // Every answer of the Worker is JSON; a body that is not, with a fault status, still says enough.
+      return response.json().then(function (body) { return { status: response.status, body: body }; }, function () { return { status: response.ok ? 0 : response.status, body: null }; });
+    }, function () { return { status: 0, body: null }; }).then(function (answer) {
+      clearTimeout(clock);
+      if (mine !== chosen) return;
+      var model = A.energielabelModel(answer.status, answer.body, window.TilburgSignalen.isoDay(new Date()));
+      renderEnergy(address, function (box) {
+        if (model.soort === "gevonden") {
+          var label = el("p", "label-klasse");
+          label.appendChild(el("span", "sr", "Energielabel "));
+          label.appendChild(el("strong", null, model.klasse));
+          box.appendChild(label);
+          box.appendChild(facts(model.feiten));
+        } else {
+          box.appendChild(el("p", model.soort === "geen" ? null : "stale", model.tekst));
+          if (model.opnieuw) {
+            var again = el("button", "ghost", "Opnieuw proberen");
+            again.type = "button";
+            again.addEventListener("click", function () { loadLabel(address, mine); });
+            box.appendChild(again);
+          }
+        }
+        box.setAttribute("data-uitkomst", model.soort);
+        if (model.bron) box.appendChild(el("p", "bronregel", model.bron));
+      });
+    });
+  }
+
+  function renderLinks(address) {
+    var links = A.viewerLinks(address);
+    var plan = $("adres-plan"), row;
+    plan.textContent = "";
     plan.appendChild(el("p", null, "Nog niet beschikbaar in de app."));
     row = el("p", "links"); row.appendChild(link(links.plan.url, links.plan.label)); plan.appendChild(row);
     plan.appendChild(el("p", "bronregel", "De link opent de kaart van het Omgevingsloket op de plek van dit adres."));
@@ -330,6 +377,8 @@
     $("adres-uitkomst").hidden = false;
     current = { address: address, parcels: [], withParcel: false, regios: [], extra: [], regioFout: false };
     renderLinks(address);
+    $("adres-energie").removeAttribute("data-uitkomst");
+    loadLabel(address, mine);
     renderNotices();
     loadRegion(address, mine);
     loadBag(address, mine);

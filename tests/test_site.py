@@ -1570,6 +1570,70 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(empty["lines"][0]["cls"], "periode")
         self.assertEqual(len(empty["lines"]), 3)  # the period, nothing found, and what was searched
 
+    # --- The energy label, with the Worker set (tests/js/adres_smoke.js, 320 px). The answers of the
+    # Worker are played; the Worker itself is tested in tests/test_energielabel.py.
+
+    EP_ONLINE = "https://www.ep-online.nl/Energylabel/Search"
+
+    def test_the_energy_label_is_asked_of_the_worker_with_the_address_and_nothing_else(self):
+        label = self.seen["adres"]["label"]
+        self.assertEqual(label["errors"], [])
+        self.assertEqual(label["elsewhere"], [], "de app roept nog een andere dienst aan")
+        first = label["asked"][0]
+        self.assertEqual(first["url"], "https://energielabel.worker.test/?postcode=5037PL&huisnummer=118&huisletter=a")
+        self.assertEqual(first["method"], "GET")
+        for header in ("authorization", "cookie", "x-api-key"):
+            self.assertNotIn(header, first["headers"], "de app stuurt geen sleutel of cookie mee")
+        self.assertEqual(len(label["asked"]), 1, "één adres kiezen is één vraag aan de Worker")
+
+    def test_a_label_that_is_found_is_shown_with_its_source_and_the_date(self):
+        label = self.seen["adres"]["label"]
+        found, day = label["found"], label["today"]
+        self.assertEqual((found["uitkomst"], found["klasse"]), ("gevonden", "A+"))
+        self.assertEqual(found["facts"], [["Geregistreerd", "12-06-2023"], ["Geldig tot", "12-06-2033"], ["Soort gebouw", "Woningbouw"]])
+        today = "%s-%s-%s" % (day[8:10], day[5:7], day[0:4])
+        self.assertEqual(found["notes"][0], "Bron: EP-Online (Rijksdienst voor Ondernemend Nederland), opgevraagd op " + today +
+                         ". Getoond is het laatst geregistreerde label dat nog geldig is.")
+        self.assertIsNone(found["button"])
+        self.assertNotIn("Nog niet beschikbaar", found["text"])
+
+    def test_the_three_other_outcomes_each_have_their_own_text(self):
+        label = self.seen["adres"]["label"]
+        self.assertEqual((label["none"]["uitkomst"], label["none"]["klasse"]), ("geen", None))
+        self.assertTrue(label["none"]["text"].startswith("Geen geldig energielabel gevonden voor dit adres."), label["none"]["text"])
+        self.assertIsNone(label["none"]["button"])
+        self.assertEqual(label["minute"]["uitkomst"], "teveel")
+        self.assertTrue(label["minute"]["text"].startswith("Er worden op dit moment te veel energielabels opgevraagd. Probeer het over een minuut opnieuw."))
+        self.assertEqual(label["minute"]["button"], "Opnieuw proberen")
+        self.assertTrue(label["day"]["text"].startswith("Er zijn vandaag te veel energielabels opgevraagd. Probeer het morgen opnieuw."))
+        self.assertIsNone(label["day"]["button"], "morgen pas: een knop om het nu opnieuw te proberen helpt niet")
+        for moment in ("gone", "fault"):
+            with self.subTest(moment=moment):
+                self.assertEqual(label[moment]["uitkomst"], "onbereikbaar")
+                self.assertTrue(label[moment]["text"].startswith("Het energielabel kon niet worden opgevraagd: de dienst is niet bereikbaar."))
+                self.assertEqual(label[moment]["button"], "Opnieuw proberen")
+        self.assertTrue(label["refused"]["text"].startswith("Voor dit adres kan geen energielabel worden opgevraagd."))
+        texts = {label[moment]["text"] for moment in ("found", "none", "minute", "day", "gone", "refused")}
+        self.assertEqual(len(texts), 6)
+
+    def test_in_every_outcome_the_link_to_ep_online_stays_and_the_box_fits_the_narrowest_phone(self):
+        label = self.seen["adres"]["label"]
+        for moment in ("found", "none", "minute", "day", "fault", "refused", "gone"):
+            with self.subTest(moment=moment):
+                box = label[moment]
+                self.assertEqual(box["links"], [self.EP_ONLINE])
+                self.assertIn("Zoek op EP-Online", box["text"])
+                self.assertIn("Vul daar in: 5037PL 118 a.", box["text"])
+                self.assertLessEqual(box["right"], 320)
+                self.assertLessEqual(box["overflow"], 0)
+
+    def test_trying_again_asks_only_the_worker_and_leaves_the_rest_of_the_address(self):
+        label = self.seen["adres"]["label"]
+        self.assertEqual(label["again"], {"klasse": "A+", "label": 1, "pdok": 0})
+        self.assertEqual(label["other"]["bag"], 1)
+        self.assertTrue(label["other"]["plan"].startswith("Nog niet beschikbaar in de app."))
+        self.assertGreater(label["other"]["notices"], 0)
+
     def test_address_tab_marks_energy_label_and_plan_as_not_available_with_a_link(self):
         seen = self.seen["adres"]
         self.assertTrue(seen["energy"]["text"].startswith("Nog niet beschikbaar in de app."))

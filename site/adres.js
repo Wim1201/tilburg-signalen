@@ -424,7 +424,60 @@
     };
   }
 
+  /* ---------- Energy label ---------- */
+
+  /* The address to ask the energy label Worker (tools/energielabel) for this address, or null:
+     when no Worker is set, when the setting is not an https address, or when the address has no
+     postcode and house number in the form EP-Online knows. The Worker asks EP-Online; the key is
+     known there and never here. */
+  function energielabelUrl(worker, address) {
+    if (typeof worker !== "string" || !/^https:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~\/-]*)?$/.test(worker)) return null;
+    var postcode = String((address && address.postcode) || ""), number = String((address && address.huisnummer) || "");
+    if (!/^[1-9][0-9]{3}[A-Z]{2}$/.test(postcode) || !/^[1-9][0-9]{0,4}$/.test(number)) return null;
+    var params = { postcode: postcode, huisnummer: number };
+    if (address.huisletter) params.huisletter = address.huisletter;
+    if (address.toevoeging) params.toevoeging = address.toevoeging;
+    return query(worker.replace(/\/+$/, "") + "/", params);
+  }
+
+  function dutchDate(iso) {
+    var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return parts ? parts[3] + "-" + parts[2] + "-" + parts[1] : "";
+  }
+
+  /* What the box "Energielabel" shows for an answer of the Worker. `status` is the HTTP status (0
+     when no answer came), `body` the JSON of the answer, `today` the day of asking as "jjjj-mm-dd".
+     Four outcomes, each with its own text: gevonden, geen, teveel and onbereikbaar. */
+  function energielabelModel(status, body, today) {
+    body = body && typeof body === "object" ? body : {};
+    if (status === 200 && body.status === "gevonden" && typeof body.klasse === "string" && body.klasse) {
+      return {
+        soort: "gevonden", klasse: body.klasse.slice(0, 10),
+        feiten: [
+          { label: "Geregistreerd", value: dutchDate(body.registratiedatum) },
+          { label: "Geldig tot", value: dutchDate(body.geldigTot) },
+          { label: "Soort gebouw", value: typeof body.gebouw === "string" ? body.gebouw.slice(0, 40) : "" },
+        ],
+        bron: "Bron: EP-Online (Rijksdienst voor Ondernemend Nederland), opgevraagd op " + dutchDate(today) + ". Getoond is het laatst geregistreerde label dat nog geldig is.",
+      };
+    }
+    if (status === 404) {
+      return { soort: "geen", tekst: "Geen geldig energielabel gevonden voor dit adres.",
+        bron: "EP-Online heeft voor dit adres geen label, of het laatste label is verlopen. Opgevraagd op " + dutchDate(today) + "." };
+    }
+    if (status === 429) {
+      return { soort: "teveel", tekst: body.grens === "dag"
+        ? "Er zijn vandaag te veel energielabels opgevraagd. Probeer het morgen opnieuw."
+        : "Er worden op dit moment te veel energielabels opgevraagd. Probeer het over een minuut opnieuw.", opnieuw: body.grens !== "dag" };
+    }
+    if (status === 400) {
+      return { soort: "geen", tekst: "Voor dit adres kan geen energielabel worden opgevraagd.", bron: "EP-Online herkent het huisnummer of de toevoeging niet in deze vorm." };
+    }
+    return { soort: "onbereikbaar", tekst: "Het energielabel kon niet worden opgevraagd: de dienst is niet bereikbaar.", opnieuw: true };
+  }
+
   return {
+    energielabelUrl: energielabelUrl, energielabelModel: energielabelModel,
     MAX_PANDEN: MAX_PANDEN, MAX_PERCELEN: MAX_PERCELEN, NEAR_M: NEAR_M,
     normalise: normalise, streetKey: streetKey, suffix: suffix, searchText: searchText,
     parcelCode: parcelCode, suggestUrl: suggestUrl, addressFromDoc: addressFromDoc, addresses: addresses, houseNumber: houseNumber,
