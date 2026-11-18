@@ -22,6 +22,7 @@ en niet is samengevoegd**. `dagelijks.yml` en het schema zijn niet gewijzigd.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 15:05 uur | **De nieuwe workflow heeft op GitHub gedraaid, op PR 24 zelf, en is geslaagd; "De nieuwe workflow op GitHub" onder "Niet getest of nog open" is daarmee afgehandeld.** Zie "De eerste run van de nieuwe workflow". |
 | 18-11-2026, 15:01 uur | **`main` is weer groen; "`main` is rood" in het vorige verslag is daarmee achterhaald.** Run 32 slaagde op alle onderdelen. |
 | 18-11-2026, 15:01 uur | **De nieuwe test met de lettertypen van de app zelf heeft op GitHub echt gedraaid en is geslaagd; "Niet nagelopen: of de nieuwe test op de runner van GitHub de lettertypen binnenkrijgt" is daarmee afgehandeld.** De browsertests telden 66 tests zonder één overgeslagen, de controle van de live site 63 zonder één overgeslagen. Was de lettertypedienst niet bereikbaar geweest, dan had er een overgeslagen test gestaan. |
 | 18-11-2026, 15:01 uur | **"De ochtendregel en de tegel Nieuw zeggen bij Alleen Zeeland iets anders" en "Standen in geen trede" uit het vorige verslag zijn opgepakt**, in deze pull request. |
@@ -73,6 +74,28 @@ samenvoegen, op de pull request zelf.
 **Wat het niet vangt.** De controle van de live site blijft achteraf: die kan pas na het publiceren.
 Een verschil tussen de momentopname in de repo en de live gegevens ziet deze workflow dus alleen voor
 zover de vaste testsituaties het nabootsen.
+
+### De eerste run van de nieuwe workflow (18-11-2026, 15:01 – 15:03 uur)
+
+Gestart door het openen van PR 24. Dit is run 1 van "Tests bij een pull request"; de verversing telt
+haar eigen runs door.
+
+| Stap | Duur | Uitkomst |
+|---|---:|---|
+| Tests | 17 s | 440 tests geslaagd; 77 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 20 s | Geslaagd |
+| Browsertests | 46 s | 66 tests geslaagd, geen overgeslagen |
+| **Hele run** | **1 min 33 s** | **Groen** |
+
+| Wat ik in het log heb nagekeken | Uitkomst |
+|---|---|
+| Wat er getest is | De samenvoeging van de pull request met `main` (`refs/pull/24/merge`: commit `38c7abb` samengevoegd in `7555b87`) |
+| De rechten van de run | "Contents: read" en "Metadata: read", niets anders |
+| Ophalen, publiceren, cache | Komt in het log niet voor: geen `signalen.update`, geen `signalen.gebied`, geen `git push`, geen publicatie, geen cache |
+| De test met de lettertypen van de app | Heeft gedraaid: geen enkele browsertest is overgeslagen |
+| De verversing | Niet gestart door de pull request; de laatste run van `dagelijks.yml` is nog run 32 |
+
+De aantallen zijn gelijk aan die in de container (440 tests) en aan de browsertests van run 32 (66).
 
 ## 2. De ochtendregel bij "Alleen" een regio
 
@@ -144,7 +167,8 @@ onder de ochtendregel. In de sessie gemaakt; niet in de repo.
 
 | Punt | Toelichting |
 |---|---|
-| De nieuwe workflow op GitHub | Zie "De eerste run van de nieuwe workflow" hieronder, als die er bij het schrijven al is |
+| Een rode run van de nieuwe workflow houdt het samenvoegen niet tegen | De uitkomst staat bij de pull request, maar GitHub blokkeert de knop niet. Dat kan alleen met een regel op de branch `main` (in de instellingen van de repo); die heb ik niet aangeraakt |
+| Het afbreken van een lopende testrun bij een nieuwe push | Zo ingesteld; of het zo werkt, laat de eerstvolgende push naar deze pull request zien |
 | Een pull request van buiten de repo | Niet geprobeerd. De workflow heeft alleen leesrechten en geen geheimen nodig; GitHub kan voor zo'n pull request eerst om goedkeuring vragen |
 | De lettertypedienst als die traag is | De test met de echte lettertypen slaat zichzelf dan over. Dat is in run 32 niet gebeurd; hoe vaak het voorkomt, weet ik niet |
 | De regel over de kern op een echte telefoon | Niet te doen vanuit deze container; bekeken in Chromium op 320 pixels |
