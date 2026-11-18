@@ -8,7 +8,9 @@ var SEEN = "tilburg-signalen.gezien";
 
 (async function () {
   var base = process.argv[2], errors = [], result = { tiles: {} };
-  var browser = await chromium.launch();
+  // Behind a proxy (a development container) the browser needs to be told; on GitHub there is none.
+  var PROXY = process.env.HTTPS_PROXY || process.env.https_proxy || "";
+  var browser = await chromium.launch(PROXY ? { proxy: { server: PROXY, bypass: "127.0.0.1,localhost" } } : {});
 
   async function open(width, changeData) {
     var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
@@ -230,6 +232,49 @@ var SEEN = "tilburg-signalen.gezien";
 
   // --- Coming back to the app after a while, and the small map on the tab Gebied (see verversen_smoke.js).
   result.verversen = await require("./verversen_smoke.js")(browser, base);
+
+  // --- The header with the fonts of the app itself. Everywhere else the font service is kept out,
+  // and the text then stands in whatever font the machine has: wider on one machine than on another.
+  // How many lines the line under the name takes can only be said with the real fonts. When they do
+  // not come within a few seconds, `loaded` is false and the Python test skips.
+  result.kop = { loaded: false, lines: {} };
+  var HEAD_TEXTS = ["Kern: binnen 15 km van De Heuvel, Tilburg-centrum", "Kern en Zeeland", "Kern, Midden-Brabant, West-Brabant en Zeeland"];
+  var HEAD_WIDTHS = [320, 375];
+  for (var w = 0; w < HEAD_WIDTHS.length; w++) {
+    var headContext = await browser.newContext({ viewport: { width: HEAD_WIDTHS[w], height: 700 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block", ignoreHTTPSErrors: !!PROXY });
+    var headPage = await headContext.newPage();
+    await headPage.route(/^https:\/\/fonts\./, async function (route) {
+      try {
+        var response = await route.fetch({ timeout: 4000 });
+        await route.fulfill({ response: response });
+      } catch (error) {
+        await route.fulfill({ status: 200, contentType: "text/css", body: "" }).catch(function () {});
+      }
+    });
+    await headPage.goto(base + "/index.html");
+    await headPage.waitForSelector("#list .card");
+    result.kop.loaded = await headPage.evaluate(function () {
+      var wait = new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 5000); });
+      var fonts = Promise.all([document.fonts.load('500 12px "Instrument Sans"'), document.fonts.load('800 19px "Bricolage Grotesque"'), document.fonts.load('500 10px "IBM Plex Mono"')])
+        .then(function (found) { return found.every(function (list) { return list.length > 0; }); }, function () { return false; });
+      return Promise.race([fonts, wait]);
+    });
+    if (!result.kop.loaded) { await headContext.close(); break; }
+    result.kop.lines[HEAD_WIDTHS[w]] = await headPage.evaluate(function (texts) {
+      var node = document.getElementById("scope"), out = {};
+      texts.forEach(function (text) {
+        node.textContent = text;
+        var range = document.createRange();
+        range.selectNodeContents(node);
+        var tops = [].map.call(range.getClientRects(), function (box) { return Math.round(box.top); });
+        out[text] = { lines: tops.filter(function (top, index) { return tops.indexOf(top) === index; }).length,
+          clear: node.getBoundingClientRect().right <= document.getElementById("updated").getBoundingClientRect().left,
+          overflow: document.documentElement.scrollWidth - window.innerWidth };
+      });
+      return out;
+    }, HEAD_TEXTS);
+    await headContext.close();
+  }
 
   result.errors = errors;
   await browser.close();
