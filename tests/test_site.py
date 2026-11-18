@@ -4,6 +4,7 @@
 The logic tests run site/logic.js under Node and are skipped when Node is missing. The browser
 test also needs Playwright and is skipped without it."""
 import json
+import math
 import os
 import re
 import shutil
@@ -277,6 +278,110 @@ class Kaart(unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class Verversen(unittest.TestCase):
+    """When it is time to fetch the data again (site/logic.js, stale)."""
+
+    def test_fifteen_minutes_is_the_limit(self):
+        start = 1_800_000_000_000
+        minute = 60_000
+        self.assertEqual(logic(["stale", start, start, 15], ["stale", start, start + 14 * minute + 59_999, 15],
+                               ["stale", start, start + 15 * minute, 15], ["stale", start, start + 600 * minute, 15]),
+                         [False, False, True, True])
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class KaartjeTeksten(unittest.TestCase):
+    """Where the texts on the small map go (site/logic.js, radarLabels): no name over another name,
+    no ring label behind a dot or over a name. Units: km from the centre, x east, y south."""
+
+    RINGS = [5, 10, 15]
+
+    @staticmethod
+    def box(label, char, up=0.9, down=0.3):
+        width = len(label.get("naam") or label["tekst"]) * char
+        return (label["x"] - width / 2, label["y"] - up, label["x"] + width / 2, label["y"] + down)
+
+    @staticmethod
+    def hit(a, b):
+        return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+    def place(self, towns, dots=()):
+        return logic(["radarLabels", towns, self.RINGS, list(dots)])[0]
+
+    def test_names_that_do_not_touch_stay_centred_above_their_place(self):
+        towns = [{"naam": "Tilburg", "x": -3.4, "y": -1.8}, {"naam": "Drunen", "x": 4.0, "y": -12.0}]
+        placed = self.place(towns)
+        self.assertEqual([(t["naam"], round(t["x"], 2), round(t["y"], 2), t["krap"]) for t in placed["towns"]],
+                         [("Tilburg", -3.4, -1.8, False), ("Drunen", 4.0, -12.0, False)])
+
+    def test_goirle_slides_beside_hilvarenbeek_and_stays_at_its_height(self):
+        # The places as the app has them on 18-11-2026: both names centred would run through each other.
+        towns = [{"naam": "Hilvarenbeek", "x": 0.8, "y": 5.5}, {"naam": "Goirle", "x": -2.5, "y": 5.8}]
+        placed = self.place(towns)["towns"]
+        first, second = placed
+        self.assertEqual((round(first["x"], 6), round(first["y"], 6), first["krap"]), (0.8, 5.5, False), "de eerste naam blijft staan")
+        self.assertEqual((round(second["y"], 6), second["krap"]), (5.8, False), "Goirle blijft op zijn eigen hoogte")
+        self.assertLess(second["x"], -2.5, "Goirle schuift naar het westen, weg van Hilvarenbeek")
+        self.assertGreater(second["x"], -2.5 - 3.5, "niet verder dan nodig")
+        self.assertFalse(self.hit(self.box(first, 0.62), self.box(second, 0.62)))
+
+    def test_a_name_that_cannot_slide_goes_below_or_above(self):
+        # Two long names at the same place: sliding aside would carry the second too far from its place.
+        towns = [{"naam": "Loon op Zand", "x": 0.0, "y": -8.0}, {"naam": "Kaatsheuvel", "x": 0.2, "y": -8.1}]
+        placed = self.place(towns)["towns"]
+        self.assertFalse(placed[1]["krap"])
+        self.assertAlmostEqual(placed[1]["x"], 0.2)
+        self.assertNotAlmostEqual(placed[1]["y"], -8.1)
+        self.assertFalse(self.hit(self.box(placed[0], 0.62), self.box(placed[1], 0.62)))
+
+    def test_a_ring_label_starts_in_the_north_just_inside_its_ring(self):
+        rings = self.place([])["rings"]
+        self.assertEqual([(r["km"], r["tekst"], r["krap"]) for r in rings], [(5, "5 km", False), (10, "10 km", False), (15, "15 km", False)])
+        for ring in rings:
+            with self.subTest(km=ring["km"]):
+                self.assertAlmostEqual(ring["x"], 0)
+                self.assertLess(ring["km"] - 1.6, -ring["y"])
+                self.assertLess(-ring["y"] + 0.9, ring["km"], "de tekst raakt de lijn van zijn ring")
+
+    def test_a_ring_label_moves_away_from_a_dot(self):
+        free = {ring["km"]: ring for ring in self.place([])["rings"]}
+        dots = [{"x": 0.3, "y": free[15]["y"] - 0.3, "r": 0.42}]  # a location right where "15 km" would stand
+        placed = {ring["km"]: ring for ring in self.place([], dots)["rings"]}
+        self.assertEqual((placed[5], placed[10]), (free[5], free[10]), "de andere ringen blijven staan")
+        moved = placed[15]
+        self.assertFalse(moved["krap"])
+        self.assertNotAlmostEqual(moved["x"], 0)
+        dot = (dots[0]["x"] - 0.42, dots[0]["y"] - 0.42, dots[0]["x"] + 0.42, dots[0]["y"] + 0.42)
+        self.assertFalse(self.hit(self.box(moved, 0.63), dot))
+        self.assertLess(math.hypot(moved["x"], moved["y"] - 0.3), 15, "het label blijft binnen zijn ring")
+
+    def test_a_ring_label_moves_away_from_a_name(self):
+        towns = [{"naam": "Loon op Zand", "x": 0.5, "y": -8.6}]  # where "10 km" would stand
+        placed = self.place(towns)
+        ring = next(r for r in placed["rings"] if r["km"] == 10)
+        self.assertFalse(ring["krap"])
+        self.assertFalse(self.hit(self.box(ring, 0.63), self.box(placed["towns"][0], 0.62)))
+
+    def test_when_a_ring_is_full_of_dots_the_label_is_marked_and_stands_where_fewest_are(self):
+        dots = []
+        for degrees in range(0, 360, 3):  # a closed row of locations just inside the 5 km ring
+            angle = math.radians(degrees)
+            for radius in (3.2, 3.8, 4.4):
+                dots.append({"x": radius * math.sin(angle), "y": -radius * math.cos(angle), "r": 0.42})
+        placed = {ring["km"]: ring for ring in self.place([], dots)["rings"]}
+        self.assertTrue(placed[5]["krap"])
+        self.assertFalse(placed[10]["krap"])
+        self.assertFalse(placed[15]["krap"])
+
+    def test_every_text_stays_on_the_map(self):
+        towns = [{"naam": "Reusel-De Mierden", "x": -13.0, "y": 0.0}, {"naam": "Hilvarenbeek", "x": 12.5, "y": 4.0}]
+        placed = self.place(towns)
+        for label in placed["towns"]:
+            left, top, right, bottom = self.box(label, 0.62)
+            self.assertTrue(-18.5 <= left and right <= 18.5 and -18.5 <= top and bottom <= 18.5, label)
+
+
 class EchteGegevens(unittest.TestCase):
     """The same checks on site/data/berichten.json as it is in the repository."""
 
@@ -850,6 +955,94 @@ class InDeBrowser(unittest.TestCase):
         _, seen = self.fixed()
         self.assertEqual((seen["first"], seen["tapped"]), ("Zeeland", "Reimerswaal"))
         self.assertEqual((seen["tap"]["cards"], seen["tap"]["filter"]), (1, "Reimerswaal"))
+
+    # --- Coming back to the app after a while (tests/js/verversen_smoke.js, 375 px). The page had a
+    # region chosen, a search and a filter set, a card opened and an address looked up.
+
+    KEPT = ("hash", "zoek", "type", "filtersOpen", "line", "pressed", "open", "adres", "adresVisible", "bag", "perceel", "scope")
+
+    def kept(self, moment):
+        return {key: self.seen["verversen"][moment]["state"][key] for key in self.KEPT}
+
+    def test_back_in_view_within_fifteen_minutes_nothing_is_fetched(self):
+        seen = self.seen["verversen"]
+        self.assertEqual(seen["errors"], [])
+        self.assertEqual(seen["early"], seen["before"])
+        self.assertEqual(seen["atOnce"], seen["after"], "direct na een verversing wordt opnieuw opgehaald")
+
+    def test_back_in_view_after_fifteen_minutes_the_data_and_the_moment_are_new(self):
+        seen = self.seen["verversen"]
+        before, after = seen["before"], seen["after"]
+        self.assertNotEqual(after["state"]["updated"], before["state"]["updated"])
+        self.assertTrue(after["state"]["updated"].startswith("Bijgewerkt ") and after["state"]["updated"].endswith("23:57"), after["state"]["updated"])
+        # One fetch of each data file and of the file of the chosen region; no register is asked again.
+        self.assertEqual((after["requests"]["berichten"], after["requests"]["gebied"]), (before["requests"]["berichten"] + 1, before["requests"]["gebied"] + 1))
+        self.assertEqual(after["requests"]["regio"], before["requests"]["regio"] + ["regio-zeeland.json"])
+        self.assertEqual(after["requests"]["pdok"], before["requests"]["pdok"])
+        # The new run brought one location in the core and one in the region; the one in the core is new.
+        tiles_before, tiles_after = [int(n) for n in before["state"]["tiles"]], [int(n) for n in after["state"]["tiles"]]
+        self.assertEqual(tiles_after, [tiles_before[0] + 2, tiles_before[1] + 1, tiles_before[2]])
+
+    def test_a_refresh_keeps_the_region_the_search_the_filter_and_the_opened_card(self):
+        seen = self.seen["verversen"]
+        before = self.kept("before")
+        self.assertEqual((before["pressed"], before["line"], before["zoek"], before["type"], before["filtersOpen"], len(before["open"])),
+                         (["Zeeland"], "Met Zeeland erbij. Alleen de kern", "Goes", "vergunning", True, 1))
+        for moment in ("after", "sameRun", "noConnection", "connectionBack", "regionDown"):
+            with self.subTest(moment=moment):
+                self.assertEqual(self.kept(moment), before)
+        # The search still narrows the list, and now finds the new notice of the region as well.
+        self.assertEqual(seen["before"]["state"]["count"], "1 ontwikkellocatie, hoogste rang eerst")
+        self.assertEqual(seen["after"]["state"]["count"], "2 ontwikkellocaties, hoogste rang eerst")
+        self.assertEqual(seen["end"]["cards"], ["test-ververst-regio"] + seen["before"]["state"]["cards"])
+        self.assertEqual(seen["end"]["open"], seen["before"]["state"]["open"], "de geopende kaart is dichtgegaan")
+
+    def test_a_refresh_keeps_the_address_and_searches_the_new_notices_for_it(self):
+        seen = self.seen["verversen"]
+        before, after = seen["before"]["state"], seen["after"]["state"]
+        self.assertEqual(before["hash"], "#adres")
+        self.assertEqual(before["adres"], "Burgemeester van de Mortelplein 118a")
+        self.assertTrue(before["adresVisible"])
+        self.assertNotIn("test-ververst-adres", before["pubs"])
+        self.assertEqual(after["pubs"], ["test-ververst-adres"] + before["pubs"])
+        self.assertNotEqual(after["searched"], before["searched"], "het aantal doorzochte berichten is niet bijgewerkt")
+
+    def test_the_same_run_again_changes_nothing(self):
+        seen = self.seen["verversen"]
+        self.assertEqual(seen["sameRun"]["state"], seen["after"]["state"])
+        self.assertEqual(seen["sameRun"]["requests"]["berichten"], seen["after"]["requests"]["berichten"] + 1)
+        self.assertEqual(seen["sameRun"]["requests"]["regio"], seen["after"]["requests"]["regio"], "zonder nieuwe run is een regiobestand opnieuw gelezen")
+
+    def test_without_connection_everything_stays_and_the_next_time_tries_again(self):
+        seen = self.seen["verversen"]
+        self.assertEqual(seen["noConnection"]["state"], seen["sameRun"]["state"])
+        self.assertFalse(seen["noConnection"]["state"]["loadError"])
+        # No waiting of fifteen minutes after a failure: back in view, it fetches at once.
+        self.assertEqual(seen["connectionBack"]["requests"]["berichten"], seen["noConnection"]["requests"]["berichten"] + 1)
+        self.assertTrue(seen["connectionBack"]["state"]["updated"].endswith("23:58"), seen["connectionBack"]["state"]["updated"])
+
+    def test_a_region_file_that_does_not_come_at_a_refresh_keeps_what_the_region_had(self):
+        seen = self.seen["verversen"]
+        down, back = seen["regionDown"]["state"], seen["connectionBack"]["state"]
+        self.assertTrue(down["updated"].endswith("23:59"), down["updated"])
+        self.assertEqual((down["pressed"], down["line"], down["count"], down["tiles"]), (back["pressed"], back["line"], back["count"], back["tiles"]))
+        self.assertEqual(seen["regionDown"]["requests"]["regio"][-1], "regio-zeeland.json")
+
+    def test_on_the_small_map_no_text_covers_another_and_no_ring_label_lies_behind_a_dot(self):
+        for width, radar in sorted(self.seen["verversen"]["radar"].items()):
+            with self.subTest(breedte=width):
+                self.assertEqual(radar["overlaps"], [])
+                self.assertEqual(radar["behind"], [])
+                self.assertEqual(radar["outside"], [])
+                self.assertEqual(radar["rings"], ["5 km", "10 km", "15 km"])
+                self.assertIn("Goirle", radar["towns"])
+                self.assertIn("Hilvarenbeek", radar["towns"])
+                self.assertLessEqual(radar["overflow"], 0)
+                self.assertGreater(radar["dots"], 0)
+                if not self.url:
+                    # With the data in the repository every text finds a free place. On the live site a
+                    # text may be marked as cramped on a crowded day; it is then left out of the above.
+                    self.assertEqual(radar["krap"], [])
 
     def test_a_region_file_that_does_not_come_leaves_the_core(self):
         seen = self.region()

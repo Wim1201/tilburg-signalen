@@ -253,7 +253,7 @@
     if (!regios) return;
     regios.voorGemeente(address.gemeente).then(function (found) {
       if (mine !== chosen) return;
-      current.regios = found.regios; current.extra = found.berichten;
+      current.regios = found.regios; current.extra = found.berichten; current.regioFout = false;
       renderNotices();
     }).catch(function () {
       if (mine !== chosen) return;
@@ -261,6 +261,14 @@
       renderNotices();
     });
   }
+
+  /* The app fetched its data again (app.js): search the new notices for the address that is open.
+     The address itself, its building and its parcel stay as they are; no register is asked again. */
+  window.addEventListener("tilburg-signalen:ververst", function () {
+    if (!current.address) return;
+    renderNotices();
+    loadRegion(current.address, chosen);
+  });
 
   /* The notices of the app about the chosen address: those of the core and, when they are in,
      those of the region of the address. With the parcel known, notices are also matched by where

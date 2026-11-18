@@ -267,7 +267,78 @@
     return names.length > 1 ? names.slice(0, -1).join(", ") + " en " + names[names.length - 1] : names.join("");
   }
 
+  /* Whether what the app shows was fetched long enough ago to fetch it again (both in milliseconds). */
+  function stale(loadedAt, now, minutes) {
+    return now - loadedAt >= minutes * 60000;
+  }
+
+  /* Where the texts on the small map go, so that no place name covers another, no ring label lies
+     behind a dot and no ring label covers a place name. Plain geometry in the units of the drawing:
+     km from the centre, x to the east and y to the south.
+       towns: [{ naam, x, y }]   the place itself; its name stands centred just above it
+       rings: [5, 10, 15]        every ring gets "<km> km" just inside its line
+       dots:  [{ x, y, r }]      the locations that are drawn
+     Returns { towns: [{ naam, x, y, krap }], rings: [{ km, tekst, x, y, krap }] } with x the middle
+     of the text and y its baseline. Earlier towns keep their place. A later one that would cover a
+     name first slides sideways, away from that name and no further than needed, so that it stays at
+     the height of its place; only then it moves below, above or beside it. A ring label walks along
+     its ring, starting in the north. `krap` says that
+     no free place was found and the text stands where it bothers least. The widths are estimates
+     that err on the wide side: the fonts are set in styles.css (.radar .town and .radar .ring-label). */
+  var RADAR = { edge: 18.3, townChar: 0.62, ringChar: 0.63, up: 0.9, down: 0.3, gap: 0.12 };
+  function radarBox(x, baseline, width) {
+    return { l: x - width / 2, r: x + width / 2, t: baseline - RADAR.up, b: baseline + RADAR.down };
+  }
+  function radarHit(a, b) {
+    return a.l < b.r + RADAR.gap && b.l < a.r + RADAR.gap && a.t < b.b + RADAR.gap && b.t < a.b + RADAR.gap;
+  }
+  function radarInside(box) {
+    return box.l >= -RADAR.edge && box.r <= RADAR.edge && box.t >= -RADAR.edge && box.b <= RADAR.edge;
+  }
+  function radarLabels(towns, rings, dots) {
+    var placed = [], result = { towns: [], rings: [] };
+    function hits(box, others) { return others.filter(function (other) { return radarHit(box, other); }).length; }
+    towns.forEach(function (town) {
+      var width = town.naam.length * RADAR.townChar, aside = width / 2 + 0.8;
+      var shifts = [[0, 0], [0, 1.7], [0, -1.4], [aside, 0.6], [-aside, 0.6], [0, 3], [0, -2.8], [aside, -0.8], [-aside, -0.8]];
+      var boxes = shifts.map(function (shift) { return radarBox(town.x + shift[0], town.y + shift[1], width); });
+      var blockers = placed.filter(function (other) { return radarHit(boxes[0], other); });
+      if (blockers.length) {
+        var clear = RADAR.gap + 0.05;
+        var left = Math.min.apply(null, blockers.map(function (other) { return other.l; })) - clear - boxes[0].r;
+        var right = Math.max.apply(null, blockers.map(function (other) { return other.r; })) + clear - boxes[0].l;
+        var slides = (-left <= right ? [left, right] : [right, left]).filter(function (dx) { return Math.abs(dx) <= width / 2 + 1; });
+        boxes = [boxes[0]].concat(slides.map(function (dx) { return radarBox(town.x + dx, town.y, width); }), boxes.slice(1));
+      }
+      var free = boxes.filter(function (box) { return radarInside(box) && !hits(box, placed); })[0];
+      var box = free || boxes[0];
+      placed.push(box);
+      result.towns.push({ naam: town.naam, x: (box.l + box.r) / 2, y: box.t + RADAR.up, krap: !free });
+    });
+    var dotBoxes = dots.map(function (dot) { return { l: dot.x - dot.r, r: dot.x + dot.r, t: dot.y - dot.r, b: dot.y + dot.r }; });
+    dotBoxes.push({ l: -0.45, r: 0.45, t: -0.45, b: 0.45 }); // the centre
+    var angles = [0];
+    for (var step = 1; step <= 12; step++) angles.push(step * 15, -step * 15);
+    rings.forEach(function (km) {
+      var text = km + " km", width = text.length * RADAR.ringChar, height = RADAR.up + RADAR.down;
+      var candidates = angles.slice(0, 24).map(function (degrees) {
+        var angle = degrees * Math.PI / 180, sin = Math.sin(angle), cos = Math.cos(angle);
+        // Far enough inside the ring that the text does not touch its line, whatever the direction.
+        var radius = km - 0.35 - Math.abs(sin) * width / 2 - Math.abs(cos) * height / 2;
+        var cx = radius * sin, cy = -radius * cos;
+        var box = radarBox(cx, cy + (RADAR.up - RADAR.down) / 2, width);
+        return { box: box, dots: hits(box, dotBoxes), texts: hits(box, placed) };
+      });
+      var free = candidates.filter(function (candidate) { return !candidate.dots && !candidate.texts; })[0];
+      var best = free || candidates.slice().sort(function (a, b) { return a.texts - b.texts || a.dots - b.dots; })[0];
+      placed.push(best.box);
+      result.rings.push({ km: km, tekst: text, x: (best.box.l + best.box.r) / 2, y: best.box.t + RADAR.up, krap: !free });
+    });
+    return result;
+  }
+
   return {
+    stale: stale, radarLabels: radarLabels,
     KERN: KERN, regioOf: regioOf, gemeentenIn: gemeentenIn, regios: regios, regioMeldingen: regioMeldingen, regiosFor: regiosFor, merged: merged, reachKm: reachKm, nameList: nameList,
     NEW_HOURS: NEW_HOURS, TOP: TOP, TYPE_LABEL: TYPE_LABEL,
     isoDay: isoDay, daysAgoIso: daysAgoIso, shortDate: shortDate, km: km, safeUrl: safeUrl, hasPoint: hasPoint,

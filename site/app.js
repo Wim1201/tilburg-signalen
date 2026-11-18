@@ -6,6 +6,7 @@
 
   var L = window.TilburgSignalen;
   var REMOVED_PAGE = 60;
+  var REFRESH_MINUTES = 15; // back in view after this long: fetch the data again
   var STORE_KEY = "tilburg-signalen.gezien";
   var VIEWS = ["berichten", "gebied", "bronnen", "adres"];
   var LISTS = ["ranglijst", "nieuw", "onzeker"];
@@ -13,6 +14,7 @@
     data: null, area: null, kern: [], regios: [], regioBerichten: {}, regioFout: "", kmMax: 15, view: "ranglijst", expanded: false, toonWeg: false, removedLimit: REMOVED_PAGE,
     zoek: "", type: "", gemeente: "", fase: "", signaal: "", dagen: 0, sort: "relevantie", maxKm: 15,
     nieuw: {}, ranks: {}, firstVisit: false, latestDay: "",
+    geladen: 0, bezig: false, regioOud: {},
   };
 
   function $(id) { return document.getElementById(id); }
@@ -59,13 +61,16 @@
     return counts;
   }
 
-  function fillSelect(select, counts, labels) {
+  /* `chosen` is what the filter is set to: it stays chosen, also when no notice has it any more. */
+  function fillSelect(select, counts, labels, chosen) {
     while (select.options.length > 1) select.remove(1); // the first option is "all"
+    if (chosen && !counts[chosen]) { counts = Object.assign({}, counts); counts[chosen] = 0; }
     Object.keys(counts).sort(function (a, b) { return a.localeCompare(b, "nl"); }).forEach(function (value) {
       var option = el("option", null, ((labels && labels[value]) || value) + " (" + counts[value] + ")");
       option.value = value;
       select.appendChild(option);
     });
+    select.value = chosen || "";
   }
 
   /* The morning line: greeting and date, how many locations are new, and the three lists. */
@@ -304,19 +309,23 @@
       return node;
     }
     svg.textContent = "";
-    [5, 10, 15].forEach(function (km) {
+    var rings = [5, 10, 15];
+    rings.forEach(function (km) {
       add("circle", { cx: 0, cy: 0, r: km, "class": "ring" + (km === state.data.straalKm ? " ring-outer" : "") });
-      add("text", { x: 0.3, y: -km + 1.2 }, km + " km");
     });
     add("text", { x: 0, y: -16.6, "text-anchor": "middle" }, "N");
     // The map is the core: a region lies far outside its rings.
     var located = state.kern.filter(function (i) { return i.klasse !== "weggefilterd" && L.hasPoint(i); });
     located.sort(function (a, b) { return (a.klasse === "ontwikkellocatie") - (b.klasse === "ontwikkellocatie"); });
-    located.forEach(function (item) {
+    var dots = located.map(function (item) {
       var o = L.offsetKm(item, centre);
-      add("circle", { cx: o.x.toFixed(2), cy: (-o.y).toFixed(2), r: item.klasse === "onzeker" ? 0.32 : 0.42, "class": "p-" + item.klasse });
+      return { x: o.x, y: -o.y, r: item.klasse === "onzeker" ? 0.32 : 0.42, klasse: item.klasse };
+    });
+    dots.forEach(function (dot) {
+      add("circle", { cx: dot.x.toFixed(2), cy: dot.y.toFixed(2), r: dot.r, "class": "p-" + dot.klasse });
     });
     add("circle", { cx: 0, cy: 0, r: 0.35, "class": "centre" });
+    var towns = [];
     state.area.gemeenten.forEach(function (gemeente) {
       var town = gemeente.woonplaatsen.filter(function (w) {
         var o = L.offsetKm(w, centre);
@@ -324,8 +333,17 @@
       })[0];
       if (!town) return;
       var o = L.offsetKm(town, centre);
-      add("text", { x: o.x.toFixed(2), y: (-o.y).toFixed(2), "text-anchor": "middle", "class": "town" }, town.naam);
+      towns.push({ naam: town.naam, x: o.x, y: -o.y });
     });
+    // The texts last, each where it covers no other text and, for a ring, no dot (see logic.js).
+    var labels = L.radarLabels(towns, rings, dots);
+    function text(label, name, content) {
+      var attrs = { x: label.x.toFixed(2), y: label.y.toFixed(2), "text-anchor": "middle", "class": name };
+      if (label.krap) attrs["data-krap"] = "1";
+      add("text", attrs, content);
+    }
+    labels.rings.forEach(function (label) { text(label, "ring-label", label.tekst); });
+    labels.towns.forEach(function (label) { text(label, "town", label.naam); });
   }
 
   function gemeenteKey(gemeente) { return gemeente.land === "BE" ? gemeente.naam + " (België)" : gemeente.naam; }
@@ -461,10 +479,10 @@
   /* The choices in the filter panel follow the notices that are shown. */
   function fillFilters() {
     var relevant = state.data.berichten.filter(function (item) { return item.klasse !== "weggefilterd"; });
-    fillSelect($("f-type"), countBy(relevant, "type"), L.TYPE_LABEL);
-    fillSelect($("f-gemeente"), countBy(relevant, "gemeente"));
-    fillSelect($("f-fase"), countBy(relevant, "fase"));
-    fillSelect($("f-signaal"), countBy(relevant, "signalen"));
+    fillSelect($("f-type"), countBy(relevant, "type"), L.TYPE_LABEL, state.type);
+    fillSelect($("f-gemeente"), countBy(relevant, "gemeente"), null, state.gemeente);
+    fillSelect($("f-fase"), countBy(relevant, "fase"), null, state.fase);
+    fillSelect($("f-signaal"), countBy(relevant, "signalen"), null, state.signaal);
   }
 
   /* The notices of one region, read once from its own file. */
@@ -474,6 +492,11 @@
     if (!regio || !/^regio-[a-z-]+\.json$/.test(regio.bestand)) return Promise.reject(new Error("onbekende regio"));
     return fetchJson("data/" + regio.bestand).then(function (file) {
       state.regioBerichten[name] = file.berichten || [];
+      return state.regioBerichten[name];
+    }, function (error) {
+      // After a refresh the file of a region may not come: what was read before stays in use.
+      if (!state.regioOud[name]) throw error;
+      state.regioBerichten[name] = state.regioOud[name];
       return state.regioBerichten[name];
     });
   }
@@ -526,6 +549,9 @@
     $("more").addEventListener("click", function () { state.expanded = true; renderList(); });
     $("more-removed").addEventListener("click", function () { state.removedLimit += REMOVED_PAGE; renderList(); });
     window.addEventListener("hashchange", showView);
+    // Back in view (the phone unlocked, the app brought to the front): fetch again when it is time.
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") refresh(); });
+    window.addEventListener("pageshow", function (event) { if (event.persisted) refresh(); });
   }
 
   /* Remember per device when each item was first seen; storage is optional. */
@@ -537,16 +563,64 @@
     return result;
   }
 
+  /* What the address tab searches: the notices of the core. One object for as long as the app is
+     open; a refresh fills it anew. The address tab never changes it. */
+  function share(data) {
+    var shared = window.TilburgSignalenGegevens = window.TilburgSignalenGegevens || {};
+    shared.bijgewerkt = data.bijgewerkt; shared.vensterDagen = data.vensterDagen; shared.centrum = data.centrum; shared.berichten = state.kern;
+  }
+
+  /* Fetch the data again when the app comes back into view and what it shows was fetched more than
+     REFRESH_MINUTES ago. Only what comes from the data changes: the chosen regions, the search and
+     the filters, the list that is open, opened cards and an address that was looked up all stay.
+     When nothing comes (no connection), everything stays as it is and the next time tries again. */
+  function refresh() {
+    if (!state.data || state.bezig || !L.stale(state.geladen, Date.now(), REFRESH_MINUTES)) return Promise.resolve(false);
+    state.bezig = true;
+    return Promise.all([fetchJson("data/berichten.json"), fetchJson("data/gebied.json")]).then(function (results) {
+      state.geladen = Date.now();
+      if (results[0].bijgewerkt === state.data.bijgewerkt) { renderBrief(); return false; } // the same run: only the day and the hour may have changed
+      return renew(results[0], results[1]).then(function () { return true; });
+    }).catch(function () { return false; }).then(function (changed) {
+      state.bezig = false;
+      return changed;
+    });
+  }
+
+  function renew(data, area) {
+    var chosen = state.regios.slice(), atMax = state.maxKm >= state.kmMax;
+    state.regioOud = state.regioBerichten; state.regioBerichten = {};
+    state.data = data; state.area = area; state.kern = data.berichten;
+    share(data);
+    return Promise.all(chosen.map(function (name) { return loadRegio(name).catch(function () { return null; }); })).then(function (lists) {
+      // A region that is no longer on offer falls away; one whose file did not come keeps what it had.
+      var kept = chosen.filter(function (name, index) { return lists[index]; });
+      state.regios = kept;
+      state.data.berichten = L.merged(state.kern, kept.map(function (name) { return state.regioBerichten[name]; }));
+      state.latestDay = L.latestDay(state.kern);
+      state.ranks = L.rankMap(state.data.berichten);
+      state.kmMax = L.reachKm(state.data.berichten, data.straalKm);
+      state.maxKm = atMax ? state.kmMax : Math.min(state.maxKm, state.kmMax); // the distance filter stays where it was set
+      $("f-km").max = state.kmMax; $("f-km").value = state.maxKm; $("f-km-out").textContent = state.maxKm + " km";
+      state.nieuw = rememberSeen(state.kern).nieuw; // what came in just now is new; firstVisit keeps its answer
+      $("scope").textContent = "Binnen " + data.straalKm + " km van " + data.centrum.naam;
+      $("updated").textContent = "Bijgewerkt " + stampFormat.format(new Date(data.bijgewerkt));
+      fillFilters();
+      renderBrief(); renderList(); renderGebied(); renderBronnen();
+      // The address tab searches again for the address that is open (see adres-app.js).
+      window.dispatchEvent(new Event("tilburg-signalen:ververst"));
+    });
+  }
+
   function start(data, area) {
     state.data = data; state.area = area;
     state.kern = data.berichten; // the app opens with the core; a region is read when it is chosen
-    // The address tab searches these notices and, for an address outside the core, those of its
-    // region. It never changes them.
-    window.TilburgSignalenGegevens = { bijgewerkt: data.bijgewerkt, vensterDagen: data.vensterDagen, centrum: data.centrum, berichten: state.kern };
+    state.geladen = Date.now();
+    share(data);
     window.TilburgSignalenRegios = {
       voorGemeente: function (gemeente) {
-        var names = L.regios(area, data.regios).map(function (regio) { return regio.naam; });
-        names = L.regiosFor(area, gemeente).filter(function (name) { return names.indexOf(name) !== -1; });
+        var names = L.regios(state.area, state.data.regios).map(function (regio) { return regio.naam; });
+        names = L.regiosFor(state.area, gemeente).filter(function (name) { return names.indexOf(name) !== -1; });
         return Promise.all(names.map(loadRegio)).then(function (lists) {
           return { regios: names, berichten: lists.reduce(function (all, list) { return all.concat(list); }, []) };
         });

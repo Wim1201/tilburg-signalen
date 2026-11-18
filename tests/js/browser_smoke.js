@@ -228,6 +228,9 @@ var SEEN = "tilburg-signalen.gezien";
   // The same walk in a fixed situation in which regions have notices whose text still waits.
   result.regioOngelezen = await require("./regio_smoke.js")(browser, base, { fixture: require("./regio_ongelezen.json") });
 
+  // --- Coming back to the app after a while, and the small map on the tab Gebied (see verversen_smoke.js).
+  result.verversen = await require("./verversen_smoke.js")(browser, base);
+
   result.errors = errors;
   await browser.close();
   process.stdout.write(JSON.stringify(result));

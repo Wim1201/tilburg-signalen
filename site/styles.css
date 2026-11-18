@@ -194,6 +194,7 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 .radar .ring { fill: none; stroke: var(--line); stroke-width: .12; }
 .radar .ring-outer { stroke: var(--ink); stroke-width: .16; stroke-dasharray: .5 .4; }
 .radar text { font-family: var(--font-data); fill: var(--muted); font-size: 1px; }
+.radar .ring-label { paint-order: stroke; stroke: var(--surface); stroke-width: .3px; }
 .radar .town { font-family: var(--font-text); fill: var(--ink); font-size: 1.05px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: .28px; }
 .radar .p-ontwikkellocatie { fill: var(--signal); fill-opacity: .85; stroke: var(--surface); stroke-width: .08; }
 .radar .p-onzeker { fill: none; stroke: var(--muted); stroke-width: .14; }
