@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 13:05 – 13:14 uur |
+| Datum | 18-11-2026, 13:05 – 13:14 uur; aangevuld 13:39 – 13:52 uur (PR 22 samengevoegd, run 31 rood, herstel) |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, opnieuw gestart vanaf `main` op commit `37f8183` (na PR 21) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen`; Chromium via Playwright |
 | Brondata | Geen opvraging bij de bronnen. Voor de uitleg van de ranglijst: de gegevens van de live site van 18-11-2026, 13:07 uur |
@@ -22,6 +22,10 @@ die **open blijft en niet is samengevoegd**. Punt 2 is een uitleg met een voorst
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 13:52 uur | **Run 31, de run na het samenvoegen van PR 22, is rood: de browsertests vóór het publiceren keurden de ondertitel af. Er is niets gepubliceerd; de live site draait de versie van run 30.** Op de runner van GitHub loopt "Kern: binnen 15 km van De Heuvel, Tilburg-centrum" op 320 pixels over drie regels, en mijn test eiste hoogstens twee. Zie "Run 31 op GitHub". |
+| 18-11-2026, 13:52 uur | **"Gemeten in Chromium: 320 pixels, 2 regels" hieronder was gemeten met het lettertype van deze container, niet met de lettertypen van de app.** De tests houden de lettertypedienst buiten de deur; de tekst staat dan in het terugval-lettertype van de machine. Hier is dat Inter, op de runner van GitHub het bredere DejaVu Sans. Dat verschil had ik moeten voorzien: het is dezelfde soort fout als bij run 26, een test die slaagt op wat hier staat en niet op wat elders staat. |
+| 18-11-2026, 13:52 uur | **Nu wel gemeten met de lettertypen van de app zelf (Instrument Sans, via de lettertypedienst): twee regels op 320, 360, 375 en 390 pixels.** Met DejaVu Sans afgedwongen: drie regels op 320 pixels en twee op 375, precies wat de runner meldde. De pagina zelf is dus niet stuk; de test was te streng voor een lettertype dat een telefoon niet gebruikt. |
+| 18-11-2026, 13:52 uur | **Het aantal tests is 410 (was 409).** Erbij: een controle van de ondertitel met de lettertypen van de app zelf. |
 | 18-11-2026, 13:14 uur | **PR 21 is samengevoegd en heeft op GitHub gedraaid; "open blijft en niet is samengevoegd" en "Op GitHub: de pull request start geen run" in het vorige verslag zijn daarmee achterhaald.** Zie "Run 30 op GitHub". |
 | 18-11-2026, 13:14 uur | **Het aantal tests is 409 (was 402).** Er zijn er 7 bij: 4 voor de logica en 3 in de browser. |
 | 18-11-2026, 13:14 uur | **De kop is op de smalste telefoons iets compacter gemaakt; dat stond niet in de opdracht.** Met "Kern: " ervoor liep de ondertitel op 320 pixels over drie regels. Tot 350 pixels breed is het beeldmerk daarom 34 in plaats van 38 pixels en is de ruimte ernaast iets kleiner. Zie "Gemaakte keuzes". |
@@ -48,6 +52,41 @@ die **open blijft en niet is samengevoegd**. Punt 2 is een uitleg met een voorst
 | Dit is de eerste gewone run met de regio's gevuld | 38 verzoeken in 52 seconden. Vóór de regio's deed een gewone run rond de 34 verzoeken |
 
 De nieuwe app staat daarmee live: het opnieuw ophalen bij terugkeer en het kaartje zonder overlap.
+
+## Run 31 op GitHub, na het samenvoegen van PR 22 (18-11-2026, 13:39 – 13:43 uur)
+
+PR 22 is samengevoegd op verzoek van Wim (13:39 uur, merge-commit `382539a`).
+
+| Stap | Duur | Uitkomst |
+|---|---:|---|
+| Tests | 18 s | 409 tests geslaagd; 71 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 2 min 21 s | Geslaagd |
+| **Browsertests** | 43 s | **Mislukt: 1 van de 60 tests, op 10 plaatsen** |
+| Gebied bijwerken, berichten ophalen, cache bewaren | | Overgeslagen |
+| Publiceren en controle van de live site | | Overgeslagen |
+| **Hele run** | **3 min 40 s** | **Rood. Niets opgehaald, niets gepubliceerd** |
+
+| | |
+|---|---|
+| Wat faalde | `test_the_line_under_the_name_follows_the_chosen_regions`: "3 not less than or equal to 2: de regel onder de naam loopt op 320 pixels over meer dan twee regels". Voor de standaardregel en voor de regel met alle drie de regio's, in beide situaties; "Kern en Zeeland" niet |
+| Oorzaak (feit) | Zie de correcties bovenaan: het terugval-lettertype van de runner is breder dan dat van deze container. Nagemaakt door DejaVu Sans in de pagina af te dwingen: drie regels op 320 pixels |
+| Is de pagina stuk? | Nee. Met de lettertypen van de app staat de regel op twee regels. In een breder lettertype worden het er drie; dan is de kop 15 pixels hoger, niets loopt buiten beeld en de regel raakt het tijdstip niet |
+| Wat dit keer goed ging | De fout is gevangen vóór het publiceren, niet erna. De live site is niet aangeraakt |
+| Gevolg tot het herstel in `main` staat | Een run door een push of met de hand strandt op de browsertests en ververst niet. **De geplande runs slaan de browsertests over: die verversen en publiceren wel, ook de nieuwe app, en eindigen daarna rood in de controle van de live site** op dezelfde test. De eerstvolgende is 16:10 uur |
+
+### Het herstel (in een eigen pull request, niet samengevoegd)
+
+| Onderdeel | Wat |
+|---|---|
+| De bestaande test | Eist nu hoogstens drie regels in het lettertype van de machine, en nog steeds dat niets buiten beeld loopt en dat de regel het tijdstip niet raakt |
+| Een nieuwe test | Laadt de pagina met de lettertypen van de app zelf en eist dan hoogstens twee regels, op 320 en 375 pixels, voor de drie regels. Komen de lettertypen niet binnen een paar seconden, dan slaat de test zichzelf over in plaats van te falen |
+| Achter een proxy | De browser van de tests gebruikt de proxy als die is ingesteld, zodat de nieuwe test ook in deze container draait. Op GitHub is er geen proxy en verandert er niets |
+| De app | Niet gewijzigd |
+
+Nagelopen in de container: 410 tests geslaagd; de nieuwe test heeft hier echt gedraaid (de lettertypen
+kwamen binnen) en geeft twee regels. **Niet nagelopen:** of de nieuwe test op de runner van GitHub de
+lettertypen binnenkrijgt en twee regels meet. Dat is dezelfde browser en hetzelfde lettertypebestand als
+hier, dus ik verwacht het; het is een vermoeden tot de eerste run.
 
 ## Opdracht
 

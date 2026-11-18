@@ -48,7 +48,11 @@ module.exports = async function (browser, base, options) {
       count: await page.textContent("#result-count"), brief: await page.textContent("#brief-title"),
       tiles: await page.$$eval(".tile b", function (nodes) { return nodes.map(function (node) { return node.textContent; }); }),
       cards: await page.$$eval("#list .card", function (nodes) { return nodes.length; }),
-      line: await page.$eval("#regio-regel", function (node) { return node.hidden ? null : node.textContent; }),
+      line: await page.$eval("#regio-regel", function (node) { return node.hidden ? null : node.firstChild.textContent.trim(); }),
+      // The choice of what the lists show: everything together, the core alone or one region alone.
+      toon: await page.$$eval("#regio-regel .keuzes button", function (nodes) {
+        return nodes.map(function (node) { var box = node.getBoundingClientRect(); return { label: node.textContent, pressed: node.getAttribute("aria-pressed") === "true", height: Math.round(box.height), right: Math.round(box.right) }; });
+      }),
       kmMax: await page.$eval("#f-km", function (node) { return node.max; }), kmOut: await page.textContent("#f-km-out"),
       gemeenten: await page.$$eval("#f-gemeente option", function (nodes) { return nodes.length - 1; }),
       removed: await page.textContent("#weg-aantal"),
@@ -99,7 +103,7 @@ module.exports = async function (browser, base, options) {
   result.askedByThePage = asked.slice(); // opening the app reads no region
   result.data = await page.evaluate(function () {
     function json(path) { return fetch(path).then(function (r) { return r.json(); }); }
-    function slim(regio) { return function (i) { return { id: i.id, klasse: i.klasse, regio: regio || i.regio || "kern", gemeente: i.gemeente, afstandKm: i.afstandKm, datum: i.datum }; }; }
+    function slim(regio) { return function (i) { return { id: i.id, klasse: i.klasse, regio: regio || i.regio || "kern", gemeente: i.gemeente, afstandKm: i.afstandKm, datum: i.datum, fase: i.fase, score: i.score, woningen: i.woningen, type: i.type }; }; }
     return Promise.all([json("data/berichten.json"), json("data/gebied.json")]).then(function (both) {
       var overview = (both[0].regios || []).filter(function (regio) { return regio.bestand; });
       return Promise.all(overview.map(function (regio) { return json("data/" + regio.bestand); })).then(function (files) {
@@ -115,6 +119,23 @@ module.exports = async function (browser, base, options) {
   asked.length = 0; // the test itself read the files just now
   function pressed(name, on) { return page.waitForSelector('#regios .regio[aria-pressed="' + on + '"]:has-text("' + name + '")'); }
   result.morning = await berichten();
+  // The filter "Fase": three steps and every phase by itself.
+  await page.click("#filter-toggle");
+  result.fase = { label: await page.$eval('label[for="f-fase"]', function (node) { return node.firstChild.textContent.trim(); }),
+    groups: await page.$$eval("#f-fase optgroup", function (groups) {
+      return groups.map(function (group) { return { label: group.label, options: [].map.call(group.children, function (option) { return { value: option.value, label: option.textContent }; }) }; });
+    }), counts: {}, cards: {} };
+  var steps = ["trede:vroeg", "trede:midden", "trede:laat"];
+  for (var f = 0; f < steps.length; f++) {
+    await page.selectOption("#f-fase", steps[f]);
+    result.fase.counts[steps[f]] = await page.textContent("#result-count");
+    await page.click("#more").catch(function () {});
+    result.fase.cards[steps[f]] = await page.$$eval("#list .card", function (nodes) { return nodes.map(function (node) { return node.getAttribute("data-id"); }); });
+  }
+  result.fase.overflow = await overflow();
+  await page.click("#filter-reset");
+  await page.click("#filter-toggle");
+  result.afterFase = await berichten();
   await page.click("#tab-gebied");
   await page.waitForSelector("#view-gebied:not([hidden])");
   result.start = await gebied();
@@ -152,19 +173,53 @@ module.exports = async function (browser, base, options) {
   }
   result.withOne = await berichten();
   result.withOneOverflow = await overflow();
-  result.lineButton = await page.$eval("#regio-regel button", function (node) { return { text: node.textContent, height: Math.round(node.getBoundingClientRect().height) }; });
   await page.click("#more");
   result.withOneAllRanks = await page.$$eval("#list .card .rank b", function (nodes) { return nodes.map(function (node) { return node.textContent; }); });
+  result.withOneAllIds = await page.$$eval("#list .card", function (nodes) { return nodes.map(function (node) { return node.getAttribute("data-id"); }); });
   result.withOneAllOverflow = await overflow();
   if (fixture) result.unsureWithOne = await unsure();
 
-  // --- Back to the core with the button on the tab Berichten.
-  await page.click("#regio-regel button");
-  await page.waitForSelector("#regio-regel", { state: "hidden" });
+  // --- What the lists show: the region alone, the core alone, and together again. The region stays chosen.
+  async function choose(label) {
+    await page.click('#regio-regel .keuzes button:text-is("' + label + '")');
+    await page.waitForSelector('#regio-regel .keuzes button[aria-pressed="true"]:text-is("' + label + '")');
+    var seen = await berichten();
+    seen.overflow = await overflow();
+    if (await page.isVisible("#more")) await page.click("#more");
+    seen.ranks = await page.$$eval("#list .card .rank b", function (nodes) { return nodes.map(function (node) { return node.textContent; }); });
+    seen.ids = await page.$$eval("#list .card", function (nodes) { return nodes.map(function (node) { return node.getAttribute("data-id"); }); });
+    return seen;
+  }
+  result.onlyRegion = await choose("Alleen " + first);
+  result.onlyCore = await choose("Alleen de kern");
+  result.together = await choose("Samen");
+  if (fixture) { // a search stays when the choice changes
+    await page.fill("#zoek", "Goes");
+    result.searchTogether = { zoek: await page.inputValue("#zoek"), count: await page.textContent("#result-count") };
+    var searched = await choose("Alleen " + first);
+    result.searchOnlyRegion = { zoek: await page.inputValue("#zoek"), count: searched.count };
+    searched = await choose("Alleen de kern");
+    result.searchOnlyCore = { zoek: await page.inputValue("#zoek"), count: searched.count };
+    await page.fill("#zoek", "");
+    await choose("Samen");
+  }
+  await page.click("#tab-gebied");
+  await page.waitForSelector("#view-gebied:not([hidden])");
+  result.oneAfterChoice = await gebied(); // the tab Gebied still has the region chosen
+  await page.click("#tab-berichten");
+  await page.waitForSelector("#view-berichten:not([hidden])");
+
+  // --- Back to the core: the region is switched off where it was switched on, on the tab Gebied.
+  await page.click("#tab-gebied");
+  await page.waitForSelector("#view-gebied:not([hidden])");
+  await page.click('#regios .regio:has-text("' + first + '")');
+  await pressed(first, false);
+  result.backGebied = await gebied();
+  await page.click("#tab-berichten");
+  await page.waitForSelector("#view-berichten:not([hidden])");
   result.back = await berichten();
   await page.click("#tab-gebied");
   await page.waitForSelector("#view-gebied:not([hidden])");
-  result.backGebied = await gebied();
 
   // --- Every region at once, then open the app again: it starts with the core.
   for (var i = 0; i < names.length; i++) {
@@ -244,8 +299,15 @@ module.exports = async function (browser, base, options) {
   await page.waitForSelector("#view-berichten:not([hidden])");
   result.missing.chosen = await shown();
   result.missing.chosenOverflow = await overflow();
-  await page.click("#regio-regel button");
+  // The core alone, with the region still chosen: what the region misses is not said then.
+  await page.click('#regio-regel .keuzes button:text-is("Alleen de kern")');
+  await page.waitForSelector('#regio-regel .keuzes button[aria-pressed="true"]:text-is("Alleen de kern")');
+  result.missing.onlyCore = await shown();
+  await page.click("#tab-gebied");
+  await page.click('#regios .regio[aria-pressed="true"]');
   await page.waitForSelector("#regio-regel", { state: "hidden" });
+  await page.click("#tab-berichten");
+  await page.waitForSelector("#view-berichten:not([hidden])");
   result.missing.back = await shown();
   result.missing.errors = missingErrors;
   await context.close();

@@ -30,9 +30,43 @@
     return items.reduce(function (latest, item) { return item.datum > latest ? item.datum : latest; }, "");
   }
 
-  /* Highest score first; with equal scores the newest notice, then the nearest. */
+  /* Highest score first. With equal scores the notice with the most dwellings, then the newest,
+     then the nearest. The phase and the kind of location play no part in the order, and the scores
+     themselves come from the run as they are. */
   function byRelevance(a, b) {
-    return b.score - a.score || (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : a.afstandKm - b.afstandKm);
+    return b.score - a.score || (b.woningen || 0) - (a.woningen || 0) || (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : a.afstandKm - b.afstandKm);
+  }
+
+  /* Three steps of how far a notice is, for the filter "Fase". This grouping is a choice made in
+     this app, not something the sources give: they only name the phase itself. A phase that is in
+     none of the three (for example "Voornemen tot verkoop" or "Geweigerd") belongs to no step. */
+  var FASE_TREDEN = [
+    { id: "vroeg", naam: "Vroeg", fasen: ["Voornemen", "Aanvraag"] },
+    { id: "midden", naam: "Midden", fasen: ["Ontwerp", "Bekendmaking", "Besluit"] },
+    { id: "laat", naam: "Laat", fasen: ["Vastgesteld", "Verleend", "Herstelbesluit"] },
+  ];
+  var TREDE = "trede:"; // a value of the filter that names a step and not one phase
+  function faseTrede(fase) {
+    var found = FASE_TREDEN.filter(function (step) { return step.fasen.indexOf(fase) !== -1; })[0];
+    return found ? found.id : null;
+  }
+  /* The choices of the filter "Fase" for these notices: the three steps, always, and every phase
+     that occurs, each with how many notices it has. */
+  function faseKeuzes(items) {
+    var perFase = {};
+    items.forEach(function (item) { if (item.fase) perFase[item.fase] = (perFase[item.fase] || 0) + 1; });
+    return {
+      treden: FASE_TREDEN.map(function (step) {
+        var count = step.fasen.reduce(function (sum, fase) { return sum + (perFase[fase] || 0); }, 0);
+        return { value: TREDE + step.id, label: step.naam + ": " + step.fasen.join(", ").toLowerCase() + " (" + count + ")", aantal: count };
+      }),
+      fasen: Object.keys(perFase).sort(function (a, b) { return a.localeCompare(b, "nl"); }).map(function (fase) {
+        return { value: fase, label: fase + " (" + perFase[fase] + ")", aantal: perFase[fase] };
+      }),
+    };
+  }
+  function faseMatches(fase, filter) {
+    return filter.indexOf(TREDE) === 0 ? faseTrede(fase) === filter.slice(TREDE.length) : fase === filter;
   }
 
   function sorted(items, sort) {
@@ -70,7 +104,7 @@
   function matches(item, filters, context) {
     if (filters.type && item.type !== filters.type) return false;
     if (filters.gemeente && item.gemeente !== filters.gemeente) return false;
-    if (filters.fase && item.fase !== filters.fase) return false;
+    if (filters.fase && !faseMatches(item.fase, filters.fase)) return false;
     if (filters.signaal && item.signalen.indexOf(filters.signaal) === -1) return false;
     if (item.afstandKm > filters.maxKm) return false;
     if (filters.alleenNieuw && !context.nieuw[item.id]) return false;
@@ -269,8 +303,30 @@
 
   /* The line under the name of the app: what the app shows now. The core alone with its radius; with
      regions only the names, so that the line stays short on a narrow phone. */
-  function scopeLine(straalKm, centrum, regios) {
-    return regios && regios.length ? nameList(["Kern"].concat(regios)) : "Kern: binnen " + straalKm + " km van " + centrum;
+  function scopeLine(straalKm, centrum, regios, toon) {
+    if (!regios || !regios.length) return "Kern: binnen " + straalKm + " km van " + centrum;
+    if (toon === KERN) return "Alleen de kern";
+    if (regios.indexOf(toon) !== -1) return "Alleen " + toon;
+    return nameList(["Kern"].concat(regios));
+  }
+
+  /* With regions chosen the lists on the tab Berichten show them together with the core, or one
+     part at a time. `toon` is SAMEN, KERN or the name of a chosen region; anything else is SAMEN. */
+  var SAMEN = "samen";
+  function toonKeuzes(regios) {
+    if (!regios || !regios.length) return [];
+    return [{ id: SAMEN, label: "Samen" }, { id: KERN, label: "Alleen de kern" }].concat(regios.map(function (name) { return { id: name, label: "Alleen " + name }; }));
+  }
+  function toonOf(regios, toon) {
+    return regios && regios.length && (toon === KERN || regios.indexOf(toon) !== -1) ? toon : SAMEN;
+  }
+  /* The notices for that choice. `lists` holds the notices per region, by name. */
+  function toonItems(core, lists, regios, toon) {
+    if (!regios || !regios.length) return core;
+    var choice = toonOf(regios, toon);
+    if (choice === KERN) return core;
+    if (choice !== SAMEN) return (lists && lists[choice]) || [];
+    return merged(core, regios.map(function (name) { return (lists && lists[name]) || []; }));
   }
 
   /* The introduction on the tab Gebied, for the same choice. `kern` is the number of municipalities
@@ -356,6 +412,7 @@
 
   return {
     stale: stale, radarLabels: radarLabels, scopeLine: scopeLine, gebiedIntro: gebiedIntro,
+    SAMEN: SAMEN, toonKeuzes: toonKeuzes, toonOf: toonOf, toonItems: toonItems, FASE_TREDEN: FASE_TREDEN, faseTrede: faseTrede, faseKeuzes: faseKeuzes,
     KERN: KERN, regioOf: regioOf, gemeentenIn: gemeentenIn, regios: regios, regioMeldingen: regioMeldingen, regiosFor: regiosFor, merged: merged, reachKm: reachKm, nameList: nameList,
     NEW_HOURS: NEW_HOURS, TOP: TOP, TYPE_LABEL: TYPE_LABEL,
     isoDay: isoDay, daysAgoIso: daysAgoIso, shortDate: shortDate, km: km, safeUrl: safeUrl, hasPoint: hasPoint,

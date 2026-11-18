@@ -225,6 +225,8 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 .regios + .hint { margin-top: 0; }
 .regio-regel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; margin-top: 6px; }
 .regio-regel .ghost { padding: 7px 12px; font-size: 13px; }
+.regio-regel .keuzes { display: flex; flex-wrap: wrap; gap: 6px; }
+.regio-regel .ghost[aria-pressed="true"] { background: var(--rank-bg); border-color: var(--rank-bg); color: var(--rank-ink); }
 
 /* Sources view */
 .bron { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
