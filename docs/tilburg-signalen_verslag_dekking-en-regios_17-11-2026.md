@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) en 09:30 – 09:29 uur (run 23 op GitHub) |
+| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) en 09:20 – 09:29 uur (run 23 op GitHub) en 09:31 – 09:48 uur (toelichting in de workflow, groei van de bestanden, pull request) |
 | Versie | versie 2 van de app met het tabblad Adres, branch `claude/optimistic-gauss-sb0xpy`, gestart vanaf `main` op commit `edf4150` (na PR #16) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | officielebekendmakingen.nl (zoekdienst SRU), opgevraagd 17-11-2026 tussen 20:25 en 20:37 uur; gemeente-indeling van het CBS, "Gebieden in Nederland 2026" (tabel 86247NED) |
@@ -27,6 +27,10 @@ gemeten; zie "Open punten".
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 09:48 uur | **Er is nu een pull request: PR 17, open en niet samengevoegd; "er is geen pull request" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Hij blijft open tot Wim zegt dat hij samengevoegd mag worden. |
+| 18-11-2026, 09:48 uur | **De toelichting in de workflow is aangepast (commit `2d21868`); "dat bestand heb ik niet aangeraakt" hieronder en "`.github/` is onaangeroerd" onder "Buiten dit verslag" gelden niet meer.** Gewijzigd zijn twee teksten: de omschrijving bij het vinkje "volledig" en het commentaar boven de stap "Berichten ophalen". Het schema is niet gewijzigd: het blok met de twee cron-regels is teken voor teken gelijk aan `main`. **Eén toelichting zegt nog "cache negeren": het commentaar achter de cron-regel van zondag 04:30 uur.** Die staat op dezelfde regel als het schema en heb ik daarom laten staan. |
+| 18-11-2026, 09:48 uur | **De groei van de cache en de regiobestanden is gemeten; de open punten "De cache wordt ruim drie keer zo groot" (met "Geen actie nodig") en "`regio-west-brabant.json` zit dicht bij de grens" zijn daarmee uitgewerkt.** De bestanden groeien niet door maar volgen de drukte in het venster. De cache blijft bij het verloop van het afgelopen jaar onder 1,5 MB (hoogstens rond 1,2 MB); West-Brabant komt er in het voorjaar en in juli tegenaan. Zie "Groei van de cache en de regiobestanden" met een voorstel dat niet gebouwd is. |
+| 18-11-2026, 09:48 uur | **In de kopregel stond bij run 23 "09:30 – 09:29 uur"; de begintijd was fout.** Verbeterd naar 09:20 uur. Dat is een vermoeden en geen genoteerd tijdstip: run 23 eindigde om 09:19 uur en het deel was om 09:29 uur klaar. |
 | 18-11-2026, 09:29 uur | **De grens is op GitHub gemeten; "Op GitHub nog niet gemeten" onder "Open punten bij dit onderdeel" is daarmee afgehandeld voor een gewone run.** Run 23 (handmatig, vanaf de werkbranch) duurde 6 minuten en 9 seconden; de stap "Berichten ophalen" 4 minuten en 23 seconden, met 613 verzoeken en 89 weigeringen. De melding voor het ochtendscherm staat op nul en de kern is gelijk aan die van run 22, plus de 21 berichten van vandaag. Zie "Run 23 op GitHub". De wekelijkse volledige run is op GitHub nog niet gedraaid. |
 | 18-11-2026, 09:05 uur | **De drie voorstellen uit "Run 22 op GitHub" zijn gebouwd; "Voorstel (niet doorgevoerd)" daar is achterhaald voor de punten 1, 2 en 4.** Grens van 300 nieuwe regioteksten per run, telling per regio en de wekelijkse volledige run in delen. Zie "Grens, telling per regio en wekelijkse beurt". Niet samengevoegd. |
 | 18-11-2026, 09:05 uur | **De volledige verversing leest niet meer alles opnieuw.** `--volledig` leest de kern en de regio van de week opnieuw en de rest uit de cache. Wat eerdere verslagen over "cache negeren en alles opnieuw ophalen" zeggen, geldt alleen nog voor de nieuwe optie `--alles`, die de workflow niet gebruikt. **De toelichting in de workflow zelf zegt nog "cache negeren"; dat bestand heb ik niet aangeraakt.** |
@@ -542,6 +546,126 @@ netwerk van de runner even onbereikbaar was); 22 lukten bij herhaling.
 | De vulling | Nog drie runs van deze omvang (300, 300 en 113 teksten). Vanaf een branch telt dat niet door, omdat de cache daar niet bewaard wordt; na samenvoegen gebeurt het vanzelf, in de eerste vier runs |
 | Daarna | Per run alleen de nieuwe teksten van die dag: voor de regio's naar schatting 20 tot 30 per dag, ver onder de grens |
 | De wekelijkse volledige run | Niet in deze run gemeten. Zie "Open punten bij dit onderdeel": de week van West-Brabant blijft de zwaarste |
+
+# Groei van de cache en de regiobestanden (18-11-2026, 09:31 – 09:48 uur)
+
+## Wat de grens van 1,5 MB is en wat hij raakt
+
+De grens is een test: `tests/test_ververst.py` keurt de repo af zodra er een bestand groter dan
+1.500.000 bytes in staat. Die test draait in de stap "Tests", de eerste stap van elke run.
+
+| Bestand | Schrijft een run het terug in de repo? | Wat gebeurt er boven 1,5 MB |
+|---|---|---|
+| `cache/ophaalcache.json` | **Ja**, vanaf `main`, bij elke wijziging | De run die hem schrijft slaagt nog. **Elke run daarna strandt in "Tests", vóór het ophalen**: er wordt niet ververst en niets gepubliceerd, tot iemand de cache met de hand verkleint. De live site blijft op de laatste stand staan |
+| `site/data/berichten.json` en de drie regiobestanden | Nee. Een run schrijft ze en publiceert ze, maar zet ze niet in de repo | Geen run strandt erop: na het ophalen controleert niets de grootte. Het raakt alleen de telefoon (een groter bestand) en de momentopname in de repo, als iemand die ooit vernieuwt |
+
+Alleen de cache kan de verversing dus stilzetten. Dat is een feit uit de code en de workflow; het is
+niet op GitHub uitgeprobeerd.
+
+## Stand nu
+
+| Bestand | Grootte | Inhoud | Deel van de grens |
+|---|---:|---|---:|
+| Cache op `main` (alleen de kern), zeven versies van 16-11 tot 18-11-2026 | 277 – 284 kB | rond 480 teksten | 19% |
+| Cache met alle regio's gelezen (container, 17-11-2026, 20:36 uur) | 922 kB | 1.478 teksten, 175 locaties, 169 percelen | 61% |
+| `berichten.json` (kern), run 23 | 996 kB | 1.101 berichten | 66% |
+| `regio-midden-brabant.json`, run 23 | 173 kB | 187 berichten | 12% |
+| `regio-west-brabant.json`, run 23 | **1.334 kB** | 1.433 berichten | **89%** |
+| `regio-zeeland.json`, run 23 | 1.001 kB | 1.074 berichten | 67% |
+
+Een bericht kost 900 tot 955 bytes; 1,5 MB is dus ongeveer 1.600 berichten in één bestand. Een tekst
+in de cache kost gemiddeld 600 bytes (vergunning rond 490, plan rond 1.340).
+
+Over de lijn gaan de databestanden gecomprimeerd, als GitHub Pages dat doet zoals gebruikelijk:
+West-Brabant is met gzip 117 kB, de kern 103 kB, Zeeland 97 kB, Midden-Brabant 18 kB. Dat is hier
+met gzip nagerekend, niet op de live site gemeten.
+
+## Ze groeien niet door; ze volgen het venster
+
+**Feit:** een vergunning verdwijnt na 42 dagen uit de lijst, een plan na 180 dagen. De cache bewaart
+alleen wat een run gebruikt heeft; wat uit het venster valt, valt bij de volgende run ook uit de
+cache. De bestanden worden dus niet elke dag groter. Hun grootte volgt het aantal publicaties in het
+venster en gaat met de drukte op en neer.
+
+Dat is van dag tot dag te zien aan West-Brabant: 1.292 kB op 17-11 (1.382 berichten), 1.274 kB op
+18-11 om 08:20 uur (1.363) en 1.334 kB om 09:15 uur (1.433; de 70 publicaties van die ochtend waren
+erbij gekomen).
+
+**Daarmee vervalt het voorbeeld uit de opdracht:** teksten ouder dan 180 dagen laten vervallen gebeurt
+al. Het zou niets opleveren.
+
+## Meting over een jaar
+
+De bron is per week gevraagd hoeveel vergunningen er waren (alleen de aantallen, één klein verzoek
+per week en per groep), over 59 weken van 29-09-2025 tot en met 15-11-2026, en per 30 dagen hoeveel
+plannen. Samen 316 verzoeken in 224 seconden, zonder weigering (09:36 – 09:39 uur). Daaruit zijn 54 vensters
+van zes weken gemaakt. De grootte per venster is geschat met de bytes per bericht van de run van
+17-11-2026.
+
+| Groep | Vergunningen in 42 dagen, nu | Laagste van het jaar | Hoogste van het jaar | Zelfde venster een jaar eerder |
+|---|---:|---:|---:|---:|
+| Kern | 1.426 | 1.223 (begin september 2026) | 1.712 (half juli 2026) | 1.497 |
+| Midden-Brabant buiten de kern (Altena) | 102 | 84 (begin februari 2026) | 163 (begin april 2026) | 106 |
+| West-Brabant | 1.084 | 966 (half januari 2026) | 1.299 (tweede helft juli 2026) | 1.261 |
+| Zeeland | 972 | 793 (begin september 2026) | 1.134 (tweede helft april 2026) | 911 |
+| Alles samen | 3.584 | 3.148 | 4.285 (tweede helft juli 2026) | 3.775 |
+
+Een stijgende lijn is er niet: het eerste halfjaar telde gemiddeld 3.751 vergunningen per venster,
+het tweede 3.688. Wat er te zien is, is seizoen: druk van februari tot en met april en in juni en
+juli, rustig rond de jaarwisseling en van half augustus tot oktober.
+
+| Bestand | Laagste schatting | Hoogste schatting | Deel van de grens op het hoogst | Vensters boven 1,5 MB | Gemiddelde verandering per week |
+|---|---:|---:|---:|---:|---:|
+| Cache (met alle regio's) | 0,83 MB (september) | 1,20 MB (tweede helft april) | 80% | 0 van 54 | 23 kB |
+| `berichten.json` (kern) | 0,87 MB (september) | 1,18 MB (half juli) | 79% | 0 van 54 | 24 kB |
+| `regio-midden-brabant.json` | 0,15 MB | 0,29 MB | 19% | 0 van 54 | 14 kB |
+| `regio-west-brabant.json` | 1,17 MB (januari) | **1,46 MB** (april en juli) | **97%** | 0 van 54; 22 van de 54 boven 90% | 35 kB |
+| `regio-zeeland.json` | 0,84 MB (september) | 1,26 MB (tweede helft april) | 84% | 0 van 54 | 27 kB |
+
+Als de drukste weken voor vergunningen en voor plannen zouden samenvallen, wat het afgelopen jaar niet
+gebeurde, komt de cache op 1,25 MB (84%) en West-Brabant op 1,55 MB (103%).
+
+**Hoe nauwkeurig dit is.** Het is een schatting, geen meting van de bestanden zelf: die bestaan pas
+sinds 17-11-2026. De telling is per groep van gemeenten en gaat ervan uit dat een bericht even groot
+blijft en dat van evenveel berichten de tekst gelezen moet worden. Voor vandaag geeft de schatting
+voor West-Brabant 1,28 MB, terwijl run 23 op 1,33 MB uitkwam: 4 procent ernaast. Reken dus met een
+marge van ongeveer 5 procent naar beide kanten. Er is één jaar geteld; wat een drukker jaar doet,
+staat er niet in.
+
+## Wanneer ze de grens bereiken
+
+| Bestand | Wanneer | Toelichting |
+|---|---|---|
+| **Cache** | **Bij het verloop van het afgelopen jaar: niet.** Het hoogst in de tweede helft van april, rond 1,2 MB | Er blijft dan ongeveer 20 procent over. De grens komt pas in zicht als er iets bijkomt: de rubriek "andere beschikking", de provincie Zeeland, een vierde regio, of een jaar dat een vijfde drukker is dan het drukste van nu |
+| Cache, direct na samenvoegen | Van 0,28 MB naar ongeveer 0,9 MB in de eerste vier runs | 300 teksten per run is ongeveer 180 kB erbij per run. Dat is de vulling, geen doorlopende groei |
+| **`regio-west-brabant.json`** | **Mogelijk in maart – april 2027 en in juli 2027**: de schatting komt dan op 1,45 tot 1,46 MB, binnen de marge van de grens | Er strandt geen run op. Het bestand zit het grootste deel van het jaar boven 90 procent, ook nu |
+| `berichten.json` (kern) en `regio-zeeland.json` | Niet; hoogstens 79 en 84 procent | |
+| `regio-midden-brabant.json` | Niet; hoogstens 19 procent | |
+
+## Voorstel (niet gebouwd)
+
+| | Wat | Wat het oplost | Wat het kost |
+|---|---|---|---|
+| **A** | **Vangnet en waarschuwing voor de cache.** Een run schrijft nooit een cache boven 1,4 MB: hij laat dan de oudste regioteksten weg (de kern blijft altijd staan) en meldt het in het log. Vanaf 1,2 MB meldt het log de grootte als waarschuwing. De weggelaten teksten haalt de volgende run opnieuw op, binnen de grens van 300 | De verversing kan zichzelf niet meer stilzetten, ook niet als de schatting te laag blijkt of er iets bijkomt | Klein: `signalen/cache.py`, `signalen/update.py` en tests. De workflow blijft ongewijzigd. Een waarschuwing staat in het overzicht van de run; je krijgt er geen bericht van |
+| **B** | **De cache per regio in een eigen bestand**: `cache/ophaalcache.json` blijft van de kern, daarnaast één bestand per regio | Structureel. Het grootste deel (West-Brabant) is nu ongeveer 0,37 MB en op het drukst naar schatting 0,45 MB; elk bestand blijft onder een derde van de grens. Er is dan ruimte voor een vierde regio of een extra rubriek | Middelgroot: `signalen/cache.py`, `signalen/update.py`, tests, en één regel in de stap "Cache bewaren" van de workflow (de map in plaats van het ene bestand). Het schema blijft gelijk |
+| **C** | **West-Brabant in twee bestanden**, bijvoorbeeld Breda met de buurgemeenten en de rest. In de app blijft het één knop | Het bestand blijft ver onder 1,5 MB en de telefoon haalt per keer minder op | Middelgroot: `signalen/update.py`, `site/app.js`, `site/adres-app.js`, tests. Raakt geen run; nu niet nodig |
+| D | Teksten eerder laten vervallen | Niets: de cache laat nu al alles vallen wat buiten het venster valt. Een kortere termijn zou betekenen dat plannen eerder uit de lijst verdwijnen | Niet aangeraden |
+| E | De grens in de test verhogen, of de bewaarde teksten korter maken | Verschuift het probleem; kortere teksten veranderen het oordeel over een bericht | Niet aangeraden |
+
+**Advies:** A nu, omdat het klein is en het enige risico wegneemt dat een run kan stilzetten. B op het
+moment dat je iets toevoegt ("andere beschikking", de provincie Zeeland, een regio) of als de
+waarschuwing van A zich meldt. C alleen als je de download op de telefoon kleiner wilt of de
+momentopname in de repo wilt vernieuwen. Geen van de drie is gebouwd; graag je akkoord per onderdeel.
+
+## Niet getest of nog open bij dit onderdeel
+
+| Punt | Toelichting |
+|---|---|
+| De schatting is niet aan echte bestanden getoetst | Er zijn pas twee dagen bestanden met regio's. De eerste echte toets is de drukte van februari tot en met april 2027 |
+| Wat er gebeurt boven 1,5 MB is niet uitgeprobeerd | Afgeleid uit de test en de volgorde van de stappen in de workflow |
+| De geschiedenis van de repo | Niet gemeten. Elke wijziging van de cache is een nieuwe versie in `main` (twee tot drie per dag); gecomprimeerd is de cache met regio's 191 kB per versie. Of GitHub daar last van krijgt, weet ik niet |
+| Verkoop van gemeentegrond | Niet apart geteld; meegeschaald met de plannen. Het is 3 procent van de berichten |
+| Compressie op de live site | Aangenomen, niet gemeten |
 
 # De Vlaamse bron
 
