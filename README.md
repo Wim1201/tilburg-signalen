@@ -57,11 +57,28 @@ python -m signalen.gebied
 python -m signalen.update
 ```
 
-Een gewone run haalt alleen op wat nog niet in de cache staat. Alles opnieuw ophalen
-(wekelijks gebeurt dat vanzelf) kan met:
+Een gewone run haalt alleen op wat nog niet in de cache staat. Van de regio's leest een run
+hoogstens 300 nieuwe teksten (`grens_regioteksten` in `config.json`); de kern wordt altijd eerst en
+helemaal gelezen. Een regiobericht dat op zijn tekst wacht, staat onder Onzeker met "Tekst nog niet
+gelezen" tot een volgende run het ophaalt.
+
+De volledige verversing (wekelijks gebeurt dat vanzelf) leest de kern opnieuw en één regio, bij
+toerbeurt per week; de andere regio's komen uit de cache:
 
 ```bash
 python -m signalen.update --volledig
+```
+
+Een bepaalde regio opnieuw lezen in plaats van de regio van de week:
+
+```bash
+python -m signalen.update --volledig --regio Zeeland
+```
+
+Echt alles opnieuw, zonder cache en zonder grens (zwaar voor de bron; niet voor de dagelijkse gang):
+
+```bash
+python -m signalen.update --alles
 ```
 
 ```bash
