@@ -22,7 +22,7 @@ blijft over de kern gaan.
 De ranglijst zet de hoogste score bovenaan. Bij een gelijke score gaat het bericht met de meeste
 woningen voor, daarna het nieuwste. Het filter **Fase** kent drie treden: vroeg (voornemen, aanvraag),
 midden (ontwerp, bekendmaking, besluit) en laat (vastgesteld, verleend, herstelbesluit). Die indeling
-is een keuze van deze app en komt niet uit de bronnen.
+is een keuze van deze app en komt niet uit de bronnen. Wat in geen trede valt, staat onder **Overig**.
 
 Het tabblad **Adres** staat daar los van: typ een adres en zie het pand (BAG), het kadastrale perceel
 met een kaartje, en de publicaties over dat adres uit de berichten die de app al heeft. Het vraagt
@@ -52,6 +52,7 @@ zoekopdracht, de filters en een opgezocht adres blijven staan.
 | `site/adres.js` | Het tabblad Adres zonder de pagina: schrijfwijzen van adressen gelijktrekken, publicaties aan een adres koppelen, en wat de antwoorden van BAG en Kadaster betekenen. `site/adres-app.js` bouwt daar het tabblad van en vraagt de bronnen op |
 | `site/styles.css` | De huisstijl: kleuren, lettertypen en opmaak, licht en donker |
 | `.github/workflows/dagelijks.yml` | Ververst de gegevens op vaste tijden (werkdagen 06:45, 09:35, 10:20, 12:10 en 16:10 uur Nederlandse tijd) en publiceert de app op GitHub Pages. Bij een push en een handmatige run draaien vooraf ook de tests in een echte browser; na elk publiceren test een eigen job de pagina op de live site |
+| `.github/workflows/tests.yml` | Draait bij elke pull request alleen de tests en de tests in een echte browser, zodat een fout zichtbaar is vóór het samenvoegen. Haalt niets op, publiceert niets en schrijft niets terug; het schema en de planner kennen dit bestand niet |
 | `.github/actions/browser/` | Zet voor die tests Node, Playwright en Chromium klaar op de GitHub-runner |
 | `package.json`, `package-lock.json` | Leggen Playwright op één versie vast. Alleen voor de tests in een echte browser; de app zelf heeft geen pakketten nodig |
 | `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
