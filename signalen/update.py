@@ -264,6 +264,38 @@ def verdeel(document, regios):
     return {**document, "regios": overview, "berichten": core}, files
 
 
+def weglaatbare_regioteksten(berichten, vensters):
+    """Text keys of the notices outside the core that the cache may leave out, in that order.
+
+    First what leaves its window first: a permit is listed for 42 days and a plan for 180, so the
+    oldest notice is not always the one that goes first. A text that is left out is downloaded again
+    by the next run; this order keeps that repetition short. The core is never listed.
+    """
+    def leaves(item):
+        try:
+            return (datetime.date.fromisoformat(item["datum"][:10]) + datetime.timedelta(days=vensters.get(item.get("type"), 0))).isoformat()
+        except (TypeError, ValueError):
+            return ""
+    outside = [item for item in berichten if item.get("regio", "kern") != "kern"]
+    return [item["id"] for item in sorted(outside, key=lambda item: (leaves(item), item["id"]))]
+
+
+def cache_meldingen(saved, grens=cachemodule.GRENS_BYTES, waarschuw=cachemodule.WAARSCHUW_BYTES, repo=cachemodule.REPO_BYTES):
+    """Lines for the run log about the size of the cache file; "::warning::" where someone should look."""
+    size, left_out = saved["bytes"], saved["weggelaten"]
+    kb = lambda count: f"{count / 1000:,.0f}".replace(",", ".") + " kB"  # noqa: E731
+    lines = [f"  cache: {kb(size)} bewaard, {size * 100 // repo} procent van de {kb(repo)} die een bestand in de repository mag zijn"]
+    if left_out:
+        lines.append(f"::warning::Cache te groot: {left_out} regioteksten niet bewaard (wat het eerst uit het venster valt), zodat het bestand "
+                     f"onder {kb(grens)} blijft; de volgende run haalt ze opnieuw op")
+    if size > grens:
+        lines.append(f"::warning::Cache is {kb(size)}, ook zonder die regioteksten boven {kb(grens)}. Boven {kb(repo)} strandt de volgende run "
+                     "in de tests; de cache moet dan met de hand kleiner")
+    elif size >= waarschuw and not left_out:
+        lines.append(f"::warning::Cache is {kb(size)}, boven {kb(waarschuw)}. Boven {kb(grens)} bewaart een run een deel van de regioteksten niet meer")
+    return lines
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Berichten ophalen en beoordelen")
     parser.add_argument("--volledig", action="store_true",
@@ -301,7 +333,8 @@ def main(argv=None):
 
     # A kind is only pruned when its stage ran: otherwise a failing source would empty its cache.
     insolvency_ok = next(s for s in document["bronnen"] if s["id"] == "staatscourant-insolventies").get("status") == "ok"
-    cache.bewaar(snoei=("tekst", "perceel", "locatie", "gemeente") + (("insolventie",) if insolvency_ok else ()))
+    saved = cache.bewaar(snoei=("tekst", "perceel", "locatie", "gemeente") + (("insolventie",) if insolvency_ok else ()),
+                         grens=cachemodule.GRENS_BYTES, weglaatbaar=weglaatbare_regioteksten(document["berichten"], config["venster_dagen"]))
 
     everything = document["berichten"]
     document, region_files = verdeel(document, config.get("regios", []))
@@ -341,6 +374,8 @@ def main(argv=None):
     print("  per regio: " + ", ".join(f'{regio["naam"]} {regio["berichten"]} ({regio["bestand"]})' for regio in document["regios"]))
     for soort, stats in document["cache"].items():
         print(f'  cache {soort}: {stats["uitCache"]} uit cache, {stats["opgehaald"]} opgehaald')
+    for line in cache_meldingen(saved):
+        print(line)
     for gap in document["onvolledigeDagen"]:
         print(f'  ONVOLLEDIG {gap["datum"]}: {gap["aantal"]} van gebruikelijk {gap["verwacht"]} Gemeenteblad-publicaties')
     for source in document["bronnen"]:

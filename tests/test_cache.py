@@ -1,6 +1,8 @@
 """Tests for the download cache (no network). The key property: a run with a full cache gives
 exactly the same outcome as a run without cache, with no downloads."""
 import copy
+import datetime
+import json
 import pathlib
 import tempfile
 import unittest
@@ -262,3 +264,171 @@ class LocatieCacheTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CacheGrens(unittest.TestCase):
+    """The workflow commits the cache, and the repository refuses files above 1.5 MB: a run must
+    never write a cache that makes the next run fail in its tests."""
+
+    def setUp(self):
+        self.map = tempfile.TemporaryDirectory()
+        self.addCleanup(self.map.cleanup)
+        self.pad = pathlib.Path(self.map.name) / "cache" / "ophaalcache.json"
+
+    def filled(self, core=4, region=10, size=200):
+        cache = cachemodule.Cache(self.pad)
+        for number in range(core):
+            cache.zet("tekst", f"kern-{number}", "k" * size)
+        for number in range(region):
+            cache.zet("tekst", f"regio-{number:02}", "r" * size)
+        cache.zet("perceel", "1.0|2.0", 1200)
+        cache.zet("locatie", "Breda|ergens", None)
+        return cache
+
+    def stored(self):
+        return json.loads(self.pad.read_text(encoding="utf-8"))
+
+    def test_the_limits_stay_below_what_the_repository_accepts(self):
+        self.assertLess(cachemodule.WAARSCHUW_BYTES, cachemodule.GRENS_BYTES)
+        self.assertLess(cachemodule.GRENS_BYTES, cachemodule.REPO_BYTES)
+        self.assertEqual(cachemodule.REPO_BYTES, 1_500_000, "gelijk aan de grens in tests/test_ververst.py")
+
+    def test_below_the_limit_everything_is_kept_and_the_size_is_reported(self):
+        saved = self.filled().bewaar(grens=100_000, weglaatbaar=[f"regio-{n:02}" for n in range(10)])
+        self.assertEqual(saved, {"bytes": self.pad.stat().st_size, "weggelaten": 0})
+        self.assertEqual(len(self.stored()["tekst"]), 14)
+
+    def test_without_a_limit_nothing_is_left_out(self):
+        saved = self.filled().bewaar(weglaatbaar=[f"regio-{n:02}" for n in range(10)])
+        self.assertEqual(saved["weggelaten"], 0)
+        self.assertEqual(len(self.stored()["tekst"]), 14)
+
+    def test_above_the_limit_the_first_listed_texts_are_left_out_until_it_fits(self):
+        full = self.filled().bewaar()["bytes"]
+        order = [f"regio-{n:02}" for n in range(10)]
+        saved = self.filled().bewaar(grens=full - 500, weglaatbaar=order)
+        self.assertLessEqual(saved["bytes"], full - 500)
+        self.assertEqual(saved["bytes"], self.pad.stat().st_size)
+        self.assertEqual(saved["weggelaten"], 3, "drie teksten van ruim 200 bytes maken 500 bytes vrij; niet meer dan nodig")
+        texts = self.stored()["tekst"]
+        self.assertEqual(sorted(set(order) - set(texts)), order[:3], "de eerstgenoemde (oudste) gaan eerst")
+        self.assertEqual(sorted(key for key in texts if key.startswith("kern-")), [f"kern-{n}" for n in range(4)])
+
+    def test_other_kinds_are_never_left_out(self):
+        full = self.filled().bewaar()["bytes"]
+        self.filled().bewaar(grens=full - 500, weglaatbaar=[f"regio-{n:02}" for n in range(10)])
+        self.assertEqual(self.stored()["perceel"], {"1.0|2.0": 1200})
+        self.assertEqual(self.stored()["locatie"], {"Breda|ergens": None})
+
+    def test_the_core_is_never_left_out_even_when_that_is_not_enough(self):
+        saved = self.filled().bewaar(grens=300, weglaatbaar=[f"regio-{n:02}" for n in range(10)])
+        texts = self.stored()["tekst"]
+        self.assertEqual(sorted(texts), [f"kern-{n}" for n in range(4)])
+        self.assertEqual(saved["weggelaten"], 10)
+        self.assertGreater(saved["bytes"], 300, "de kern alleen is al groter; dat meldt de run")
+
+    def test_a_listed_key_that_is_not_stored_does_not_count(self):
+        full = self.filled().bewaar()["bytes"]
+        saved = self.filled().bewaar(grens=full - 100, weglaatbaar=["onbekend", "regio-07", "regio-00"])
+        self.assertEqual(saved["weggelaten"], 1)
+        self.assertNotIn("regio-07", self.stored()["tekst"])
+        self.assertIn("regio-00", self.stored()["tekst"])
+
+    def test_a_text_that_was_left_out_is_downloaded_again_by_the_next_run(self):
+        full = self.filled().bewaar()["bytes"]
+        self.filled().bewaar(grens=full - 100, weglaatbaar=["regio-00"])
+        second = cachemodule.Cache(self.pad)
+        asked = []
+        fetch = second.omwikkel("tekst", lambda key: asked.append(key) or "opnieuw gelezen", lambda key: key)
+        self.assertEqual(fetch("regio-00"), "opnieuw gelezen")
+        self.assertEqual(fetch("regio-01"), "r" * 200)
+        self.assertEqual(asked, ["regio-00"])
+
+    def test_the_file_keeps_one_entry_per_line(self):
+        full = self.filled().bewaar()["bytes"]
+        self.filled().bewaar(grens=full - 500, weglaatbaar=[f"regio-{n:02}" for n in range(10)])
+        lines = self.pad.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(sum(1 for line in lines if line.startswith('"regio-')), 7)
+        self.assertTrue(self.pad.read_text(encoding="utf-8").endswith("}\n"))
+
+
+class CacheGrensInDeRun(unittest.TestCase):
+    """What the run names as droppable, and what it writes in its log."""
+
+    WINDOWS = {"vergunning": 42, "plan": 180, "verkoop": 120}
+
+    def test_only_region_notices_are_droppable_and_what_leaves_its_window_first_goes_first(self):
+        notices = [{"id": "k1", "regio": "kern", "datum": "2026-10-01", "type": "vergunning"},
+                   {"id": "z2", "regio": "Zeeland", "datum": "2026-11-02", "type": "vergunning"},     # leaves 14-12-2026
+                   {"id": "w1", "regio": "West-Brabant", "datum": "2026-10-07", "type": "vergunning"},  # leaves 18-11-2026
+                   {"id": "z1", "regio": "Zeeland", "datum": "2026-10-07", "type": "vergunning"},     # leaves 18-11-2026
+                   {"id": "p1", "regio": "Zeeland", "datum": "2026-06-01", "type": "plan"},           # leaves 28-11-2026
+                   {"id": "v1", "regio": "West-Brabant", "datum": "2026-09-01", "type": "verkoop"},   # leaves 30-12-2026
+                   {"id": "k2", "datum": "2026-09-01", "type": "plan"},
+                   {"id": "m1", "regio": "Midden-Brabant", "datum": None, "type": "vergunning"}]
+        self.assertEqual(update.weglaatbare_regioteksten(notices, self.WINDOWS), ["m1", "w1", "z1", "p1", "z2", "v1"])
+
+    def test_an_old_plan_outlasts_a_recent_permit(self):
+        notices = [{"id": "plan-mei", "regio": "Zeeland", "datum": "2026-07-20", "type": "plan"},
+                   {"id": "vergunning-oktober", "regio": "Zeeland", "datum": "2026-10-20", "type": "vergunning"}]
+        self.assertEqual(update.weglaatbare_regioteksten(notices, self.WINDOWS), ["vergunning-oktober", "plan-mei"])
+
+    def test_a_small_cache_gives_one_plain_line(self):
+        lines = update.cache_meldingen({"bytes": 921_648, "weggelaten": 0})
+        self.assertEqual(lines, ["  cache: 922 kB bewaard, 61 procent van de 1.500 kB die een bestand in de repository mag zijn"])
+
+    def test_from_1200_kb_the_log_warns(self):
+        self.assertEqual(len(update.cache_meldingen({"bytes": 1_199_999, "weggelaten": 0})), 1)
+        lines = update.cache_meldingen({"bytes": 1_200_000, "weggelaten": 0})
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("::warning::Cache is 1.200 kB, boven 1.200 kB"))
+        self.assertIn("Boven 1.400 kB bewaart een run een deel van de regioteksten niet meer", lines[1])
+
+    def test_left_out_texts_are_reported_as_a_warning(self):
+        lines = update.cache_meldingen({"bytes": 1_399_100, "weggelaten": 37})
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("::warning::Cache te groot: 37 regioteksten niet bewaard (wat het eerst uit het venster valt)"))
+        self.assertIn("onder 1.400 kB", lines[1])
+        self.assertIn("de volgende run haalt ze opnieuw op", lines[1])
+
+    def test_a_core_that_alone_is_too_large_is_reported_separately(self):
+        lines = update.cache_meldingen({"bytes": 1_450_000, "weggelaten": 900})
+        self.assertEqual(len(lines), 3)
+        self.assertIn("ook zonder die regioteksten boven 1.400 kB", lines[2])
+        self.assertIn("Boven 1.500 kB strandt de volgende run in de tests", lines[2])
+
+    def run_main(self, limit):
+        """The real `main` with a real cache in a temporary folder and a stand-in for the fetching."""
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        pad = pathlib.Path(folder.name) / "cache" / "ophaalcache.json"
+        notices = ([{"id": f"kern-{n}", "regio": "kern", "datum": "2026-11-01", "klasse": "ontwikkellocatie", "type": "vergunning"} for n in range(3)]
+                   + [{"id": f"wb-{n}", "regio": "West-Brabant", "datum": f"2026-11-{10 + n:02}", "klasse": "onzeker", "type": "vergunning"} for n in range(6)])
+
+        def fake_run(config, area, now, cache=None, ververs=()):
+            for notice in notices:
+                cache.zet("tekst", notice["id"], "t" * 300)
+            return {"bijgewerkt": now.isoformat(timespec="seconds"), "berichten": [dict(notice) for notice in notices], "ophaalstatistiek": {},
+                    "ophaalfouten": {}, "cache": cache.statistiek(), "onvolledigeDagen": [],
+                    "bronnen": [{"id": "officielebekendmakingen", "status": "ok", "aantal": 9}, {"id": "staatscourant-insolventies", "status": "ok", "aantal": 0}]}
+
+        printed = []
+        real = cachemodule.Cache
+        output = pathlib.Path(folder.name) / "data" / "berichten.json"
+        with mock.patch.object(update, "OUTPUT", output), mock.patch.object(update, "run", fake_run), \
+                mock.patch.object(update.cachemodule, "Cache", lambda **kwargs: real(pad, **kwargs)), \
+                mock.patch.object(update.cachemodule, "GRENS_BYTES", limit), \
+                mock.patch("builtins.print", lambda *args, **kwargs: printed.append(" ".join(str(arg) for arg in args))):
+            update.main([])
+        return json.loads(pad.read_text(encoding="utf-8"))["tekst"], printed, pad.stat().st_size
+
+    def test_the_run_keeps_the_cache_below_its_limit_and_says_so(self):
+        everything, printed, full = self.run_main(limit=1_400_000)
+        self.assertEqual(len(everything), 9)
+        self.assertFalse([line for line in printed if "Cache te groot" in line])
+        self.assertTrue([line for line in printed if line.startswith("  cache: ") and "bewaard" in line])
+
+        texts, printed, size = self.run_main(limit=full - 600)
+        self.assertLessEqual(size, full - 600)
+        self.assertEqual(sorted(texts), ["kern-0", "kern-1", "kern-2", "wb-2", "wb-3", "wb-4", "wb-5"], "de twee van de regio die het eerst uit het venster vallen, zijn weggelaten")
+        self.assertEqual(len([line for line in printed if line.startswith("::warning::Cache te groot: 2 regioteksten niet bewaard")]), 1)

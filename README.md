@@ -81,6 +81,12 @@ Echt alles opnieuw, zonder cache en zonder grens (zwaar voor de bron; niet voor 
 python -m signalen.update --alles
 ```
 
+De cache staat in de repository, en een bestand daar mag niet groter zijn dan 1,5 MB (een test
+bewaakt dat). Een run schrijft daarom nooit een cache boven 1,4 MB: is hij groter, dan bewaart de run
+een deel van de regioteksten niet (eerst wat het eerst uit het venster valt; de kern blijft altijd
+staan) en haalt de volgende run die opnieuw op. Het log van de run meldt de grootte, en waarschuwt
+vanaf 1,2 MB.
+
 ```bash
 python -m http.server 8000 --directory site
 ```

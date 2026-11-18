@@ -17,6 +17,12 @@ What is stored, per kind:
 
 Entries that a run did not use are dropped when the cache is saved, so the file stays as large as
 the window. Failed downloads are never cached; the next run tries them again.
+
+The file is committed by the workflow, and the repository refuses files above 1.5 MB
+(tests/test_ververst.py): a larger cache would make every following run fail before it fetches
+anything. So a run never writes more than GRENS_BYTES: above that it leaves out texts the caller
+named as droppable (texts of the regions, first what leaves its window first; never the core), and
+the next run downloads those again.
 """
 import collections
 import hashlib
@@ -28,6 +34,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 PAD = ROOT / "cache" / "ophaalcache.json"
 VERSIE = 1
 SOORTEN = ("tekst", "perceel", "locatie", "gemeente", "insolventie")
+REPO_BYTES = 1_500_000       # tests/test_ververst.py: no tracked file may be larger
+GRENS_BYTES = 1_400_000      # a run never writes a larger cache
+WAARSCHUW_BYTES = 1_200_000  # from here on the run log warns
 
 
 def insolventie_sleutel(config):
@@ -121,15 +130,35 @@ class Cache:
         return {soort: {"uitCache": self.treffers[soort], "opgehaald": self.opgehaald[soort],
                         **({"nietVerverst": self.niet_ververst[soort]} if self.niet_ververst[soort] else {})} for soort in SOORTEN}
 
-    def bewaar(self, snoei=SOORTEN):
-        """Write the cache. Kinds listed in `snoei` keep only the entries this run used."""
+    def bewaar(self, snoei=SOORTEN, grens=None, weglaatbaar=()):
+        """Write the cache. Kinds listed in `snoei` keep only the entries this run used.
+
+        With `grens` the file never becomes larger than that many bytes, as far as leaving out texts
+        can achieve it: texts are left out in the order of `weglaatbaar` (text keys) until it fits.
+        A key that is not listed there is never left out. Returns the size written and how many
+        texts were left out; the size is above `grens` only when leaving out everything listed was
+        not enough.
+        """
         stored = {"versie": VERSIE, "insolventieSleutel": self.sleutel}
         for soort in SOORTEN:
             keep = self.gebruikt[soort] if soort in snoei else self.data[soort].keys()
             stored[soort] = {key: self.data[soort][key] for key in keep}
-        self.pad.parent.mkdir(parents=True, exist_ok=True)
         # One entry per line and sorted keys: a daily run then changes only a few lines in git.
-        self.pad.write_text(json.dumps(stored, ensure_ascii=False, indent=0, sort_keys=True) + "\n", encoding="utf-8")
+        serialise = lambda: (json.dumps(stored, ensure_ascii=False, indent=0, sort_keys=True) + "\n").encode("utf-8")  # noqa: E731
+        content = serialise()
+        left_out = 0
+        if grens is not None and len(content) > grens:
+            waiting = [key for key in weglaatbaar if key in stored["tekst"]]
+            while len(content) > grens and waiting:
+                excess = len(content) - grens
+                while waiting and excess > 0:  # an entry is one line: its key, its text and four characters around them
+                    key = waiting.pop(0)
+                    excess -= len(json.dumps(key, ensure_ascii=False).encode("utf-8")) + len(json.dumps(stored["tekst"].pop(key), ensure_ascii=False).encode("utf-8")) + 4
+                    left_out += 1
+                content = serialise()
+        self.pad.parent.mkdir(parents=True, exist_ok=True)
+        self.pad.write_bytes(content)
+        return {"bytes": len(content), "weggelaten": left_out}
 
 
 def tekst_sleutel(url, titel=None, limiet=None):
