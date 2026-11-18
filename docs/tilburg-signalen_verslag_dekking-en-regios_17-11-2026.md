@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) |
+| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) |
 | Versie | versie 2 van de app met het tabblad Adres, branch `claude/optimistic-gauss-sb0xpy`, gestart vanaf `main` op commit `edf4150` (na PR #16) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | officielebekendmakingen.nl (zoekdienst SRU), opgevraagd 17-11-2026 tussen 20:25 en 20:37 uur; gemeente-indeling van het CBS, "Gebieden in Nederland 2026" (tabel 86247NED) |
@@ -27,6 +27,10 @@ gemeten; zie "Open punten".
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 09:05 uur | **De drie voorstellen uit "Run 22 op GitHub" zijn gebouwd; "Voorstel (niet doorgevoerd)" daar is achterhaald voor de punten 1, 2 en 4.** Grens van 300 nieuwe regioteksten per run, telling per regio en de wekelijkse volledige run in delen. Zie "Grens, telling per regio en wekelijkse beurt". Niet samengevoegd. |
+| 18-11-2026, 09:05 uur | **De volledige verversing leest niet meer alles opnieuw.** `--volledig` leest de kern en de regio van de week opnieuw en de rest uit de cache. Wat eerdere verslagen over "cache negeren en alles opnieuw ophalen" zeggen, geldt alleen nog voor de nieuwe optie `--alles`, die de workflow niet gebruikt. **De toelichting in de workflow zelf zegt nog "cache negeren"; dat bestand heb ik niet aangeraakt.** |
+| 18-11-2026, 09:05 uur | **De vier ontbrekende teksten uit run 22 zijn verklaard; "Ik vond er 31 terug" was dus geen telfout.** Bij vier berichten besliste de titel al over de uitkomst, waardoor niets in het bericht liet zien dat de tekst ontbrak. Zie "Waar de vier teksten bleven". |
+| 18-11-2026, 09:05 uur | **Het aantal tests is 361 (was 336).** Er zijn er 25 bij: 24 voor de grens, de telling, de beurt en de meldingen, en 1 in de browser. |
 | 18-11-2026, 08:37 uur | **Op GitHub is de eerste run met de regio's over de tien minuten gegaan, met 173 weigeringen; "De stopregel is niet geraakt" onder "Stand" geldt alleen voor de meting vanuit de container.** Run 22 (handmatig, vanaf de werkbranch, door Wim gestart) deed in de stap "Berichten ophalen" 1.404 verzoeken in 12 minuten en 49 seconden; 35 teksten kwamen niet binnen. De run eindigde zonder fout. Volgens de afspraak is er niet verder uitgebreid; zie "Run 22 op GitHub" met het voorstel. |
 | 18-11-2026, 08:37 uur | **Mijn schatting voor die eerste run was te laag.** Ik schatte 1.300 verzoeken "rond de tien minuten" en ging uit van de 43 weigeringen van run 5. Het werden 1.404 verzoeken, bijna 13 minuten en 173 weigeringen. |
 | 18-11-2026, 08:37 uur | **Gevonden gebrek in de uitbreiding: de melding bovenaan het ochtendscherm telt ook niet-gelezen teksten uit de regio's.** In run 22 zaten alle teruggevonden niet-gelezen teksten in de regio's en geen in de kern, maar de app zou na publiceren melden dat 35 bekendmakingen niet volledig gelezen konden worden. Niet hersteld; zie het voorstel. |
@@ -375,7 +379,7 @@ regio's, niet de dagelijkse toestand; maar of de dagelijkse toestand op GitHub b
 blijft, heb ik niet gemeten en kan vanaf een branch ook niet gemeten worden. Er is daarom niets meer
 toegevoegd.
 
-### Voorstel (niet doorgevoerd)
+### Voorstel (op 18-11-2026 gebouwd: 1, 2 en 4; zie "Grens, telling per regio en wekelijkse beurt")
 
 | Voorstel | Wat het oplost | Prijs |
 |---|---|---|
@@ -387,6 +391,104 @@ toegevoegd.
 
 Mijn advies: 1 en 2 samen, en 4 voordat de eerste zondag aanbreekt. Daarna opnieuw meten met een
 handmatige run. Ik bouw hiervan niets zonder akkoord.
+
+# Grens, telling per regio en wekelijkse beurt (18-11-2026)
+
+Gebouwd op verzoek van Wim na run 22. Niet samengevoegd; het schema van de workflow en de cache
+zijn niet gewijzigd.
+
+## Wat er is gebouwd
+
+| Onderdeel | Wat |
+|---|---|
+| **1. Grens per run** | Een run leest hoogstens 300 nieuwe teksten van de regio's (`grens_regioteksten` in `config.json`). De kern wordt eerst en helemaal gelezen, in een eigen ronde: pas als die klaar is, herhalingen inbegrepen, wordt de eerste regiotekst gevraagd |
+| Welke 300 | De nieuwste berichten eerst. Een tekst die al in de cache staat, is niet nieuw en telt niet mee |
+| Een bericht dat wacht | Staat in zijn regio onder Onzeker, onderaan, met de zin "Tekst nog niet gelezen; een volgende verversing haalt hem op." Dat geldt voor elk wachtend bericht, ook als de titel al veel zegt. Voor zo'n bericht wordt ook geen perceel opgezocht |
+| **2. Telling per regio** | De run telt per regio hoeveel berichten een tekst of perceel missen. `ophaalfouten` in `berichten.json`, waar de melding op het ochtendscherm uit komt, telt alleen nog de kern. Het overzicht van de regio's noemt per regio `ongelezen` en `mislukt` |
+| Meldingen in de app | Het ochtendscherm meldt alleen de kern. De knop van een regio op het tabblad Gebied zegt "143 locaties · 146 ongelezen". Wie een regio kiest, krijgt op het tabblad Berichten de meldingen van die regio erbij |
+| **3. Wekelijkse beurt** | De volledige verversing leest de kern en één regio opnieuw; de andere twee komen uit de cache |
+| Mislukt het opnieuw lezen | Dan blijft de tekst van vorige keer staan in plaats van te verdwijnen. Run 22 liet zien dat er bij veel verzoeken teksten uitvallen; bij een verversing kost dat nu niets meer |
+| Het log van een run | Meldt per regio wat wacht en wat mislukte, en welke regio's opnieuw gelezen zijn |
+
+## Welke regio wanneer
+
+De week loopt van maandag tot en met zondag en wordt doorgeteld, zodat de beurt bij de jaarwisseling
+niet verspringt. De geplande volledige run is zondag 04:30 uur. Een handmatige volledige run neemt
+de regio van de lopende week; deze week (16 tot en met 22 november) is dat Midden-Brabant.
+
+| Zondag | Kern | Regio die opnieuw gelezen wordt |
+|---|---|---|
+| 22-11-2026 | ja | Midden-Brabant |
+| 29-11-2026 | ja | West-Brabant |
+| 06-12-2026 | ja | Zeeland |
+| 13-12-2026 | ja | Midden-Brabant |
+| 20-12-2026 | ja | West-Brabant |
+| 27-12-2026 | ja | Zeeland |
+| 03-01-2027 | ja | Midden-Brabant |
+| 10-01-2027 | ja | West-Brabant |
+| 17-01-2027 | ja | Zeeland |
+
+Daarna gaat het zo door: elke regio eens per drie weken, de kern elke week. Een andere regio
+afdwingen kan alleen buiten de workflow om (`--volledig --regio Zeeland`).
+
+## Waar de vier teksten bleven
+
+Run 22 meldde 35 niet-opgehaalde teksten; in het resultaat vond ik 31 berichten met de zin "kon niet
+worden opgehaald".
+
+| Vraag | Antwoord |
+|---|---|
+| Waar zijn de andere vier? | In het resultaat, met een gewone uitkomst. De regels van de app kijken eerst naar de titel en de omschrijving. Zegt de titel al genoeg (een thematisch plan, "het bouwen van 12 woningen", een herkenbaar signaal), dan krijgt het bericht die uitkomst en komt de zin over de ontbrekende tekst er niet aan te pas |
+| Is er één aan te wijzen? | Ja, één: `gmb-2026-383525`, "Kennisgeving 'Omgevingsprogramma Centrum West'" (Roosendaal). In run 22 weggefilterd als thematisch plan, zonder signaal; in de volledige run van 17-11 met het signaal "functiewijziging", dat uit de tekst komt. De uitkomst is gelijk, alleen dat ene veld verschilt |
+| En de andere drie? | Niet aan te wijzen. Ik heb alle 1.461 berichten die een tekst nodig hadden vergeleken met de run van 17-11: bij deze drie is elk veld gelijk. De tekst ontbrak, maar veranderde niets aan wat de app toont |
+| Was er iets kwijt? | Nee. De telling van 35 klopte; alleen was aan vier berichten niet te zien dat ze erbij hoorden |
+| Wat is eraan gedaan | De telling per regio telt een ontbrekende tekst ook als de titel al beslist. Daar is een test voor |
+
+## Proef vanuit de container (18-11-2026, 08:58 – 09:03 uur)
+
+Drie runs achter elkaar, beginnend met de cache van `main` van 17-11 zonder regio's: dezelfde
+uitgangspositie als run 22.
+
+| Run | Verzoeken | waarvan aan de bron | Duur | Weigeringen | Regioteksten gelezen | Wachten nog |
+|---|---:|---:|---:|---:|---:|---:|
+| Gewone run 1 | 494 | 334 | 117 s | 0 | 300 | 681 (Midden-Brabant 50, West-Brabant 398, Zeeland 233) |
+| Gewone run 2 | 353 | 334 | 77 s | 0 | 300 | 381 (28, 238, 115) |
+| Volledige run (kern en Midden-Brabant) | 1.215 | 1.063 | 196 s | 0 | 300 nieuw, plus Midden-Brabant opnieuw | 81 (3, 52, 26) |
+
+Ter vergelijking: zonder grens deed dezelfde eerste run op GitHub 1.404 verzoeken in 769 seconden
+(run 22).
+
+| Controle op het resultaat | Uitkomst |
+|---|---|
+| De kern | 1.080 berichten, dezelfde als in run 22, met dezelfde inhoud; geen enkel bericht met "Tekst nog niet gelezen" |
+| `ophaalfouten` (ochtendscherm) | 0 teksten, 0 percelen, 0 rechtbankpublicaties |
+| De wachtende berichten | Staan alle onder Onzeker met het label; het aantal per regio in het overzicht is gelijk aan het aantal in het regiobestand |
+| Volgorde | Na drie runs wachten alleen nog berichten van 22-05 tot en met 23-07-2026; alles daarna is gelezen |
+| De volledige run | Las de 200 rechtbankpublicaties en de kern opnieuw; West-Brabant en Zeeland kwamen uit de cache (552 teksten) |
+
+Na een vierde run wacht er niets meer. Op GitHub is dit nog niet gedraaid; dat is de volgende
+handmatige run.
+
+## Tests
+
+| Wat | Tests |
+|---|---|
+| Grens per run | 6: de kern helemaal en eerst, daarna de nieuwste van de regio's; de grens raakt de kern nooit; zonder grens alles zoals voorheen; het label is één zin en gaat voor wat de titel zegt; geen perceel voor een bericht dat wacht; een tekst uit de cache is niet nieuw en de volgende run leest verder |
+| Telling per regio | 7: een mislukking in een regio is geen mislukking van de kern; een mislukking in de kern wordt gemeld zoals voorheen; een ontbrekende tekst telt ook als de titel beslist (de vier van run 22); een mislukt perceel telt bij zijn regio; statistiek zonder uitsplitsing; wat de run voor het ochtendscherm schrijft gaat over de kern; elke regio krijgt haar eigen telling in het overzicht |
+| Wekelijkse beurt | 9: welke regio welke zondag; de hele week dezelfde regio en geen week overgeslagen (120 weken, ook over de jaarwisseling); kern en regio van de week opnieuw, de rest uit de cache; een mislukte verversing houdt wat er was; een nooit gelezen tekst die mislukt wordt opnieuw geprobeerd; opzoekingen volgen het label van de gemeente; de run leest opnieuw wat zijn opties zeggen; een onbekende regio stopt de run; de grens in `config.json` is 300 |
+| Meldingen, logica | 2: een gekozen regio meldt wat ze mist, in enkelvoud en meervoud, en zonder gekozen regio niets; het tekort reist mee met de regio die wordt aangeboden |
+| Meldingen, browser op 320 pixels | 1: de kern mist niets en een regio mist 146 teksten en 20 bekendmakingen. Het ochtendscherm zegt daar niets over; de knop van de regio zegt "· 146 ongelezen"; na kiezen staan beide meldingen op het tabblad Berichten; na "Alleen de kern" zijn ze weer weg |
+| Alle tests | 361, geslaagd; 10 overgeslagen zoals voorheen |
+
+## Open punten bij dit onderdeel
+
+| Punt | Toelichting |
+|---|---|
+| **De week van West-Brabant blijft zwaar** | De volledige run leest dan de kern (480 teksten), West-Brabant (550) en de 200 rechtbankpublicaties opnieuw: naar schatting 1.250 tot 1.300 verzoeken aan de bron, iets meer dan run 22. Op GitHub is dat geschat op 12 tot 14 minuten met weigeringen. Het verschil met run 22: een tekst die nu niet komt, blijft staan zoals hij was. De weken van Midden-Brabant (rond 800) en Zeeland (rond 1.100) zijn lichter. Eerste keer: zondag 29-11-2026. Wil je dit lichter, dan kan West-Brabant in tweeën, of de kern om de week |
+| De toelichting in de workflow klopt niet meer | Daar staat "cache negeren en alles opnieuw ophalen" bij de wekelijkse run en bij het vinkje "volledig". Ik heb het bestand niet aangeraakt, omdat het schema niet mocht wijzigen. Twee regels tekst; zeg het als ik ze mag aanpassen |
+| Op GitHub nog niet gemeten | De cijfers hierboven komen uit de container, waar de bron niets weigert. De volgende handmatige run laat zien wat 334 verzoeken aan de bron daar doen |
+| Een wachtend bericht verbergt wat de titel al zegt | Zo afgesproken: elk wachtend regiobericht staat onder Onzeker. Een aanvraag met "12 woningen" in de titel staat dus hooguit een paar runs te laag. Het gaat om de oudste berichten eerst |
+| Vier runs voor de eerste vulling | 300, 300, 300 en 81 teksten. Met vijf runs per werkdag is dat binnen een dag rond |
 
 # De Vlaamse bron
 
