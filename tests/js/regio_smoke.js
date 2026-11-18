@@ -2,16 +2,33 @@
    the narrowest phone. Works with the data the page itself loads: the core, and per region the file
    the app reads when that region is chosen. What those files hold is reported next to what the page
    showed, and the Python test compares the two. With data from before the regions nothing is on
-   offer; the report then says so. */
+   offer; the report then says so.
+
+   With `options.fixture` (regio_ongelezen.json) the same walk is done in a fixed situation: the
+   overview of the regions and the region files are played back from the fixture, in which regions
+   have notices whose text still waits. The site in the repository has none of those, the live site
+   often has; this way the tests before publishing meet them too. */
 "use strict";
 
-module.exports = async function (browser, base) {
-  var result = {}, errors = [];
+module.exports = async function (browser, base, options) {
+  var result = {}, errors = [], fixture = options && options.fixture;
   var context = await browser.newContext({ viewport: { width: 320, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
   var page = await context.newPage();
   page.on("console", function (message) { if (message.type() === "error") errors.push(message.text()); });
   page.on("pageerror", function (error) { errors.push(error.message); });
   await page.route(/^https:\/\/fonts\./, function (route) { route.fulfill({ status: 200, contentType: "text/css", body: "" }); });
+  if (fixture) {
+    // The core stays as the site has it; only what it says about the regions comes from the fixture.
+    await page.route("**/data/berichten.json", async function (route) {
+      var data = await (await route.fetch()).json();
+      data.regios = fixture.regios;
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+    });
+    await page.route("**/data/regio-*.json", function (route) {
+      var file = fixture.bestanden[/\/data\/(regio-[a-z-]+\.json)/.exec(route.request().url())[1]];
+      route.fulfill(file ? { status: 200, contentType: "application/json", body: JSON.stringify(file) } : { status: 404, body: "" });
+    });
+  }
 
   function overflow() { return page.evaluate(function () { return document.documentElement.scrollWidth - window.innerWidth; }); }
   async function berichten() {
@@ -46,6 +63,20 @@ module.exports = async function (browser, base) {
       dots: await page.$$eval("#radar circle.p-ontwikkellocatie, #radar circle.p-onzeker", function (nodes) { return nodes.length; }),
       overflow: await overflow(),
     };
+  }
+
+  // The notices under Onzeker with the reason on each card: there the ones that wait for their text show.
+  async function unsure() {
+    await page.click("#tile-onzeker");
+    await page.waitForSelector('#tile-onzeker[aria-pressed="true"]');
+    if (await page.isVisible("#more")) await page.click("#more");
+    var seen = { count: await page.textContent("#result-count"),
+      notices: await page.$$eval("#notices .stale", function (nodes) { return nodes.map(function (node) { return node.textContent; }); }),
+      reasons: await page.$$eval("#list .card .why", function (nodes) { return nodes.map(function (node) { return node.textContent; }); }),
+      overflow: await overflow() };
+    await page.click("#tile-ranglijst");
+    await page.waitForSelector('#tile-ranglijst[aria-pressed="true"]');
+    return seen;
   }
 
   var asked = [];
@@ -112,6 +143,7 @@ module.exports = async function (browser, base) {
   await page.click("#more");
   result.withOneAllRanks = await page.$$eval("#list .card .rank b", function (nodes) { return nodes.map(function (node) { return node.textContent; }); });
   result.withOneAllOverflow = await overflow();
+  if (fixture) result.unsureWithOne = await unsure();
 
   // --- Back to the core with the button on the tab Berichten.
   await page.click("#regio-regel button");
@@ -131,6 +163,7 @@ module.exports = async function (browser, base) {
   await page.click("#tab-berichten");
   await page.waitForSelector("#view-berichten:not([hidden])");
   result.withAll = await berichten();
+  if (fixture) result.unsureWithAll = await unsure();
   result.storage = await page.evaluate(function () { return Object.keys(localStorage); });
   await page.reload();
   await page.waitForSelector("#list .card");
@@ -141,6 +174,7 @@ module.exports = async function (browser, base) {
 
   result.errors = errors;
   await context.close();
+  if (fixture) return result; // the two situations below change the data themselves
 
   // --- The file of a region does not come: the region is not chosen and the tab says so.
   context = await browser.newContext({ viewport: { width: 320, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });

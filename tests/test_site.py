@@ -661,6 +661,24 @@ class InDeBrowser(unittest.TestCase):
             self.skipTest("de gegevens zijn van vóór de regio's: er is niets te kiezen")
         return seen
 
+    # The walk through the region choice is done twice: with the regions as the site delivers them,
+    # and in a fixed situation (tests/js/regio_ongelezen.json) in which regions have notices whose
+    # text still waits. The site in the repository has none of those and the live site often has;
+    # run 26 failed on exactly that difference, after publishing. Every check of the walk runs in both.
+    SITUATIES = (("regio", "de regio's zoals de site ze levert"), ("regioOngelezen", "vaste situatie met ongelezen regioberichten"))
+
+    def in_both(self, check):
+        for key, label in self.SITUATIES:
+            with self.subTest(situatie=label):
+                seen = self.seen[key]
+                if not seen["start"]["buttons"]:
+                    self.skipTest("de gegevens zijn van vóór de regio's: er is niets te kiezen")
+                check(seen)
+
+    def fixed(self):
+        with open(os.path.join(JS, "regio_ongelezen.json"), encoding="utf-8") as handle:
+            return json.load(handle), self.seen["regioOngelezen"]
+
     @staticmethod
     def shown(data, chosen):
         return [entry for entry in data["berichten"] if entry["regio"] == "kern" or entry["regio"] in chosen]
@@ -682,7 +700,9 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(page["kmOut"], want["kmMax"] + " km")
 
     def test_region_choice_is_offered_but_nothing_is_chosen_at_the_start(self):
-        seen = self.region()
+        self.in_both(self.check_region_choice_is_offered_but_nothing_is_chosen_at_the_start)
+
+    def check_region_choice_is_offered_but_nothing_is_chosen_at_the_start(self, seen):
         data, start = seen["data"], seen["start"]
         self.assertEqual([button["name"] for button in start["buttons"]], data["regios"])
         self.assertEqual(data["inFiles"], [regio["berichten"] for regio in data["overview"]], "het overzicht klopt niet met de regiobestanden")
@@ -707,7 +727,9 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(seen["errors"], [])
 
     def test_region_choice_fits_the_narrowest_phone(self):
-        seen = self.region()
+        self.in_both(self.check_region_choice_fits_the_narrowest_phone)
+
+    def check_region_choice_fits_the_narrowest_phone(self, seen):
         for moment in ("start", "one", "all", "backGebied"):
             with self.subTest(moment=moment):
                 self.assertLessEqual(seen[moment]["overflow"], 0)
@@ -720,7 +742,9 @@ class InDeBrowser(unittest.TestCase):
             self.assertLessEqual(seen["tap"]["overflow"], 0)
 
     def test_a_chosen_region_is_shown_with_the_core(self):
-        seen = self.region()
+        self.in_both(self.check_a_chosen_region_is_shown_with_the_core)
+
+    def check_a_chosen_region_is_shown_with_the_core(self, seen):
         data, first, one = seen["data"], seen["first"], seen["one"]
         self.assertEqual({button["name"]: button["pressed"] for button in one["buttons"]},
                          {button["name"]: str(button["name"] == first).lower() for button in one["buttons"]})
@@ -753,7 +777,9 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(seen["withOneAllRanks"], [str(n) for n in range(1, want["locations"] + 1)])
 
     def test_tapping_a_municipality_of_a_region_shows_its_notices(self):
-        seen = self.region()
+        self.in_both(self.check_tapping_a_municipality_of_a_region_shows_its_notices)
+
+    def check_tapping_a_municipality_of_a_region_shows_its_notices(self, seen):
         if not seen["tapped"]:
             self.skipTest("de gekozen regio heeft geen eigen gemeenten")
         data, name, tap = seen["data"], seen["tapped"], seen["tap"]
@@ -766,7 +792,9 @@ class InDeBrowser(unittest.TestCase):
             self.assertTrue(all(" km" in distance or distance == "geen exacte locatie" for distance in tap["distances"]))
 
     def test_back_to_the_core_and_every_region_at_once(self):
-        seen = self.region()
+        self.in_both(self.check_back_to_the_core_and_every_region_at_once)
+
+    def check_back_to_the_core_and_every_region_at_once(self, seen):
         data = seen["data"]
         self.assertEqual(seen["back"], seen["morning"])
         self.assertEqual({button["pressed"] for button in seen["backGebied"]["buttons"]}, {"false"})
@@ -779,6 +807,50 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(seen["withAll"]["line"], "Met " + sentence + " erbij. Alleen de kern")
         self.assertEqual(sorted(seen["askedForAll"]), sorted(regio["bestand"] for regio in data["overview"]), "een regiobestand is twee keer gelezen")
 
+    def test_the_fixed_situation_is_what_the_page_was_given(self):
+        fixture, seen = self.fixed()
+        self.assertEqual(seen["data"]["overview"], fixture["regios"])
+        self.assertEqual(seen["data"]["inFiles"], [len(fixture["bestanden"][regio["bestand"]]["berichten"]) for regio in fixture["regios"]])
+        self.assertEqual(seen["data"]["core"], self.seen["regio"]["data"]["core"], "de kern is die van de site zelf")
+        self.assertEqual(seen["morning"], self.seen["regio"]["morning"], "het ochtendscherm verandert door de regio's")
+        self.assertEqual(seen["errors"], [])
+
+    def test_a_region_with_waiting_notices_says_so_on_its_button(self):
+        # Written out, not worked out: this is the line that the live check of run 26 stumbled on.
+        _, seen = self.fixed()
+        for moment in ("start", "one", "all", "backGebied", "reopenedGebied"):
+            with self.subTest(moment=moment):
+                self.assertEqual({button["name"]: button["sub"] for button in seen[moment]["buttons"]},
+                                 {"Midden-Brabant": "2 locaties", "West-Brabant": "1 locatie · 4 ongelezen", "Zeeland": "3 locaties · 1 ongelezen"})
+
+    def test_waiting_notices_stand_under_onzeker_with_their_reason(self):
+        fixture, seen = self.fixed()
+        waiting = {regio["naam"]: regio["ongelezen"] for regio in fixture["regios"]}
+        unsure = {regio["naam"]: regio["onzeker"] for regio in fixture["regios"]}
+        core = int(seen["morning"]["tiles"][2])
+        reason = "Tekst nog niet gelezen; een volgende verversing haalt hem op."
+        first = seen["first"]
+        self.assertGreater(waiting[first], 0, "de regio die de test kiest, heeft in de vaste situatie wachtende berichten")
+        for moment, chosen in (("unsureWithOne", [first]), ("unsureWithAll", list(waiting))):
+            with self.subTest(moment=moment):
+                shown = seen[moment]
+                total = core + sum(unsure[name] for name in chosen)
+                self.assertEqual(shown["count"], "%d onzekere berichten, hoogste rang eerst" % total)
+                self.assertEqual(len(shown["reasons"]), total)
+                self.assertEqual(shown["reasons"].count(reason), sum(waiting[name] for name in chosen))
+                self.assertLessEqual(shown["overflow"], 0)
+        # The tab says it per chosen region, in the singular for one notice.
+        self.assertEqual([line for line in seen["unsureWithOne"]["notices"] if "gelezen" in line],
+                         ['Van Zeeland is 1 bericht nog niet gelezen. Het staat onder Onzeker met "Tekst nog niet gelezen"; een volgende verversing haalt het op.'])
+        self.assertEqual([line for line in seen["unsureWithAll"]["notices"] if "gelezen" in line],
+                         ['Van West-Brabant zijn 4 berichten nog niet gelezen. Ze staan onder Onzeker met "Tekst nog niet gelezen"; de volgende verversingen halen ze op.',
+                          'Van Zeeland is 1 bericht nog niet gelezen. Het staat onder Onzeker met "Tekst nog niet gelezen"; een volgende verversing haalt het op.'])
+
+    def test_in_the_fixed_situation_tapping_a_municipality_shows_a_location(self):
+        _, seen = self.fixed()
+        self.assertEqual((seen["first"], seen["tapped"]), ("Zeeland", "Reimerswaal"))
+        self.assertEqual((seen["tap"]["cards"], seen["tap"]["filter"]), (1, "Reimerswaal"))
+
     def test_a_region_file_that_does_not_come_leaves_the_core(self):
         seen = self.region()
         down = seen["fileDown"]
@@ -789,7 +861,9 @@ class InDeBrowser(unittest.TestCase):
         self.assertLessEqual(down["overflow"], 0)
 
     def test_the_app_opens_with_the_core_again(self):
-        seen = self.region()
+        self.in_both(self.check_the_app_opens_with_the_core_again)
+
+    def check_the_app_opens_with_the_core_again(self, seen):
         self.assertEqual(seen["storage"], ["tilburg-signalen.gezien"], "de keuze voor een regio wordt bewaard")
         self.assertEqual({button["pressed"] for button in seen["reopenedGebied"]["buttons"]}, {"false"})
         self.assertEqual(seen["reopenedGebied"]["rows"], seen["start"]["rows"])

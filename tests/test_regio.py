@@ -792,3 +792,54 @@ class EchteGegevens(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VasteSituatieOngelezen(unittest.TestCase):
+    """tests/js/regio_ongelezen.json: the fixed situation the browser tests play back, in which
+    regions have notices whose text still waits. It must stay what a run would have written."""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(ROOT, "tests", "js", "regio_ongelezen.json"), encoding="utf-8") as handle:
+            cls.fixture = json.load(handle)
+        with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as handle:
+            cls.config = json.load(handle)
+
+    def test_the_overview_is_what_a_run_writes_for_these_files(self):
+        notices = [notice for file in self.fixture["bestanden"].values() for notice in file["berichten"]]
+        waiting = {}
+        for notice in notices:
+            if notice["waarom"] == relevantie.ONGELEZEN:
+                waiting[notice["regio"]] = waiting.get(notice["regio"], 0) + 1
+        document = {"bijgewerkt": "2026-11-18T09:13:38+01:00", "berichten": notices,
+                    "ophaalstatistiek": {"tekst": {"perRegio": {naam: {"uitgesteld": count} for naam, count in waiting.items()}}}}
+        core, files = update.verdeel(document, self.config["regios"])
+        self.assertEqual(core["berichten"], [])
+        self.assertEqual(core["regios"], self.fixture["regios"])
+        self.assertEqual({name: file["berichten"] for name, file in files.items()},
+                         {name: file["berichten"] for name, file in self.fixture["bestanden"].items()})
+
+    def test_a_waiting_notice_looks_like_the_run_makes_it(self):
+        waiting = [notice for file in self.fixture["bestanden"].values() for notice in file["berichten"] if notice["waarom"] == relevantie.ONGELEZEN]
+        self.assertEqual(len(waiting), 5)
+        for notice in waiting:
+            with self.subTest(id=notice["id"]):
+                self.assertEqual((notice["klasse"], notice["score"], notice["omschrijving"]), ("onzeker", 5, None))
+        self.assertEqual({notice["type"] for notice in waiting}, {"vergunning", "plan", "verkoop"})
+
+    def test_it_has_a_region_without_and_regions_with_waiting_notices_and_a_single_location(self):
+        by_name = {regio["naam"]: regio for regio in self.fixture["regios"]}
+        self.assertEqual(list(by_name), self.config["regios"])
+        self.assertEqual({naam: regio["ongelezen"] for naam, regio in by_name.items()}, {"Midden-Brabant": 0, "West-Brabant": 4, "Zeeland": 1})
+        self.assertEqual({naam: regio["locaties"] for naam, regio in by_name.items()}, {"Midden-Brabant": 2, "West-Brabant": 1, "Zeeland": 3})
+
+    def test_every_notice_lies_in_a_municipality_of_its_region(self):
+        regions = {}
+        for gemeente in self.config["gemeenten"]:
+            regions.setdefault(gemeente["naam"], set()).update(filter(None, [gemeente["regio"], gemeente.get("buiten_straal")]))
+        for file in self.fixture["bestanden"].values():
+            for notice in file["berichten"]:
+                with self.subTest(id=notice["id"]):
+                    self.assertEqual(notice["regio"], file["regio"])
+                    self.assertIn(file["regio"], regions[notice["gemeente"]])
+                    self.assertGreaterEqual(notice["afstandKm"], self.config["straal_km"])  # 15.0 is 15.04 rounded

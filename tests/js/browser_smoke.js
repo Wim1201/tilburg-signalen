@@ -225,6 +225,8 @@ var SEEN = "tilburg-signalen.gezien";
 
   // --- The region choice on the tab "Gebied" (see regio_smoke.js).
   result.regio = await require("./regio_smoke.js")(browser, base);
+  // The same walk in a fixed situation in which regions have notices whose text still waits.
+  result.regioOngelezen = await require("./regio_smoke.js")(browser, base, { fixture: require("./regio_ongelezen.json") });
 
   result.errors = errors;
   await browser.close();
