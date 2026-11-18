@@ -259,6 +259,8 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 .feiten dt { color: var(--muted); }
 .feiten dd { margin: 0; font-weight: 600; }
 .feiten dd.is-leeg { font-weight: 400; color: var(--muted); }
+.label-klasse { margin: 0; }
+.label-klasse strong { display: inline-block; min-width: 44px; padding: 6px 12px; border-radius: 8px; background: var(--rank-bg); color: var(--rank-ink); font: 800 24px/1.1 var(--font-display); text-align: center; }
 .perceelkaart { margin: 0; display: flex; flex-direction: column; gap: 6px; }
 /* The map service draws black on white, so the map keeps a white ground in the dark theme too. */
 .kaartvlak { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; background: #ffffff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }

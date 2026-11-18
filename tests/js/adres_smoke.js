@@ -12,6 +12,9 @@ var TYPED = "Burg. van de Mortelplein 118a";
 // An address outside the core: Noordweg 402 in Middelburg, a municipality of the region Zeeland.
 var OUTSIDE = A.addresses(fixtures.buitenKern.suggest)[0];
 var TYPED_OUTSIDE = "Noordweg 402 Middelburg";
+// The energy label Worker (tools/energielabel) as the app would be set to it; the answers are played here.
+var LABEL_WORKER = "https://energielabel.worker.test";
+var LABEL_FOUND = { status: 200, body: { status: "gevonden", klasse: "A+", registratiedatum: "2023-06-12", geldigTot: "2033-06-12", gebouw: "Woningbouw" } };
 
 /* A point inside the second parcel of the address, away from the address point itself. */
 function insideParcel() {
@@ -77,7 +80,10 @@ module.exports = async function (browser, base) {
 
   /* `down` lists what does not answer: a part name fails to connect, "name:503" answers with an
      error, "name:stil" never answers. The list can be changed while the page is open. */
-  async function open(width, down, withoutNotices) {
+  /* `label`: the energy label Worker is set, and answers as `label.antwoord` says at that moment:
+     { status, body } or "weg" (no connection). Without `label` the setting is empty, as on the site
+     before the Worker is placed. */
+  async function open(width, down, withoutNotices, label) {
     var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
     var page = await context.newPage(), seen = { errors: [], pdok: [], elsewhere: [] };
     page.on("pageerror", function (error) { seen.errors.push(error.message); });
@@ -87,6 +93,7 @@ module.exports = async function (browser, base) {
     });
     page.on("request", function (request) {
       var url = request.url();
+      if (label && url.indexOf(LABEL_WORKER + "/") === 0) { (seen.label = seen.label || []).push({ url: url, method: request.method(), headers: Object.keys(request.headers()).sort() }); return; }
       if (url.indexOf(base) !== 0 && !/^(data:|blob:|https:\/\/fonts\.|https:\/\/(api|service)\.pdok\.nl\/)/.test(url)) seen.elsewhere.push(url);
     });
     await page.route(/^https:\/\/fonts\./, function (route) { route.fulfill({ status: 200, contentType: "text/css", body: "" }); });
@@ -96,8 +103,17 @@ module.exports = async function (browser, base) {
       seen.regioTest = data.regioTest;
       seen.regios = (data.regios || []).map(function (regio) { return regio.naam; });
       delete data.regioTest;
+      if (label) data.energielabelWorker = LABEL_WORKER;
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
     });
+    if (label) {
+      await page.route(LABEL_WORKER + "/**", function (route) {
+        var answer = label.antwoord;
+        if (answer === "weg") return route.abort("connectionfailed");
+        // The real Worker allows only the origin of the live site; the test page has another one.
+        return route.fulfill({ status: answer.status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(answer.body) });
+      });
+    }
     await page.route("**/data/regio-zeeland.json", async function (route) {
       seen.regionFile = (seen.regionFile || 0) + 1;
       var file = await (await route.fetch()).json();
@@ -306,6 +322,44 @@ module.exports = async function (browser, base) {
   await page.waitForSelector("#view-berichten:not([hidden])");
   result.outside.coreCards = await page.$$eval("#list .card", function (nodes) { return nodes.length; });
   result.outside.coreCount = await page.textContent("#result-count");
+  await session.context.close();
+
+  // --- The energy label, with the Worker set (config.json, energielabel_worker). On the narrowest
+  // phone: found, no valid label, too many requests (minute and day), and a service that is not there.
+  var label = { antwoord: LABEL_FOUND };
+  session = await open(320, [], false, label); page = session.page;
+  await page.click("#tab-adres");
+  async function labelBox(antwoord) {
+    label.antwoord = antwoord;
+    await choose(page);
+    await page.waitForSelector("#adres-energie[data-uitkomst]");
+    return page.evaluate(function () {
+      var box = document.getElementById("adres-energie"), klasse = box.querySelector(".label-klasse strong"), button = box.querySelector("button");
+      return { uitkomst: box.getAttribute("data-uitkomst"), text: box.innerText.replace(/\s+/g, " ").trim(), klasse: klasse ? klasse.textContent : null,
+        facts: [].map.call(box.querySelectorAll(".feiten dt"), function (dt) { return [dt.textContent, dt.nextElementSibling.textContent]; }),
+        notes: [].map.call(box.querySelectorAll(".bronregel"), function (node) { return node.textContent; }),
+        links: [].map.call(box.querySelectorAll("a"), function (a) { return a.href; }), button: button ? button.textContent : null,
+        right: Math.round(box.getBoundingClientRect().right), overflow: document.documentElement.scrollWidth - window.innerWidth };
+    });
+  }
+  result.label = { found: await labelBox(LABEL_FOUND) };
+  result.label.asked = session.seen.label.slice();
+  result.label.today = await page.evaluate(function () { return window.TilburgSignalen.isoDay(new Date()); });
+  result.label.none = await labelBox({ status: 404, body: { status: "geen" } });
+  result.label.minute = await labelBox({ status: 429, body: { status: "teveel", grens: "minuut" } });
+  result.label.day = await labelBox({ status: 429, body: { status: "teveel", grens: "dag" } });
+  result.label.fault = await labelBox({ status: 502, body: { status: "onbereikbaar" } });
+  result.label.refused = await labelBox({ status: 400, body: { status: "ongeldig", veld: "toevoeging" } });
+  result.label.gone = await labelBox("weg");
+  // The service is back: the button in the box asks again, without the address being looked up again.
+  var before = { label: session.seen.label.length, pdok: session.seen.pdok.length };
+  label.antwoord = LABEL_FOUND;
+  await page.click("#adres-energie button");
+  await page.waitForSelector('#adres-energie[data-uitkomst="gevonden"]');
+  result.label.again = { klasse: await page.textContent("#adres-energie .label-klasse strong"), label: session.seen.label.length - before.label, pdok: session.seen.pdok.length - before.pdok };
+  result.label.other = { bag: (await facts(page, "#adres-bag")).length, plan: await text(page, "#adres-plan"), notices: await page.$$eval("#adres-publicaties .pub", function (nodes) { return nodes.length; }) };
+  result.label.elsewhere = session.seen.elsewhere;
+  result.label.errors = session.seen.errors;
   await session.context.close();
 
   // --- The address search accepts the request and then stays silent: the app stops waiting.

@@ -8,6 +8,7 @@ import concurrent.futures
 import datetime
 import json
 import pathlib
+import re
 import sys
 import time
 import zoneinfo
@@ -154,6 +155,16 @@ def verrijk(items, drempel, haal_tekst=tekst.haal_op, perceel_m2=perceel.kadaste
     return items, statistiek
 
 
+def worker_adres(waarde):
+    """The address of the energy label Worker (tools/energielabel) for the tab "Adres", or "".
+
+    Only an https address without anything odd in it is passed on to the app; anything else is
+    left empty, and the tab then stays as it was without the Worker.
+    """
+    waarde = (waarde or "").strip() if isinstance(waarde, str) else ""
+    return waarde.rstrip("/") if re.fullmatch(r"https://[A-Za-z0-9.-]+(:\d+)?(/[A-Za-z0-9._~/-]*)?", waarde) else ""
+
+
 def kern_fouten(statistiek):
     """Downloads that failed for good, counted for the core only: what the morning screen reports.
 
@@ -218,6 +229,7 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
         "straalKm": config["straal_km"],
         "vensterDagen": config["venster_dagen"],
         "drempelPerceelM2": config["drempel_perceel_m2"],
+        "energielabelWorker": worker_adres(config.get("energielabel_worker")),
         "onvolledigeDagen": incomplete,
         "ophaalfouten": kern_fouten(statistiek),
         "ophaalstatistiek": statistiek,

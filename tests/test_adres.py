@@ -640,7 +640,9 @@ class Tabblad(unittest.TestCase):
     def test_tab_only_reads(self):
         for text in (self.logic, self.page):
             self.assertNotRegex(text, r"localStorage|sessionStorage|indexedDB|ophaalcache|method:|\.setItem\(|sendBeacon")
-        self.assertEqual(len(re.findall(r"\bfetch\(", self.page)), 1)
+        # Two places ask something: the registers of PDOK (getJson) and, when it is set, the energy
+        # label Worker. Both are a plain GET without anything sent along.
+        self.assertEqual(re.findall(r"\bfetch\(([^)]*)\)", self.page), ["url, controller ? { signal: controller.signal } : {}"] * 2)
         self.assertNotIn("fetch(", self.logic)
 
     def test_size_of_the_parcel_carries_the_warning(self):
@@ -648,12 +650,90 @@ class Tabblad(unittest.TestCase):
 
     def test_energy_label_and_plan_are_marked_as_not_available_with_a_plain_link(self):
         block = re.search(r"function renderLinks\(address\) \{(.*?)\n  \}", self.page, flags=re.S).group(1)
-        self.assertEqual(block.count('"Nog niet beschikbaar in de app."'), 2)
+        self.assertEqual(block.count('"Nog niet beschikbaar in de app."'), 1)
         self.assertNotIn("getJson", block)
+        # The energy label says the same as long as no Worker is set (config.json, energielabel_worker).
+        label = re.search(r"function loadLabel\(address, mine\) \{(.*?)\n  \}", self.page, flags=re.S).group(1)
+        self.assertRegex(label, r'if \(!url\) \{\s+renderEnergy\(address, function \(box\) \{ box\.appendChild\(el\("p", null, "Nog niet beschikbaar in de app\."\)\); \}\);\s+return;')
         links, = adres(["viewerLinks", {"huisnummer": 118, "huisletter": "a", "toevoeging": "", "postcode": "5037PL", "rd": {"x": 132133.035, "y": 395879.872}}]) if NODE else [None]
         if links:
             self.assertEqual(links["energielabel"], {"url": "https://www.ep-online.nl/Energylabel/Search", "label": "Zoek op EP-Online", "zoekwaarde": "5037PL 118 a"})
             self.assertEqual(links["plan"]["url"], "https://omgevingswet.overheid.nl/regels-op-de-kaart/documenten?locatie-stelsel=RD&locatie-x=132133&locatie-y=395880")
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class Energielabel(unittest.TestCase):
+    """The box "Energielabel" on the tab: what is asked of the Worker (tools/energielabel) and what
+    the box shows for each answer. The Worker itself is tested in tests/test_energielabel.py."""
+
+    WORKER = "https://tilburg-signalen-energielabel.voorbeeld.workers.dev"
+    ADDRESS = {"postcode": "5037PL", "huisnummer": 118, "huisletter": "a", "toevoeging": ""}
+    TODAY = "2026-11-18"
+
+    def url(self, worker, address=None):
+        return adres(["energielabelUrl", worker, address or self.ADDRESS])[0]
+
+    def test_without_a_setting_nothing_is_asked(self):
+        for worker in ("", None, 0, " ", "http://onveilig.voorbeeld", "javascript:alert(1)", "//voorbeeld.example", "https://", "https://voorbeeld.example/?a=b",
+                       "https://voorbeeld.example/#x", "https://gebruiker:wachtwoord@voorbeeld.example", "ftp://voorbeeld.example", "https://voorbeeld.example/a b"):
+            with self.subTest(instelling=worker):
+                self.assertIsNone(self.url(worker))
+
+    def test_the_address_goes_along_as_the_worker_expects_it(self):
+        self.assertEqual(self.url(self.WORKER), self.WORKER + "/?postcode=5037PL&huisnummer=118&huisletter=a")
+        self.assertEqual(self.url(self.WORKER + "/"), self.WORKER + "/?postcode=5037PL&huisnummer=118&huisletter=a")
+        self.assertEqual(self.url(self.WORKER, {"postcode": "4333KK", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}), self.WORKER + "/?postcode=4333KK&huisnummer=402&toevoeging=2")
+        self.assertEqual(self.url(self.WORKER, {"postcode": "5037PL", "huisnummer": 12, "huisletter": "B", "toevoeging": "bis"}),
+                         self.WORKER + "/?postcode=5037PL&huisnummer=12&huisletter=B&toevoeging=bis")
+
+    def test_an_address_without_postcode_or_house_number_is_not_asked(self):
+        for address in ({"postcode": "", "huisnummer": 118}, {"postcode": "5037PL", "huisnummer": None}, {"postcode": "5037 PL", "huisnummer": 118}, {"postcode": "5037PL", "huisnummer": 0}, None):
+            with self.subTest(adres=address):
+                self.assertIsNone(adres(["energielabelUrl", self.WORKER, address])[0])
+
+    def model(self, status, body=None):
+        return adres(["energielabelModel", status, body, self.TODAY])[0]
+
+    def test_a_label_is_shown_with_its_dates_its_kind_of_building_and_its_source(self):
+        model = self.model(200, {"status": "gevonden", "klasse": "A+", "registratiedatum": "2023-06-12", "geldigTot": "2033-06-12", "gebouw": "Woningbouw"})
+        self.assertEqual((model["soort"], model["klasse"]), ("gevonden", "A+"))
+        self.assertEqual(model["feiten"], [{"label": "Geregistreerd", "value": "12-06-2023"}, {"label": "Geldig tot", "value": "12-06-2033"}, {"label": "Soort gebouw", "value": "Woningbouw"}])
+        self.assertEqual(model["bron"], "Bron: EP-Online (Rijksdienst voor Ondernemend Nederland), opgevraagd op 18-11-2026. Getoond is het laatst geregistreerde label dat nog geldig is.")
+
+    def test_each_other_outcome_has_its_own_text(self):
+        none, minute, day, gone, fault, refused = (self.model(404, {"status": "geen"}), self.model(429, {"status": "teveel", "grens": "minuut"}),
+                                                   self.model(429, {"status": "teveel", "grens": "dag"}), self.model(0), self.model(502, {"status": "onbereikbaar"}),
+                                                   self.model(400, {"status": "ongeldig"}))
+        self.assertEqual((none["soort"], none["tekst"]), ("geen", "Geen geldig energielabel gevonden voor dit adres."))
+        self.assertIn("opgevraagd op 18-11-2026", none["bron"].lower())
+        self.assertEqual((minute["soort"], minute["tekst"], minute["opnieuw"]), ("teveel", "Er worden op dit moment te veel energielabels opgevraagd. Probeer het over een minuut opnieuw.", True))
+        self.assertEqual((day["soort"], day["tekst"], day["opnieuw"]), ("teveel", "Er zijn vandaag te veel energielabels opgevraagd. Probeer het morgen opnieuw.", False))
+        for model in (gone, fault):
+            self.assertEqual((model["soort"], model["tekst"], model["opnieuw"]), ("onbereikbaar", "Het energielabel kon niet worden opgevraagd: de dienst is niet bereikbaar.", True))
+        self.assertEqual((refused["soort"], refused["tekst"]), ("geen", "Voor dit adres kan geen energielabel worden opgevraagd."))
+        self.assertEqual(len({none["tekst"], minute["tekst"], day["tekst"], gone["tekst"], refused["tekst"]}), 5)
+
+    def test_an_answer_that_is_not_what_the_worker_sends_is_not_shown_as_a_label(self):
+        for status, body in ((200, None), (200, {}), (200, {"status": "gevonden"}), (200, {"status": "gevonden", "klasse": ""}), (200, {"status": "geen", "klasse": "A"}),
+                             (200, "<html>"), (200, [{"klasse": "A"}]), (500, {"status": "gevonden", "klasse": "A"}), (403, {"status": "geweigerd"}), (503, None)):
+            with self.subTest(status=status, body=body):
+                self.assertEqual(self.model(status, body)["soort"], "onbereikbaar")
+
+    def test_the_setting_reaches_the_tab_only_as_an_https_address(self):
+        from signalen import update
+        self.assertEqual(update.worker_adres("https://tilburg-signalen-energielabel.wim.workers.dev"), "https://tilburg-signalen-energielabel.wim.workers.dev")
+        self.assertEqual(update.worker_adres(" https://tilburg-signalen-energielabel.wim.workers.dev/ "), "https://tilburg-signalen-energielabel.wim.workers.dev")
+        for odd in ("", None, 7, "http://onveilig.voorbeeld", "javascript:alert(1)", "https://voorbeeld.example/?sleutel=x", "https://a b", "https://voorbeeld.example/<script>"):
+            with self.subTest(instelling=odd):
+                self.assertEqual(update.worker_adres(odd), "")
+
+    def test_the_setting_is_empty_until_the_worker_is_placed(self):
+        with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle)["energielabel_worker"], "")
+        app = read("app.js")
+        self.assertIn('shared.energielabelWorker = data.energielabelWorker || "";', app)
+        with open(os.path.join(ROOT, "signalen", "update.py"), encoding="utf-8") as handle:
+            self.assertIn('"energielabelWorker": worker_adres(config.get("energielabel_worker")),', handle.read())
 
 
 if __name__ == "__main__":

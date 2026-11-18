@@ -638,6 +638,7 @@
   function share(data) {
     var shared = window.TilburgSignalenGegevens = window.TilburgSignalenGegevens || {};
     shared.bijgewerkt = data.bijgewerkt; shared.vensterDagen = data.vensterDagen; shared.centrum = data.centrum; shared.berichten = state.kern;
+    shared.energielabelWorker = data.energielabelWorker || ""; // the address of the Worker for the energy label; empty: not placed yet
   }
 
   /* Fetch the data again when the app comes back into view and what it shows was fetched more than
