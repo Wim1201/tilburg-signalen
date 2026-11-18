@@ -203,7 +203,7 @@ De testrun op de pull request staat onderaan, onder "De testrun op de pull reque
 
 ## De testrun op de pull request (PR 28, 22:46 – 22:48 uur)
 
-Run 6 van "Tests bij een pull request", voor commit `49616dd`: **groen**.
+De run van "Tests bij een pull request" voor commit `49616dd` (job `testen`, run-id 44404983031): **groen**.
 
 | Stap | Uitkomst |
 |---|---|
