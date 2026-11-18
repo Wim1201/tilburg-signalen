@@ -52,9 +52,10 @@ Wat blijft staan bij een verversing:
 |---|---|
 | De gekozen regio's | Blijven gekozen; hun bestand wordt opnieuw gelezen |
 | De zoekopdracht en de filters | Blijven staan, ook als geen bericht meer bij een gekozen filter past: de keuze staat dan in de lijst met (0) |
-| Het filterpaneel, de gekozen lijst en "toon alles" | Blijven zoals ze stonden |
+| Het filterpaneel | Blijft open als het open stond |
+| De gekozen lijst (Ranglijst, Nieuw, Onzeker), "toon alles" en de afstand | Worden door een verversing niet aangeraakt. Dat volgt uit de code; het is niet apart getest |
 | Geopende kaarten | Blijven open |
-| Het tabblad | Blijft hetzelfde; de pagina springt niet naar boven |
+| Het tabblad | Blijft hetzelfde |
 | Een opgezocht adres | Blijft staan met pand en perceel. Alleen de publicaties worden opnieuw gezocht, in de nieuwe berichten; PDOK wordt niet opnieuw bevraagd |
 | "Nieuw" | Wat met de verversing binnenkomt, telt als nieuw; wat al nieuw was, blijft dat |
 
@@ -120,6 +121,8 @@ sessie gemaakt en aan Wim gestuurd; ze staan niet in de repo.
 |---|---|
 | Op een echte iPhone | Niet te doen vanuit deze container. Getest in Chromium op 375 en 320 pixels. Safari kan een tekst iets breder of smaller tekenen dan Chromium; de schatting is daarom ruim genomen |
 | Of iOS het terugkeren meldt zoals Chromium | Niet getest. De app luistert naar twee seinen (`visibilitychange` en `pageshow`); een app op het beginscherm van een iPhone geeft het eerste bij het naar voren halen. Dat is de bekende werking, niet door mij gemeten |
+| De plek op de pagina | Niet getest. Een verversing zet de pagina niet naar boven, maar de lijst wordt opnieuw opgebouwd; komt er boven de plek waar je leest een bericht bij, dan verschuift wat je ziet |
+| De gekozen lijst, "toon alles" en de afstand na een verversing | Niet apart getest; zie de tabel bij onderdeel 1 |
 | Op GitHub | De pull request start geen run. De eerste run na het samenvoegen draait de nieuwe tests vóór het publiceren en tegen de live site |
 | Een dag met heel veel stippen op één ring | Dan kan een ringlabel geen vrije plek vinden. De logica is daarop getest; op de live site is het niet voorgekomen |
 | Het kaartje bij andere schermbreedtes dan 320 en 375 | Niet gemeten. De plaatsing wordt uitgerekend in kilometers en schaalt mee; alleen de verhouding tussen tekst en kaart is op die twee breedtes gecontroleerd |
