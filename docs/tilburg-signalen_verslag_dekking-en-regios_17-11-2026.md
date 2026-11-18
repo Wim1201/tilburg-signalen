@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) en 09:20 – 09:29 uur (run 23 op GitHub) en 09:31 – 09:48 uur (toelichting in de workflow, groei van de bestanden, pull request) |
+| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) en 09:20 – 09:29 uur (run 23 op GitHub) en 09:31 – 09:48 uur (toelichting in de workflow, groei van de bestanden, pull request) en 09:55 – 09:56 uur (besluit over het voorstel, uitleg van de zondagse run, nulmeting van de repo) |
 | Versie | versie 2 van de app met het tabblad Adres, branch `claude/optimistic-gauss-sb0xpy`, gestart vanaf `main` op commit `edf4150` (na PR #16) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | officielebekendmakingen.nl (zoekdienst SRU), opgevraagd 17-11-2026 tussen 20:25 en 20:37 uur; gemeente-indeling van het CBS, "Gebieden in Nederland 2026" (tabel 86247NED) |
@@ -27,6 +27,9 @@ gemeten; zie "Open punten".
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 09:56 uur | **Besluit van Wim over het voorstel bij de groei: A wel, B en C niet.** A (vangnet en waarschuwing voor de cache) komt in een aparte pull request en wordt pas gebouwd nadat PR 17 is samengevoegd. "Graag je akkoord per onderdeel" onder "Voorstel (niet gebouwd)" is daarmee beantwoord. |
+| 18-11-2026, 09:56 uur | **De opmerking achter de cron-regel van zondag 04:30 uur ("cache negeren") blijft staan, op verzoek van Wim.** Ze klopt niet meer met wat de run doet; de juiste uitleg staat onder "Welke regio wanneer", in "De opmerking bij de cron-regel van zondag". |
+| 18-11-2026, 09:56 uur | **De repo is gemeten als nulmeting; "De geschiedenis van de repo: niet gemeten" en "gecomprimeerd 191 kB per versie" onder "Niet getest of nog open bij dit onderdeel" zijn daarmee achterhaald.** De zeven versies van de cache nemen samen 134 kB in, omdat de meeste als verschil met de vorige zijn opgeslagen. Zie "Nulmeting van de repo". De meting wordt op 25-11-2026 herhaald. |
 | 18-11-2026, 09:48 uur | **Er is nu een pull request: PR 17, open en niet samengevoegd; "er is geen pull request" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Hij blijft open tot Wim zegt dat hij samengevoegd mag worden. |
 | 18-11-2026, 09:48 uur | **De toelichting in de workflow is aangepast (commit `2d21868`); "dat bestand heb ik niet aangeraakt" hieronder en "`.github/` is onaangeroerd" onder "Buiten dit verslag" gelden niet meer.** Gewijzigd zijn twee teksten: de omschrijving bij het vinkje "volledig" en het commentaar boven de stap "Berichten ophalen". Het schema is niet gewijzigd: het blok met de cron-regels (`schedule`) is teken voor teken gelijk aan `main`. **Eén toelichting zegt nog "cache negeren": het commentaar achter de cron-regel van zondag 04:30 uur.** Die staat op dezelfde regel als het schema en heb ik daarom laten staan. |
 | 18-11-2026, 09:48 uur | **De groei van de cache en de regiobestanden is gemeten; de open punten "De cache wordt ruim drie keer zo groot" (met "Geen actie nodig") en "`regio-west-brabant.json` zit dicht bij de grens" zijn daarmee uitgewerkt.** De bestanden groeien niet door maar volgen de drukte in het venster. De cache blijft bij het verloop van het afgelopen jaar onder 1,5 MB (hoogstens rond 1,2 MB); West-Brabant komt er in het voorjaar en in juli tegenaan. Zie "Groei van de cache en de regiobestanden" met een voorstel dat niet gebouwd is. |
@@ -436,6 +439,25 @@ de regio van de lopende week; deze week (16 tot en met 22 november) is dat Midde
 Daarna gaat het zo door: elke regio eens per drie weken, de kern elke week. Een andere regio
 afdwingen kan alleen buiten de workflow om (`--volledig --regio Zeeland`).
 
+### De opmerking bij de cron-regel van zondag
+
+In `.github/workflows/dagelijks.yml` staat achter de cron-regel van zondag 04:30 uur nog:
+"wekelijkse volledige verversing, cache negeren". **Die opmerking blijft staan** (besluit van Wim,
+18-11-2026): ze staat op dezelfde regel als het schema, en die regel blijft onaangeroerd. Ze
+beschrijft de run van vóór de regio's. Wat de run van zondag 04:30 uur nu doet:
+
+| Onderdeel | Wat de run doet |
+|---|---|
+| De kern | Elke week opnieuw gelezen: de cache wordt voor de kern niet gebruikt |
+| De regio van de week | Opnieuw gelezen, volgens de tabel hierboven |
+| De twee andere regio's | Komen uit de cache; alleen wat nieuw is, wordt opgehaald, binnen de grens van 300 |
+| Mislukt het opnieuw lezen van een bericht | Dan blijft het oude antwoord uit de cache staan |
+| Echt alles zonder cache | Alleen met `--alles`; de workflow gebruikt die optie niet |
+
+"Cache negeren" geldt dus alleen nog voor de kern en voor één regio per week. De twee toelichtingen
+elders in het bestand (bij het vinkje "volledig" en boven de stap "Berichten ophalen") zeggen het
+wel zoals het is.
+
 ## Waar de vier teksten bleven
 
 Run 22 meldde 35 niet-opgehaalde teksten; in het resultaat vond ik 31 berichten met de zin "kon niet
@@ -656,6 +678,41 @@ staat er niet in.
 moment dat je iets toevoegt ("andere beschikking", de provincie Zeeland, een regio) of als de
 waarschuwing van A zich meldt. C alleen als je de download op de telefoon kleiner wilt of de
 momentopname in de repo wilt vernieuwen. Geen van de drie is gebouwd; graag je akkoord per onderdeel.
+
+**Besluit van Wim (18-11-2026, kort voor 09:55 uur):** akkoord op A, als aparte pull request, en pas te bouwen
+nadat PR 17 is samengevoegd. B en C niet.
+
+## Nulmeting van de repo (18-11-2026, 09:55 uur)
+
+Gemeten op een volledige kopie van de repo, vers opgehaald van GitHub, vóór het samenvoegen van
+PR 17. "Op schijf" is de grootte zoals git het bewaart, gecomprimeerd.
+
+| Wat | Waarde |
+|---|---:|
+| De hele repo, alle branches | 2.297 kB in 556 objecten |
+| `main` (commit `8f587be`) | 1.813 kB op schijf, 451 objecten; uitgepakt 11,6 MB |
+| Commits op `main` | 59, waarvan 7 van de cache |
+| De zeven versies van de cache samen | **134 kB op schijf** (7 procent van `main`); uitgepakt 1.983 kB |
+| Wat de werkbranch (PR 17) eraan toevoegt | 500 kB op schijf, 97 objecten |
+
+| Versie van de cache | Uitgepakt | Op schijf |
+|---|---:|---:|
+| 16-11-2026, 15:50 uur | 283 kB | 73.559 bytes (volledig bewaard) |
+| 16-11-2026, 17:22 uur | 284 kB | 379 bytes |
+| 16-11-2026, 17:35 uur | 284 kB | 62 bytes |
+| 17-11-2026, 08:40 uur | 277 kB | 91 bytes |
+| 17-11-2026, 11:36 uur | 280 kB | 890 bytes |
+| 18-11-2026, 06:46 uur | 278 kB | 55.546 bytes (volledig bewaard) |
+| 18-11-2026, 09:36 uur | 296 kB | 3.603 bytes |
+
+**Feit:** in de kopie die GitHub levert, staan vijf van de zeven versies als verschil met een andere
+versie, en dan kost een versie tientallen bytes tot enkele kB. **Vermoeden:** de groei door de
+cache-commits is daardoor klein, ook met de regio's erbij. Dat is na twee dagen en zeven versies
+niet te zeggen; hoe GitHub het aan zijn eigen kant bewaart, is van hieruit niet te zien.
+
+**De meting wordt op 25-11-2026 herhaald**, op dezelfde manier: de hele repo, `main`, het aantal
+cache-commits per dag en wat de versies van de cache samen op schijf innemen. Het verschil met deze
+nulmeting wordt gesplitst in wat PR 17 zelf toevoegde en wat de cache-commits toevoegden.
 
 ## Niet getest of nog open bij dit onderdeel
 
