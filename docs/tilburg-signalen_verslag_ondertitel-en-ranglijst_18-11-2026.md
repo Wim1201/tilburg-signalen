@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 13:05 – 13:16 uur |
+| Datum | 18-11-2026, 13:05 – 13:14 uur |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, opnieuw gestart vanaf `main` op commit `37f8183` (na PR 21) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen`; Chromium via Playwright |
 | Brondata | Geen opvraging bij de bronnen. Voor de uitleg van de ranglijst: de gegevens van de live site van 18-11-2026, 13:07 uur |
@@ -22,9 +22,9 @@ die **open blijft en niet is samengevoegd**. Punt 2 is een uitleg met een voorst
 
 | Tijdstip | Wat |
 |---|---|
-| 18-11-2026, 13:16 uur | **PR 21 is samengevoegd en heeft op GitHub gedraaid; "open blijft en niet is samengevoegd" en "Op GitHub: de pull request start geen run" in het vorige verslag zijn daarmee achterhaald.** Zie "Run 30 op GitHub". |
-| 18-11-2026, 13:16 uur | **Het aantal tests is 409 (was 402).** Er zijn er 7 bij: 4 voor de logica en 3 in de browser. |
-| 18-11-2026, 13:16 uur | **De kop is op de smalste telefoons iets compacter gemaakt; dat stond niet in de opdracht.** Met "Kern: " ervoor liep de ondertitel op 320 pixels over drie regels. Tot 350 pixels breed is het beeldmerk daarom 34 in plaats van 38 pixels en is de ruimte ernaast iets kleiner. Zie "Gemaakte keuzes". |
+| 18-11-2026, 13:14 uur | **PR 21 is samengevoegd en heeft op GitHub gedraaid; "open blijft en niet is samengevoegd" en "Op GitHub: de pull request start geen run" in het vorige verslag zijn daarmee achterhaald.** Zie "Run 30 op GitHub". |
+| 18-11-2026, 13:14 uur | **Het aantal tests is 409 (was 402).** Er zijn er 7 bij: 4 voor de logica en 3 in de browser. |
+| 18-11-2026, 13:14 uur | **De kop is op de smalste telefoons iets compacter gemaakt; dat stond niet in de opdracht.** Met "Kern: " ervoor liep de ondertitel op 320 pixels over drie regels. Tot 350 pixels breed is het beeldmerk daarom 34 in plaats van 38 pixels en is de ruimte ernaast iets kleiner. Zie "Gemaakte keuzes". |
 
 ## Run 30 op GitHub, na het samenvoegen van PR 21 (18-11-2026, 13:05 – 13:09 uur)
 

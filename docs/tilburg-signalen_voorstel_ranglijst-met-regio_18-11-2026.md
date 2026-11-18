@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 13:08 – 13:15 uur |
+| Datum | 18-11-2026, 13:08 – 13:13 uur |
 | Versie | versie 2 van de app met de regio's, `main` op commit `37f8183` (na PR 21) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | De gegevens van de live site, bijgewerkt 18-11-2026, 13:07 uur, opgehaald om 13:08 uur: de kern (1.140 berichten, 83 ontwikkellocaties) en de drie regiobestanden. Geen opvraging bij de bronnen |
