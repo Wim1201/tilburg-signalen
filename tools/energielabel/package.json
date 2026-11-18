@@ -1,0 +1,6 @@
+{
+  "name": "tilburg-signalen-energielabel",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker die het energielabel van één adres opvraagt bij EP-Online, voor het tabblad Adres. Geen pakketten nodig."
+}

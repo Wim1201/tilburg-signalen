@@ -1,0 +1,33 @@
+{
+  // Energielabel for Tilburg Signalen: a Cloudflare Worker that asks EP-Online for the energy label
+  // of one address, for the tab "Adres" of the app. See README.md in this folder.
+  "name": "tilburg-signalen-energielabel",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-17",
+
+  // The Worker gets an address on workers.dev; the app calls it from the browser.
+  "workers_dev": true,
+  "preview_urls": false,
+
+  // Keep the logs. A line says how a request ended; it never holds the address or the key.
+  "observability": { "enabled": true },
+
+  "vars": {
+    // The only site whose pages may read the answers (the Origin header of a browser).
+    "HERKOMST": "https://wim1201.github.io",
+    // The public API of EP-Online, version 5 (public.ep-online.nl/swagger).
+    "EP_ONLINE_URL": "https://public.ep-online.nl",
+    // The most requests that are passed on to EP-Online, counted over all visitors together.
+    "PER_MINUUT": "20",
+    "PER_DAG": "300"
+  },
+
+  // The counter for those two limits: one small object with its own storage, so that the count is
+  // exact and the same wherever a request comes in.
+  "durable_objects": { "bindings": [{ "name": "TELLER", "class_name": "Teller" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Teller"] }],
+
+  // The API key of EP-Online is a secret, set with `wrangler secret put EP_ONLINE_KEY`; it is never
+  // in this file. Deploying fails while the secret is missing.
+  "secrets": { "required": ["EP_ONLINE_KEY"] }
+}
