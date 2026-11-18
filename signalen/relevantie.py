@@ -170,8 +170,19 @@ def _size_bonus(parcel, threshold):
     return min(12, 6 * math.log10(max(parcel, threshold) / threshold)) if parcel else 0
 
 
-def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=True, drempel=400, tekst_mislukt=False):
-    """Return (klasse, score, waarom). `waarom` is one Dutch sentence shown with the notice."""
+ONGELEZEN = "Tekst nog niet gelezen; een volgende verversing haalt hem op."
+
+
+def beoordeel(soort, facts, perceel_m2, fase, informatief=True, locatie_bekend=True, drempel=400, tekst_mislukt=False,
+              tekst_uitgesteld=False):
+    """Return (klasse, score, waarom). `waarom` is one Dutch sentence shown with the notice.
+
+    `tekst_uitgesteld`: the text of a notice in a region was not read yet because the run had read
+    its share of new texts. Such a notice is unsure whatever its title says, at the bottom of the
+    list, until a later run reads it.
+    """
+    if tekst_uitgesteld:
+        return ONZEKER, 5, ONGELEZEN
     signals = facts["signalen"]
     dwellings = facts["woningen"]
     on_parcel = f" op een perceel van {m2(perceel_m2)}" if perceel_m2 else ""

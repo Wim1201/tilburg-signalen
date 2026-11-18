@@ -52,7 +52,7 @@ class GeschrevenBestand(unittest.TestCase):
     def write(self, main_source_status):
         seen = {}
 
-        def fake_run(config, area, now, cache=None):
+        def fake_run(config, area, now, cache=None, **extra):
             seen["now"] = now
             return {"bijgewerkt": now.isoformat(timespec="seconds"), "berichten": [], "ophaalstatistiek": {}, "ophaalfouten": {},
                     "cache": {}, "onvolledigeDagen": [],

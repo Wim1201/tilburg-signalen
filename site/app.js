@@ -120,6 +120,8 @@
       lines.push("Bij de laatste verversing konden " + missing + " bekendmakingen niet volledig worden gelezen. " +
         "Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw.");
     }
+    // A chosen region reports what it still misses itself; without a region these lines are not there.
+    L.regioMeldingen(state.data.regios, state.regios).forEach(function (line) { lines.push(line); });
     if (failed.insolventie) {
       lines.push("Bij de laatste verversing konden " + failed.insolventie + " rechtbankpublicaties over faillissementen niet worden gelezen. " +
         "De volgende verversing probeert het opnieuw.");
@@ -339,7 +341,8 @@
       var button = el("button", "regio", regio.naam);
       button.type = "button";
       button.setAttribute("aria-pressed", String(chosen));
-      button.appendChild(el("span", null, regio.locaties + (regio.locaties === 1 ? " locatie" : " locaties")));
+      button.appendChild(el("span", null, regio.locaties + (regio.locaties === 1 ? " locatie" : " locaties") +
+        (regio.ongelezen ? " · " + regio.ongelezen + " ongelezen" : "")));
       button.addEventListener("click", function () {
         setRegios(chosen ? state.regios.filter(function (name) { return name !== regio.naam; }) : state.regios.concat(regio.naam));
       });

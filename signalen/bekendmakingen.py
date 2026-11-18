@@ -159,7 +159,13 @@ def lookups(cache=None):
         found, value = cache.haal("locatie", key)
         if found:
             return (value[0], (value[1], value[2])) if value else None
-        hit = geocode_title(title, gemeente)
+        try:
+            hit = geocode_title(title, gemeente)
+        except Exception:
+            found, value = cache.houd("locatie", key)  # a refresh that fails keeps the address found before
+            if found:
+                return (value[0], (value[1], value[2])) if value else None
+            raise
         cache.zet("locatie", key, [hit[0], hit[1][0], hit[1][1]] if hit else None)
         return hit
 

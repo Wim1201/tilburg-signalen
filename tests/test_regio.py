@@ -6,12 +6,15 @@ No network. The logic tests run site/logic.js under Node and are skipped when No
 import datetime
 import json
 import os
+import pathlib
 import shutil
 import subprocess
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+from unittest import mock
 
-from signalen import bekendmakingen, gebied, http, update
+from signalen import bekendmakingen, cache as cachemodule, gebied, http, relevantie, update
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = os.path.join(ROOT, "site")
@@ -261,9 +264,9 @@ class Verversing(unittest.TestCase):
         self.assertEqual([entry["id"] for entry in core["berichten"]], ["k1", "k2", "oud"])  # the order of the run is kept
         self.assertEqual(core["straalKm"], 15)
         self.assertEqual(core["regios"], [
-            {"naam": "Midden-Brabant", "bestand": "regio-midden-brabant.json", "berichten": 0, "locaties": 0, "onzeker": 0},
-            {"naam": "West-Brabant", "bestand": "regio-west-brabant.json", "berichten": 1, "locaties": 0, "onzeker": 1},
-            {"naam": "Zeeland", "bestand": "regio-zeeland.json", "berichten": 2, "locaties": 1, "onzeker": 0}])
+            {"naam": "Midden-Brabant", "bestand": "regio-midden-brabant.json", "berichten": 0, "locaties": 0, "onzeker": 0, "ongelezen": 0, "mislukt": 0},
+            {"naam": "West-Brabant", "bestand": "regio-west-brabant.json", "berichten": 1, "locaties": 0, "onzeker": 1, "ongelezen": 0, "mislukt": 0},
+            {"naam": "Zeeland", "bestand": "regio-zeeland.json", "berichten": 2, "locaties": 1, "onzeker": 0, "ongelezen": 0, "mislukt": 0}])
         self.assertEqual(sorted(files), ["regio-midden-brabant.json", "regio-west-brabant.json", "regio-zeeland.json"])
         self.assertEqual(files["regio-zeeland.json"], {"regio": "Zeeland", "bijgewerkt": "2026-11-17T09:00:00+01:00",
                                                        "berichten": [notice("z1", "Zeeland", "ontwikkellocatie"), notice("z2", "Zeeland")]})
@@ -382,9 +385,9 @@ class Regiofilter(unittest.TestCase):
     def test_regions_on_offer_say_what_they_add(self):
         offered, = logic(["regios", self.AREA, self.OVERVIEW])
         self.assertEqual(offered, [
-            {"naam": "Midden-Brabant", "bestand": "regio-midden-brabant.json", "berichten": 0, "locaties": 0, "onzeker": 0, "gemeenten": 0},
-            {"naam": "West-Brabant", "bestand": "regio-west-brabant.json", "berichten": 3, "locaties": 1, "onzeker": 1, "gemeenten": 2},
-            {"naam": "Zeeland", "bestand": "regio-zeeland.json", "berichten": 1, "locaties": 1, "onzeker": 0, "gemeenten": 1}])
+            {"naam": "Midden-Brabant", "bestand": "regio-midden-brabant.json", "berichten": 0, "locaties": 0, "onzeker": 0, "ongelezen": 0, "mislukt": 0, "gemeenten": 0},
+            {"naam": "West-Brabant", "bestand": "regio-west-brabant.json", "berichten": 3, "locaties": 1, "onzeker": 1, "ongelezen": 0, "mislukt": 0, "gemeenten": 2},
+            {"naam": "Zeeland", "bestand": "regio-zeeland.json", "berichten": 1, "locaties": 1, "onzeker": 0, "ongelezen": 0, "mislukt": 0, "gemeenten": 1}])
 
     def test_data_from_before_the_regions_offers_no_choice(self):
         old_area = {"gemeenten": [{"naam": "Tilburg"}, {"naam": "Dongen"}]}
@@ -405,9 +408,327 @@ class Regiofilter(unittest.TestCase):
         core, west, zeeland, empty = logic(["reachKm", self.ITEMS[:3], 15], ["reachKm", self.ITEMS[:6], 15], ["reachKm", self.ITEMS, 15], ["reachKm", [], 15])
         self.assertEqual((core, west, zeeland, empty), (15, 42, 104, 15))
 
+    def test_a_chosen_region_reports_what_it_still_misses(self):
+        overview = [dict(self.OVERVIEW[0]), dict(self.OVERVIEW[1], ongelezen=146, mislukt=20), dict(self.OVERVIEW[2], ongelezen=1, mislukt=1)]
+        none, west, both, complete = logic(["regioMeldingen", overview, []], ["regioMeldingen", overview, ["West-Brabant"]],
+                                           ["regioMeldingen", overview, ["Zeeland", "West-Brabant"]], ["regioMeldingen", overview, ["Midden-Brabant"]])
+        self.assertEqual(none, [], "zonder gekozen regio meldt de app niets over de regio's")
+        self.assertEqual(west, [
+            'Van West-Brabant zijn 146 berichten nog niet gelezen. Ze staan onder Onzeker met "Tekst nog niet gelezen"; de volgende verversingen halen ze op.',
+            "Bij de laatste verversing konden 20 bekendmakingen van West-Brabant niet volledig worden gelezen. Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw."])
+        self.assertEqual(both[:2], west)
+        self.assertEqual(both[2:], [
+            'Van Zeeland is 1 bericht nog niet gelezen. Het staat onder Onzeker met "Tekst nog niet gelezen"; een volgende verversing haalt het op.',
+            "Bij de laatste verversing kon 1 bekendmaking van Zeeland niet volledig worden gelezen. Ze staat tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw."])
+        self.assertEqual(complete, [])
+        empty, old = logic(["regioMeldingen", None, ["Zeeland"]], ["regioMeldingen", [{"naam": "Zeeland", "bestand": "regio-zeeland.json"}], ["Zeeland"]])
+        self.assertEqual((empty, old), ([], []))  # an overview from before the counts reports nothing
+
+    def test_what_a_region_misses_travels_with_the_region_on_offer(self):
+        offered, = logic(["regios", self.AREA, [dict(self.OVERVIEW[1], ongelezen=146, mislukt=20)]])
+        self.assertEqual((offered[0]["ongelezen"], offered[0]["mislukt"]), (146, 20))
+
     def test_names_in_a_sentence(self):
         lines = logic(["nameList", ["Zeeland"]], ["nameList", ["Midden-Brabant", "Zeeland"]], ["nameList", ["Midden-Brabant", "West-Brabant", "Zeeland"]], ["nameList", []])
         self.assertEqual(lines, ["Zeeland", "Midden-Brabant en Zeeland", "Midden-Brabant, West-Brabant en Zeeland", ""])
+
+
+def tekstbericht(id, regio="kern", datum="2026-11-10", **extra):
+    """A permit notice without a description: the app has to read its text."""
+    base = {"id": id, "type": "vergunning", "titel": "Aanvraag omgevingsvergunning, Teststraat " + id, "omschrijving": None, "activiteiten": [],
+            "fase": "Aanvraag", "locatieSoort": "exact", "regio": regio, "datum": datum, "_rd": None, "_perceelM2": None,
+            "_urlXml": "https://repository.overheid.nl/frbr/x/%s/1/xml/%s.xml" % (id, id)}
+    base.update(extra)
+    return base
+
+
+class Teksten:
+    """Stands in for the text service: records what is asked, in order, and can fail for some."""
+
+    def __init__(self, fail=(), text="het plaatsen van een dakkapel"):
+        self.asked, self.fail, self.text = [], set(fail), text
+
+    def __call__(self, url, titel, limiet):
+        key = url.rsplit("/", 1)[-1][:-4]
+        self.asked.append(key)
+        if key in self.fail or "*" in self.fail:
+            raise http.OphaalFout(url, "HTTP 429", 1)
+        return self.text
+
+
+def verrijk(items, bron, **kwargs):
+    return update.verrijk(items, 400, haal_tekst=bron, perceel_m2=lambda x, y: 1200, slaap=lambda seconds: None, **kwargs)
+
+
+class GrensPerRun(unittest.TestCase):
+    """At most a set number of new texts of the regions per run; the core first and without a limit."""
+
+    def setUp(self):
+        self.map = tempfile.TemporaryDirectory()
+        self.addCleanup(self.map.cleanup)
+        self.pad = pathlib.Path(self.map.name) / "ophaalcache.json"
+
+    def cache(self):
+        return cachemodule.Cache(self.pad)
+
+    @staticmethod
+    def notices():
+        core = [tekstbericht("k%d" % n) for n in range(1, 6)]
+        zeeland = [tekstbericht("z%d" % n, "Zeeland", "2026-11-%02d" % n) for n in range(1, 5)]
+        west = [tekstbericht("w%d" % n, "West-Brabant", "2026-11-%02d" % (10 + n)) for n in range(1, 3)]
+        return zeeland + core + west  # the regions deliberately not behind the core
+
+    def test_core_is_read_completely_and_first_then_the_newest_of_the_regions(self):
+        bron = Teksten()
+        items, stats = verrijk(self.notices(), bron, grens_regio=3)
+        # Texts are fetched a few at a time, so the order within a group is free; the groups are not mixed.
+        self.assertEqual(sorted(bron.asked[:5]), ["k1", "k2", "k3", "k4", "k5"], "een regiotekst is gevraagd voordat de kern klaar was")
+        self.assertEqual(sorted(bron.asked[5:]), ["w1", "w2", "z4"])  # the three newest of the regions: 12, 11 and 4 November
+        waiting = {entry["id"]: entry for entry in items if entry["id"] in ("z1", "z2", "z3")}
+        for entry in waiting.values():
+            self.assertEqual((entry["klasse"], entry["score"], entry["waarom"]), ("onzeker", 5, "Tekst nog niet gelezen; een volgende verversing haalt hem op."))
+        self.assertTrue(all(entry["klasse"] == "weggefilterd" for entry in items if entry["id"] not in waiting))
+        self.assertEqual(stats["tekst"]["uitgesteld"], 3)
+        self.assertEqual(stats["tekst"]["perRegio"], {"kern": {"mislukt": 0, "uitgesteld": 0}, "Zeeland": {"mislukt": 0, "uitgesteld": 3},
+                                                      "West-Brabant": {"mislukt": 0, "uitgesteld": 0}})
+
+    def test_limit_never_touches_the_core(self):
+        bron = Teksten()
+        items, stats = verrijk([tekstbericht("k%d" % n) for n in range(40)] + [tekstbericht("z1", "Zeeland")], bron, grens_regio=0)
+        self.assertEqual(len([key for key in bron.asked if key.startswith("k")]), 40)
+        self.assertNotIn("z1", bron.asked)
+        self.assertEqual(stats["tekst"]["perRegio"]["kern"], {"mislukt": 0, "uitgesteld": 0})
+
+    def test_without_a_limit_everything_is_read_as_before(self):
+        bron = Teksten()
+        items, stats = verrijk(self.notices(), bron)
+        self.assertEqual(len(bron.asked), 11)
+        self.assertEqual(stats["tekst"]["uitgesteld"], 0)
+
+    def test_the_label_is_one_sentence_and_wins_from_what_the_title_says(self):
+        self.assertRegex(relevantie.ONGELEZEN, r"^Tekst nog niet gelezen\b[^.]*\.$")
+        title = "Aanvraag omgevingsvergunning voor het bouwen van 12 appartementen, Teststraat 1"
+        items, _ = verrijk([tekstbericht("z-nieuw", "Zeeland", "2026-11-12"), tekstbericht("z-oud", "Zeeland", "2026-11-01", titel=title, _rd=(1.0, 2.0))],
+                           Teksten(), grens_regio=1)
+        old = next(entry for entry in items if entry["id"] == "z-oud")
+        self.assertEqual((old["klasse"], old["waarom"], old["perceelM2"]), ("onzeker", relevantie.ONGELEZEN, None))
+
+    def test_no_parcel_is_looked_up_for_a_notice_that_waits(self):
+        looked_up = []
+        title = "Aanvraag omgevingsvergunning voor het slopen van een loods, Teststraat 1"
+        items = [tekstbericht("z1", "Zeeland", "2026-11-12", titel=title, _rd=(1.0, 2.0)), tekstbericht("z2", "Zeeland", "2026-11-01", titel=title, _rd=(3.0, 4.0))]
+        update.verrijk(items, 400, haal_tekst=Teksten(), perceel_m2=lambda x, y: looked_up.append((x, y)) or 1200, slaap=lambda seconds: None, grens_regio=1)
+        self.assertEqual(looked_up, [(1.0, 2.0)])
+
+    def test_a_text_that_is_in_the_cache_is_not_new_and_the_next_run_reads_on(self):
+        first, bron = self.cache(), Teksten()
+        verrijk(self.notices(), bron, cache=first, grens_regio=3)
+        first.bewaar()
+        self.assertEqual(len(bron.asked), 8)
+
+        second, bron = self.cache(), Teksten()
+        items, stats = verrijk(self.notices(), bron, cache=second, grens_regio=2)
+        self.assertEqual(sorted(bron.asked), ["z2", "z3"], "de tweede run leest niet verder waar de eerste ophield")
+        self.assertEqual([entry["id"] for entry in items if entry["waarom"] == relevantie.ONGELEZEN], ["z1"])
+        self.assertEqual(stats["tekst"]["perRegio"]["Zeeland"], {"mislukt": 0, "uitgesteld": 1})
+        second.bewaar()
+
+        third, bron = self.cache(), Teksten()
+        items, stats = verrijk(self.notices(), bron, cache=third, grens_regio=2)
+        self.assertEqual(bron.asked, ["z1"])
+        self.assertEqual(stats["tekst"]["uitgesteld"], 0)
+        self.assertFalse([entry for entry in items if entry["klasse"] == "onzeker"])
+
+
+class TellingPerRegio(unittest.TestCase):
+    """What could not be read is counted per region, so the morning screen reports the core only."""
+
+    def test_a_failure_in_a_region_is_not_a_failure_of_the_core(self):
+        items, stats = verrijk([tekstbericht("k1"), tekstbericht("z1", "Zeeland"), tekstbericht("z2", "Zeeland"), tekstbericht("w1", "West-Brabant")],
+                               Teksten(fail={"z1", "w1"}))
+        self.assertEqual(stats["tekst"]["definitiefMislukt"], 2)
+        self.assertEqual(stats["tekst"]["perRegio"], {"kern": {"mislukt": 0, "uitgesteld": 0}, "Zeeland": {"mislukt": 1, "uitgesteld": 0},
+                                                      "West-Brabant": {"mislukt": 1, "uitgesteld": 0}})
+        self.assertEqual(update.kern_fouten(stats), {"tekst": 0, "perceel": 0})
+
+    def test_a_failure_in_the_core_is_reported_as_before(self):
+        items, stats = verrijk([tekstbericht("k1"), tekstbericht("k2"), tekstbericht("z1", "Zeeland")], Teksten(fail={"k1", "z1"}))
+        self.assertEqual(update.kern_fouten(stats), {"tekst": 1, "perceel": 0})
+        failed = next(entry for entry in items if entry["id"] == "k1")
+        self.assertEqual((failed["klasse"], failed["waarom"]),
+                         ("onzeker", "De tekst van deze bekendmaking kon niet worden opgehaald; de volgende verversing probeert het opnieuw."))
+
+    def test_a_missing_text_is_counted_also_when_the_title_already_decides(self):
+        # Run 22 of 18-11-2026: 35 texts did not come, but only 31 notices showed it. For the other four the
+        # title settled the verdict, so nothing in the notice told that its text was missing.
+        title = "Aanvraag omgevingsvergunning voor het bouwen van 12 appartementen, Teststraat 1"
+        items, stats = verrijk([tekstbericht("w1", "West-Brabant", titel=title)], Teksten(fail={"w1"}))
+        self.assertEqual(items[0]["klasse"], "ontwikkellocatie")
+        self.assertNotIn("kon niet worden opgehaald", items[0]["waarom"])
+        self.assertEqual(stats["tekst"]["perRegio"]["West-Brabant"]["mislukt"], 1)
+
+    def test_a_failed_parcel_lookup_is_counted_with_its_region(self):
+        def down(x, y):
+            raise http.OphaalFout("https://api.pdok.nl/x", "tijdslimiet", 2)
+
+        title = "Aanvraag omgevingsvergunning voor het slopen van een loods, Teststraat 1"
+        items = [tekstbericht("k1", titel=title, _rd=(1.0, 2.0)), tekstbericht("z1", "Zeeland", titel=title, _rd=(3.0, 4.0))]
+        _, stats = update.verrijk(items, 400, haal_tekst=Teksten(), perceel_m2=down, slaap=lambda seconds: None)
+        self.assertEqual(stats["perceel"]["perRegio"], {"kern": {"mislukt": 1}, "Zeeland": {"mislukt": 1}})
+        self.assertEqual(update.kern_fouten(stats)["perceel"], 1)
+
+    def test_statistics_without_a_split_count_as_they_are(self):
+        self.assertEqual(update.kern_fouten({"insolventie": {"definitiefMislukt": 3}, "tekst": {"definitiefMislukt": 2}}), {"insolventie": 3, "tekst": 2})
+
+    def document(self, fail, grens=None):
+        def notice(id, regio):
+            return dict(tekstbericht(id, regio), afstandKm=1.0 if regio == "kern" else 90.0)
+
+        config = {"venster_dagen": {"vergunning": 42}, "centrum": {}, "straal_km": 15, "drempel_perceel_m2": 400}
+        fetchers = {"officielebekendmakingen": lambda: [notice("k1", "kern"), notice("z1", "Zeeland"), notice("z2", "Zeeland"), notice("z3", "Zeeland"),
+                                                         notice("w1", "West-Brabant")]}
+        now = datetime.datetime(2026, 11, 18, 9, 0, tzinfo=datetime.timezone.utc)
+        return update.run(config, {"gemeenten": []}, now, fetchers=fetchers, dagcontrole=lambda moment: [],
+                          verrijker=lambda found: verrijk(found, Teksten(fail=fail), grens_regio=grens))
+
+    def test_what_the_run_writes_for_the_morning_screen_is_about_the_core(self):
+        document = self.document(fail={"z1", "w1"})
+        self.assertEqual(document["ophaalfouten"], {"tekst": 0, "perceel": 0})
+        self.assertEqual(document["ophaalstatistiek"]["tekst"]["definitiefMislukt"], 2)  # the full figures stay in the statistics
+        self.assertEqual(self.document(fail={"k1"})["ophaalfouten"], {"tekst": 1, "perceel": 0})
+
+    def test_every_region_gets_its_own_count_in_the_overview(self):
+        # Four new texts in the regions on one day and room for three: the last one waits. One of Zeeland fails.
+        document = self.document(fail={"z1"}, grens=3)
+        core, files = update.verdeel(document, ["Midden-Brabant", "West-Brabant", "Zeeland"])
+        self.assertEqual({regio["naam"]: (regio["ongelezen"], regio["mislukt"]) for regio in core["regios"]},
+                         {"Midden-Brabant": (0, 0), "West-Brabant": (1, 0), "Zeeland": (0, 1)})
+        waiting = [entry["id"] for file in files.values() for entry in file["berichten"] if entry["waarom"] == relevantie.ONGELEZEN]
+        self.assertEqual(waiting, ["w1"])
+        self.assertEqual(core["ophaalfouten"], {"tekst": 0, "perceel": 0})
+
+
+class WekelijkseBeurt(unittest.TestCase):
+    """The weekly full refresh reads the core anew and one region, in turn."""
+
+    REGIOS = ["Midden-Brabant", "West-Brabant", "Zeeland"]
+
+    def setUp(self):
+        self.map = tempfile.TemporaryDirectory()
+        self.addCleanup(self.map.cleanup)
+        self.pad = pathlib.Path(self.map.name) / "ophaalcache.json"
+
+    def test_which_region_which_sunday(self):
+        sundays = {"2026-11-22": "Midden-Brabant", "2026-11-29": "West-Brabant", "2026-12-06": "Zeeland", "2026-12-13": "Midden-Brabant",
+                   "2026-12-20": "West-Brabant", "2026-12-27": "Zeeland", "2027-01-03": "Midden-Brabant", "2027-01-10": "West-Brabant",
+                   "2027-01-17": "Zeeland"}
+        for day, regio in sundays.items():
+            with self.subTest(zondag=day):
+                self.assertEqual(update.regio_van_de_week(datetime.date.fromisoformat(day), self.REGIOS), regio)
+
+    def test_the_whole_week_has_the_same_region_and_no_week_is_skipped(self):
+        monday = datetime.date(2026, 11, 16)
+        self.assertEqual({update.regio_van_de_week(monday + datetime.timedelta(days=n), self.REGIOS) for n in range(7)}, {"Midden-Brabant"})
+        turns = [update.regio_van_de_week(monday + datetime.timedelta(weeks=n), self.REGIOS) for n in range(120)]
+        for n in range(len(turns) - 2):
+            self.assertEqual(set(turns[n:n + 3]), set(self.REGIOS), "een regio wacht langer dan drie weken (week %d)" % n)
+        self.assertIsNone(update.regio_van_de_week(monday, []))
+
+    def filled(self):
+        cache = cachemodule.Cache(self.pad)
+        verrijk(GrensPerRun.notices(), Teksten(text="oude tekst"), cache=cache)
+        cache.bewaar()
+        return cachemodule.Cache(self.pad)
+
+    def test_core_and_the_region_of_the_week_are_read_anew_the_rest_comes_from_the_cache(self):
+        cache, bron = self.filled(), Teksten()
+        items, stats = verrijk(GrensPerRun.notices(), bron, cache=cache, ververs=("kern", "Zeeland"), grens_regio=1)
+        self.assertEqual(sorted(bron.asked), ["k1", "k2", "k3", "k4", "k5", "z1", "z2", "z3", "z4"])
+        self.assertEqual(stats["tekst"]["uitgesteld"], 0, "een tekst die opnieuw gelezen wordt telt als nieuw voor de grens")
+        self.assertEqual(cache.statistiek()["tekst"], {"uitCache": 2, "opgehaald": 9})
+        cache.bewaar()
+        stored = json.loads(self.pad.read_text(encoding="utf-8"))["tekst"]
+        self.assertEqual((stored["z1"], stored["k1"], stored["w1"]), ("het plaatsen van een dakkapel", "het plaatsen van een dakkapel", "oude tekst"))
+
+    def test_a_refresh_that_fails_keeps_what_was_read_before(self):
+        cache = self.filled()
+        items, stats = verrijk(GrensPerRun.notices(), Teksten(fail={"*"}), cache=cache, ververs=("kern", "Zeeland"))
+        self.assertEqual((stats["tekst"]["definitiefMislukt"], stats["tekst"]["perRegio"]["kern"]["mislukt"]), (0, 0))
+        self.assertFalse([entry for entry in items if entry["klasse"] == "onzeker"])
+        self.assertEqual(cache.statistiek()["tekst"]["nietVerverst"], 9)
+        cache.bewaar()
+        stored = json.loads(self.pad.read_text(encoding="utf-8"))["tekst"]
+        self.assertEqual(len(stored), 11)
+        self.assertEqual(stored["z1"], "oude tekst")
+
+    def test_a_text_that_was_never_read_and_fails_is_tried_again_next_time(self):
+        cache = cachemodule.Cache(self.pad)
+        items, stats = verrijk([tekstbericht("z1", "Zeeland")], Teksten(fail={"z1"}), cache=cache, ververs=("kern", "Zeeland"))
+        self.assertEqual(stats["tekst"]["perRegio"]["Zeeland"]["mislukt"], 1)
+        cache.bewaar()
+        self.assertEqual(json.loads(self.pad.read_text(encoding="utf-8"))["tekst"], {})
+
+    def test_lookups_made_while_fetching_follow_the_label_of_the_municipality(self):
+        cache = cachemodule.Cache(self.pad)
+        for key in ("Tilburg|Plan A", "Middelburg|Plan B", "Breda|Plan C", "Oosterhout|Plan D"):
+            cache.zet("locatie", key, None)
+        cache.zet("gemeente", "1,2", "Tilburg")
+        cache.zet("insolventie", "stcrt-1", 0)
+        area = {"gemeenten": [{"naam": "Tilburg", "regio": "kern"}, {"naam": "Oosterhout", "regio": "kern", "buitenStraal": "West-Brabant"},
+                              {"naam": "Middelburg", "regio": "Zeeland"}, {"naam": "Breda", "regio": "West-Brabant"}]}
+        update.markeer_verversing(cache, area, ("kern", "Zeeland"))
+        self.assertEqual({key: cache.haal("locatie", key)[0] for key in cache.data["locatie"]},
+                         {"Tilburg|Plan A": False, "Middelburg|Plan B": False, "Breda|Plan C": True, "Oosterhout|Plan D": False})
+        self.assertEqual((cache.haal("gemeente", "1,2")[0], cache.haal("insolventie", "stcrt-1")[0]), (False, False))
+        untouched = cachemodule.Cache(self.pad)
+        untouched.zet("locatie", "Tilburg|Plan A", None)
+        update.markeer_verversing(untouched, area, ())
+        self.assertTrue(untouched.haal("locatie", "Tilburg|Plan A")[0])
+
+    def main(self, argv):
+        """Run update.main with the sources replaced; returns what the run was asked to read anew."""
+        seen = {}
+
+        def fake_run(config, area, now, cache=None, ververs=()):
+            seen.update(ververs=ververs, grens=config.get("grens_regioteksten"), now=now)
+            return {"bijgewerkt": now.isoformat(timespec="seconds"), "berichten": [], "ophaalstatistiek": {}, "ophaalfouten": {},
+                    "cache": {}, "onvolledigeDagen": [],
+                    "bronnen": [{"id": "officielebekendmakingen", "status": "ok", "aantal": 0}, {"id": "staatscourant-insolventies", "status": "ok", "aantal": 0}]}
+
+        output = pathlib.Path(self.map.name) / "data" / "berichten.json"
+        cache = mock.MagicMock()
+        with mock.patch.object(update, "OUTPUT", output), mock.patch.object(update, "run", fake_run), \
+                mock.patch.object(update.cachemodule, "Cache", cache), mock.patch("builtins.print"):
+            update.main(argv)
+        seen["lezen"] = cache.call_args.kwargs["lezen"]
+        seen["written"] = json.loads(output.read_text(encoding="utf-8"))
+        seen["files"] = sorted(path.name for path in output.parent.iterdir())
+        return seen
+
+    def test_the_run_reads_anew_what_its_arguments_say(self):
+        plain = self.main([])
+        self.assertEqual((plain["ververs"], plain["lezen"], plain["grens"]), ((), True, 300))
+        self.assertEqual((plain["written"]["ververst"], plain["written"]["volledigeVerversing"]), ([], False))
+
+        weekly = self.main(["--volledig"])
+        turn = update.regio_van_de_week(weekly["now"].date(), CONFIG["regios"])
+        self.assertEqual((weekly["ververs"], weekly["lezen"]), (("kern", turn), True), "de wekelijkse run leest de cache niet meer, of niet de regio van de week")
+        self.assertEqual((weekly["written"]["ververst"], weekly["written"]["volledigeVerversing"]), (["kern", turn], True))
+
+        chosen = self.main(["--volledig", "--regio", "Zeeland"])
+        self.assertEqual(chosen["ververs"], ("kern", "Zeeland"))
+
+        everything = self.main(["--alles"])
+        self.assertEqual((everything["ververs"], everything["lezen"], everything["grens"]), ((), False, None))
+        self.assertEqual(everything["written"]["ververst"], ["alles"])
+        self.assertEqual(plain["files"], ["berichten.json", "regio-midden-brabant.json", "regio-west-brabant.json", "regio-zeeland.json"])
+
+    def test_an_unknown_region_stops_the_run(self):
+        with self.assertRaises(SystemExit), mock.patch("builtins.print"):
+            update.main(["--volledig", "--regio", "Limburg"])
+
+    def test_the_limit_in_the_config_is_the_agreed_one(self):
+        self.assertEqual((CONFIG["grens_regioteksten"], update.GRENS_REGIOTEKSTEN), (300, 300))
 
 
 class EchteGegevens(unittest.TestCase):

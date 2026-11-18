@@ -161,5 +161,40 @@ module.exports = async function (browser, base) {
   result.fileDown.count = await page.textContent("#result-count");
   result.fileDown.line = await page.$eval("#regio-regel", function (node) { return !node.hidden; });
   await context.close();
+
+  // --- A region that still misses texts, while the core misses nothing: the morning screen says nothing,
+  // the region says it on its button, and the tab Berichten says it once the region is chosen.
+  context = await browser.newContext({ viewport: { width: 320, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
+  page = await context.newPage();
+  var missingErrors = [];
+  page.on("pageerror", function (error) { missingErrors.push(error.message); });
+  await page.route(/^https:\/\/fonts\./, function (route) { route.fulfill({ status: 200, contentType: "text/css", body: "" }); });
+  await page.route("**/data/berichten.json", async function (route) {
+    var data = await (await route.fetch()).json();
+    data.ophaalfouten = { tekst: 0, perceel: 0, insolventie: 0 };
+    data.regios.forEach(function (regio) { regio.ongelezen = regio.naam === first ? 146 : 0; regio.mislukt = regio.naam === first ? 20 : 0; });
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+  });
+  function shown() { return page.$$eval("#notices .stale", function (nodes) { return nodes.map(function (node) { return node.textContent; }); }); }
+  await page.goto(base + "/index.html");
+  await page.waitForSelector("#list .card");
+  result.missing = { morning: await shown() };
+  await page.click("#tab-gebied");
+  await page.waitForSelector("#regios .regio");
+  result.missing.buttons = await page.$$eval("#regios .regio", function (nodes) {
+    return nodes.map(function (node) { var box = node.getBoundingClientRect(); return { name: node.firstChild.textContent, sub: node.querySelector("span").textContent, right: Math.round(box.right) }; });
+  });
+  result.missing.buttonOverflow = await overflow();
+  await page.click('#regios .regio:has-text("' + first + '")');
+  await page.waitForSelector('#regios .regio[aria-pressed="true"]');
+  await page.click("#tab-berichten");
+  await page.waitForSelector("#view-berichten:not([hidden])");
+  result.missing.chosen = await shown();
+  result.missing.chosenOverflow = await overflow();
+  await page.click("#regio-regel button");
+  await page.waitForSelector("#regio-regel", { state: "hidden" });
+  result.missing.back = await shown();
+  result.missing.errors = missingErrors;
+  await context.close();
   return result;
 };

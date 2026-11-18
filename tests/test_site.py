@@ -796,6 +796,24 @@ class InDeBrowser(unittest.TestCase):
             page["tiles"] = [page["tiles"][0], page["tiles"][2]]
         self.assertEqual(reopened, morning)
 
+    def test_what_a_region_misses_is_reported_with_the_region_not_on_the_morning_screen(self):
+        seen = self.region()
+        missing, first = seen["missing"], seen["first"]
+        unread = 'Van %s zijn 146 berichten nog niet gelezen. Ze staan onder Onzeker met "Tekst nog niet gelezen"; de volgende verversingen halen ze op.' % first
+        failed = ("Bij de laatste verversing konden 20 bekendmakingen van %s niet volledig worden gelezen. "
+                  "Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw." % first)
+        self.assertEqual(missing["errors"], [])
+        # The core misses nothing: no line about reading on the morning screen, whatever the regions miss.
+        self.assertFalse([line for line in missing["morning"] if "gelezen" in line], missing["morning"])
+        self.assertEqual([line for line in missing["chosen"] if "gelezen" in line], [unread, failed])
+        self.assertEqual(missing["back"], missing["morning"])
+        subs = {button["name"]: button["sub"] for button in missing["buttons"]}
+        self.assertTrue(subs[first].endswith(" · 146 ongelezen"), subs[first])
+        self.assertFalse([sub for name, sub in subs.items() if name != first and "ongelezen" in sub])
+        self.assertTrue(all(button["right"] <= 320 for button in missing["buttons"]), missing["buttons"])
+        self.assertLessEqual(missing["buttonOverflow"], 0)
+        self.assertLessEqual(missing["chosenOverflow"], 0)
+
     def test_address_outside_the_core_finds_its_notices_while_the_app_shows_the_core(self):
         outside = self.seen["adres"]["outside"]
         self.assertEqual(outside["errors"], [])

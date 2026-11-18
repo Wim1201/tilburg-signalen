@@ -206,9 +206,32 @@
     return (overview || []).filter(function (regio) { return regio && regio.naam && regio.bestand; }).map(function (regio) {
       return {
         naam: regio.naam, bestand: regio.bestand, berichten: regio.berichten || 0, locaties: regio.locaties || 0, onzeker: regio.onzeker || 0,
+        ongelezen: regio.ongelezen || 0, mislukt: regio.mislukt || 0,
         gemeenten: area.gemeenten.filter(function (gemeente) { return regioOf(gemeente) === regio.naam; }).length,
       };
     });
+  }
+
+  /* What the chosen regions still miss, as the lines the app shows with them. The morning screen
+     reports the core only (`ophaalfouten` of the data file); a region reports its own shortfall, and
+     only when it is chosen. `ongelezen`: texts that wait for a later run, because a run reads a
+     limited number of new texts of the regions. `mislukt`: downloads that failed. */
+  function regioMeldingen(overview, chosen) {
+    var lines = [];
+    (overview || []).forEach(function (regio) {
+      if (!regio || (chosen || []).indexOf(regio.naam) === -1) return;
+      if (regio.ongelezen) {
+        lines.push(regio.ongelezen === 1
+          ? "Van " + regio.naam + " is 1 bericht nog niet gelezen. Het staat onder Onzeker met \"Tekst nog niet gelezen\"; een volgende verversing haalt het op."
+          : "Van " + regio.naam + " zijn " + regio.ongelezen + " berichten nog niet gelezen. Ze staan onder Onzeker met \"Tekst nog niet gelezen\"; de volgende verversingen halen ze op.");
+      }
+      if (regio.mislukt) {
+        lines.push(regio.mislukt === 1
+          ? "Bij de laatste verversing kon 1 bekendmaking van " + regio.naam + " niet volledig worden gelezen. Ze staat tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw."
+          : "Bij de laatste verversing konden " + regio.mislukt + " bekendmakingen van " + regio.naam + " niet volledig worden gelezen. Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw.");
+      }
+    });
+    return lines;
   }
 
   /* The regions whose file can hold notices about a municipality: its own region, or for a
@@ -245,7 +268,7 @@
   }
 
   return {
-    KERN: KERN, regioOf: regioOf, gemeentenIn: gemeentenIn, regios: regios, regiosFor: regiosFor, merged: merged, reachKm: reachKm, nameList: nameList,
+    KERN: KERN, regioOf: regioOf, gemeentenIn: gemeentenIn, regios: regios, regioMeldingen: regioMeldingen, regiosFor: regiosFor, merged: merged, reachKm: reachKm, nameList: nameList,
     NEW_HOURS: NEW_HOURS, TOP: TOP, TYPE_LABEL: TYPE_LABEL,
     isoDay: isoDay, daysAgoIso: daysAgoIso, shortDate: shortDate, km: km, safeUrl: safeUrl, hasPoint: hasPoint,
     latestDay: latestDay, byRelevance: byRelevance, sorted: sorted, rankMap: rankMap, markNew: markNew,
