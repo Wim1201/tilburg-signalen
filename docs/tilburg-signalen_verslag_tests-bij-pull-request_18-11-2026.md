@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 14:50 – 15:01 uur |
+| Datum | 18-11-2026, 14:50 – 15:01 uur; aangevuld 15:09 – 15:16 uur (PR 24 samengevoegd, run 33) |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, opnieuw gestart vanaf `main` op commit `7555b87` (na PR 23) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen`; Chromium via Playwright |
 | Brondata | Geen opvraging bij de bronnen. Voor de controle: de gegevens van de live site, bijgewerkt 18-11-2026, 14:52 uur |
@@ -22,6 +22,9 @@ en niet is samengevoegd**. `dagelijks.yml` en het schema zijn niet gewijzigd.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 15:16 uur | **PR 24 is samengevoegd op verzoek van Wim (15:09 uur, merge-commit `053cd74`) en run 33 is groen; "open blijft en niet is samengevoegd" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Vóór het samenvoegen was de testrun op de pull request groen voor de laatste commit. Zie "Run 33 op GitHub". |
+| 18-11-2026, 15:16 uur | **Nieuwe werkafspraak van Wim: voortaan alleen samenvoegen als de testrun op de pull request groen is, en die uitkomst in het verslag melden.** Bij PR 24 is dat voor het eerst zo gedaan. |
+| 18-11-2026, 15:16 uur | **"Het afbreken van een lopende testrun bij een nieuwe push" is niet gezien:** de tweede push naar PR 24 kwam nadat de eerste testrun al klaar was. De tweede run startte wel vanzelf en slaagde. Het afbreken zelf blijft dus ongetest. |
 | 18-11-2026, 15:05 uur | **De nieuwe workflow heeft op GitHub gedraaid, op PR 24 zelf, en is geslaagd; "De nieuwe workflow op GitHub" onder "Niet getest of nog open" is daarmee afgehandeld.** Zie "De eerste run van de nieuwe workflow". |
 | 18-11-2026, 15:01 uur | **`main` is weer groen; "`main` is rood" in het vorige verslag is daarmee achterhaald.** Run 32 slaagde op alle onderdelen. |
 | 18-11-2026, 15:01 uur | **De nieuwe test met de lettertypen van de app zelf heeft op GitHub echt gedraaid en is geslaagd; "Niet nagelopen: of de nieuwe test op de runner van GitHub de lettertypen binnenkrijgt" is daarmee afgehandeld.** De browsertests telden 66 tests zonder één overgeslagen, de controle van de live site 63 zonder één overgeslagen. Was de lettertypedienst niet bereikbaar geweest, dan had er een overgeslagen test gestaan. |
@@ -43,6 +46,33 @@ en niet is samengevoegd**. `dagelijks.yml` en het schema zijn niet gewijzigd.
 | **Hele run** | **4 min 30 s** | **68** | **0** | **Groen** |
 
 Berichten: 3.888, waarvan 1.140 in de kern; geen wachtende regioberichten; cache 963 kB (64 procent).
+
+## Run 33 op GitHub, na het samenvoegen van PR 24 (18-11-2026, 15:09 – 15:13 uur)
+
+**De testrun op de pull request vóór het samenvoegen:** groen. Run 2 van "Tests bij een pull request",
+op de laatste commit van PR 24 (`f149e55`), 15:05 – 15:06 uur. `main` was sindsdien niet veranderd, dus
+wat getest is, is wat er is samengevoegd.
+
+| Stap | Duur | Verzoeken | Weigeringen (HTTP 429) | Uitkomst |
+|---|---:|---:|---:|---|
+| Tests | 12 s | geen | | 440 tests geslaagd; 77 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 18 s | | | Geslaagd |
+| Browsertests | 43 s | geen naar de bronnen | | 66 tests geslaagd, geen overgeslagen |
+| Gebied bijwerken | 17 s | 29 | 0 | Geslaagd |
+| Berichten ophalen | 47 s | 40 | 0 | Geslaagd, zonder waarschuwing; niets mislukt |
+| Cache bewaren | 2 s | | | Cache teruggezet in `main` (commit `47fbd3a`): 1 nieuwe tekst en 1 nieuw perceel |
+| Publiceren | 6 s | | | Geslaagd |
+| Controle van de live site | 34 s | | | 63 tests geslaagd, geen overgeslagen |
+| **Hele run** | **3 min 45 s** | **69** | **0** | **Groen** |
+
+| Wat | Waarde |
+|---|---|
+| Berichten | 3.889, waarvan 1.140 in de kern: 1 nieuw bericht in Zeeland sinds run 32 |
+| Wachtende regioberichten | Geen |
+| Cache | 963 kB, 64 procent van 1,5 MB |
+| De nieuwe workflow | Is door het samenvoegen niet gestart: die draait alleen bij een pull request. Op `main` draaide alleen de verversing |
+
+De regel over de kern bij één regio alleen en de keuze "Overig" in het filter Fase staan daarmee live.
 
 ## Opdracht
 
