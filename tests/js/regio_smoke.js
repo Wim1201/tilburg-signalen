@@ -45,6 +45,8 @@ module.exports = async function (browser, base, options) {
   async function berichten() {
     return {
       scope: (await scope()).text,
+      // Next to the morning line: that it is about the core, when the lists show one region alone.
+      kernNote: await page.$eval("#brief-kern", function (node) { return node.hidden ? null : node.textContent; }),
       count: await page.textContent("#result-count"), brief: await page.textContent("#brief-title"),
       tiles: await page.$$eval(".tile b", function (nodes) { return nodes.map(function (node) { return node.textContent; }); }),
       cards: await page.$$eval("#list .card", function (nodes) { return nodes.length; }),
@@ -125,11 +127,11 @@ module.exports = async function (browser, base, options) {
     groups: await page.$$eval("#f-fase optgroup", function (groups) {
       return groups.map(function (group) { return { label: group.label, options: [].map.call(group.children, function (option) { return { value: option.value, label: option.textContent }; }) }; });
     }), counts: {}, cards: {} };
-  var steps = ["trede:vroeg", "trede:midden", "trede:laat"];
+  var steps = ["trede:vroeg", "trede:midden", "trede:laat", "trede:overig"];
   for (var f = 0; f < steps.length; f++) {
     await page.selectOption("#f-fase", steps[f]);
     result.fase.counts[steps[f]] = await page.textContent("#result-count");
-    await page.click("#more").catch(function () {});
+    if (await page.isVisible("#more")) await page.click("#more");
     result.fase.cards[steps[f]] = await page.$$eval("#list .card", function (nodes) { return nodes.map(function (node) { return node.getAttribute("data-id"); }); });
   }
   result.fase.overflow = await overflow();

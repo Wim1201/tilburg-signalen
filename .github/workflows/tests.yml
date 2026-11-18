@@ -1,0 +1,41 @@
+name: Tests bij een pull request
+
+# Draait bij elke pull request alleen de tests en de browsertests, zodat een fout zichtbaar is vóór
+# het samenvoegen en niet pas in de run erna. Haalt niets op, publiceert niets en schrijft niets
+# terug in het repository: dat doet alleen dagelijks.yml, vanaf main. De planner (tools/planner)
+# kent alleen dagelijks.yml en merkt van dit bestand niets.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Per pull request één run: een nieuwe push naar de pull request breekt de run van de vorige af.
+# Een eigen groep, los van de verversing: deze run wacht nooit op een verversing en andersom.
+concurrency:
+  group: tests-pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  testen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Zonder `ref`: GitHub haalt bij een pull request de samenvoeging met main op. Getest wordt dus
+      # wat er na het samenvoegen in main zou staan.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Dezelfde twee stappen als in dagelijks.yml, met dezelfde opdrachten.
+      - name: Tests
+        run: python -m unittest discover tests
+      - name: Browser klaarzetten
+        timeout-minutes: 10
+        uses: ./.github/actions/browser
+      - name: Browsertests
+        timeout-minutes: 10
+        run: |
+          # Zonder Playwright slaan deze tests zichzelf over en zou de stap groen zijn zonder iets te testen.
+          node -e "require('playwright')"
+          python -m unittest tests.test_site.InDeBrowser tests.test_video.Droogloop

@@ -46,27 +46,31 @@
     { id: "laat", naam: "Laat", fasen: ["Vastgesteld", "Verleend", "Herstelbesluit"] },
   ];
   var TREDE = "trede:"; // a value of the filter that names a step and not one phase
+  var OVERIG = "overig"; // everything that is in none of the three steps, so that the four together are all
   function faseTrede(fase) {
     var found = FASE_TREDEN.filter(function (step) { return step.fasen.indexOf(fase) !== -1; })[0];
     return found ? found.id : null;
   }
-  /* The choices of the filter "Fase" for these notices: the three steps, always, and every phase
-     that occurs, each with how many notices it has. */
+  /* The choices of the filter "Fase" for these notices: the three steps and "Overig" (what is in no
+     step), always, and every phase that occurs, each with how many notices it has. */
   function faseKeuzes(items) {
     var perFase = {};
     items.forEach(function (item) { if (item.fase) perFase[item.fase] = (perFase[item.fase] || 0) + 1; });
+    var other = items.filter(function (item) { return faseTrede(item.fase) === null; }).length;
     return {
       treden: FASE_TREDEN.map(function (step) {
         var count = step.fasen.reduce(function (sum, fase) { return sum + (perFase[fase] || 0); }, 0);
         return { value: TREDE + step.id, label: step.naam + ": " + step.fasen.join(", ").toLowerCase() + " (" + count + ")", aantal: count };
-      }),
+      }).concat([{ value: TREDE + OVERIG, label: "Overig: standen in geen trede (" + other + ")", aantal: other }]),
       fasen: Object.keys(perFase).sort(function (a, b) { return a.localeCompare(b, "nl"); }).map(function (fase) {
         return { value: fase, label: fase + " (" + perFase[fase] + ")", aantal: perFase[fase] };
       }),
     };
   }
   function faseMatches(fase, filter) {
-    return filter.indexOf(TREDE) === 0 ? faseTrede(fase) === filter.slice(TREDE.length) : fase === filter;
+    if (filter.indexOf(TREDE) !== 0) return fase === filter;
+    var step = filter.slice(TREDE.length);
+    return step === OVERIG ? faseTrede(fase) === null : faseTrede(fase) === step;
   }
 
   function sorted(items, sort) {
@@ -310,6 +314,13 @@
     return nameList(["Kern"].concat(regios));
   }
 
+  /* The morning line is always about the core. When the lists show one region alone, the page says
+     so next to it; in every other case the line and the lists are about the same notices or more. */
+  function kernNote(regios, toon) {
+    var choice = toonOf(regios, toon);
+    return choice !== SAMEN && choice !== KERN ? "Dit gaat over de kern. De lijsten hieronder tonen alleen " + choice + "." : "";
+  }
+
   /* With regions chosen the lists on the tab Berichten show them together with the core, or one
      part at a time. `toon` is SAMEN, KERN or the name of a chosen region; anything else is SAMEN. */
   var SAMEN = "samen";
@@ -412,7 +423,7 @@
 
   return {
     stale: stale, radarLabels: radarLabels, scopeLine: scopeLine, gebiedIntro: gebiedIntro,
-    SAMEN: SAMEN, toonKeuzes: toonKeuzes, toonOf: toonOf, toonItems: toonItems, FASE_TREDEN: FASE_TREDEN, faseTrede: faseTrede, faseKeuzes: faseKeuzes,
+    SAMEN: SAMEN, toonKeuzes: toonKeuzes, toonOf: toonOf, toonItems: toonItems, kernNote: kernNote, FASE_TREDEN: FASE_TREDEN, faseTrede: faseTrede, faseKeuzes: faseKeuzes,
     KERN: KERN, regioOf: regioOf, gemeentenIn: gemeentenIn, regios: regios, regioMeldingen: regioMeldingen, regiosFor: regiosFor, merged: merged, reachKm: reachKm, nameList: nameList,
     NEW_HOURS: NEW_HOURS, TOP: TOP, TYPE_LABEL: TYPE_LABEL,
     isoDay: isoDay, daysAgoIso: daysAgoIso, shortDate: shortDate, km: km, safeUrl: safeUrl, hasPoint: hasPoint,

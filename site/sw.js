@@ -1,6 +1,6 @@
 /* Service worker: makes the app installable and usable without a connection.
    Data is fetched fresh first; the last successful copy is the fallback. */
-var CACHE = "tilburg-signalen-v11";
+var CACHE = "tilburg-signalen-v12";
 var SHELL = ["./", "index.html", "styles.css", "logic.js", "app.js", "adres.js", "adres-app.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png",
   "img/ochtend.svg", "img/ochtend-donker.svg"];
 

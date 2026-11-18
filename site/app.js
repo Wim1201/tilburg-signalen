@@ -85,6 +85,9 @@
     var now = new Date(), counts = L.counts(inView(), state.nieuw), core = L.counts(state.kern, state.nieuw);
     $("brief-day").textContent = L.greeting(now.getHours()) + " · " + dayFormat.format(now);
     $("brief-title").textContent = L.briefing(core.nieuw, state.firstVisit);
+    var note = L.kernNote(state.regios, state.toon);
+    $("brief-kern").textContent = note;
+    $("brief-kern").hidden = !note;
     $("brief-sub").textContent = (L.alsoNewLine(core.onzekerNieuw) + " Laatste publicatiedag: " +
       (state.latestDay ? dayLabel(state.latestDay).toLowerCase() : "nog geen berichten") + ".").trim();
     $("tile-ranglijst").querySelector("b").textContent = counts.locaties;
