@@ -22,6 +22,7 @@ en niet is samengevoegd**. `dagelijks.yml` en het schema zijn niet gewijzigd.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 15:30 uur | **Nieuwe werkafspraak van Wim: voor een pull request die alleen `docs/` raakt, geldt voortaan vooraf akkoord.** Ik voeg zo'n pull request samen zodra de testrun erop groen is, en meld het achteraf. Voor al het andere blijft gelden: niet samenvoegen zonder dat Wim het zegt. |
 | 18-11-2026, 15:16 uur | **PR 24 is samengevoegd op verzoek van Wim (15:09 uur, merge-commit `053cd74`) en run 33 is groen; "open blijft en niet is samengevoegd" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Vóór het samenvoegen was de testrun op de pull request groen voor de laatste commit. Zie "Run 33 op GitHub". |
 | 18-11-2026, 15:16 uur | **Nieuwe werkafspraak van Wim: voortaan alleen samenvoegen als de testrun op de pull request groen is, en die uitkomst in het verslag melden.** Bij PR 24 is dat voor het eerst zo gedaan. |
 | 18-11-2026, 15:16 uur | **"Het afbreken van een lopende testrun bij een nieuwe push" is niet gezien:** de tweede push naar PR 24 kwam nadat de eerste testrun al klaar was. De tweede run startte wel vanzelf en slaagde. Het afbreken zelf blijft dus ongetest. |
