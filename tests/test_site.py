@@ -291,6 +291,36 @@ class Verversen(unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class OndertitelEnInleiding(unittest.TestCase):
+    """The line under the name of the app and the introduction on the tab Gebied follow what is
+    shown: the core, or the core with the chosen regions (site/logic.js)."""
+
+    CENTRE = "De Heuvel, Tilburg-centrum"
+
+    def test_without_a_region_the_line_names_the_core_and_its_radius(self):
+        self.assertEqual(logic(["scopeLine", 15, self.CENTRE, []], ["scopeLine", 15, self.CENTRE, None], ["scopeLine", 20, "de Markt", []]),
+                         ["Kern: binnen 15 km van De Heuvel, Tilburg-centrum", "Kern: binnen 15 km van De Heuvel, Tilburg-centrum", "Kern: binnen 20 km van de Markt"])
+
+    def test_with_regions_the_line_names_the_core_and_the_regions(self):
+        self.assertEqual(logic(["scopeLine", 15, self.CENTRE, ["Zeeland"]], ["scopeLine", 15, self.CENTRE, ["West-Brabant", "Zeeland"]],
+                               ["scopeLine", 15, self.CENTRE, ["Midden-Brabant", "West-Brabant", "Zeeland"]]),
+                         ["Kern en Zeeland", "Kern, West-Brabant en Zeeland", "Kern, Midden-Brabant, West-Brabant en Zeeland"])
+
+    def test_the_introduction_without_a_region_describes_the_core(self):
+        self.assertEqual(logic(["gebiedIntro", 15, self.CENTRE, 17, [], 17])[0],
+                         "Kern: alles binnen 15 km hemelsbreed van De Heuvel, Tilburg-centrum. Daarin liggen 17 gemeenten, waarvan de meeste maar voor een deel. "
+                         "Een bericht telt mee als de locatie zelf binnen de straal valt.")
+
+    def test_the_introduction_with_regions_says_what_is_added(self):
+        one, three = logic(["gebiedIntro", 15, self.CENTRE, 17, ["Zeeland"], 30],
+                           ["gebiedIntro", 15, self.CENTRE, 17, ["Midden-Brabant", "West-Brabant", "Zeeland"], 43])
+        self.assertEqual(one, "Kern en Zeeland. De kern is alles binnen 15 km hemelsbreed van De Heuvel, Tilburg-centrum: 17 gemeenten, waarvan de meeste maar voor een deel. "
+                              "Van Zeeland telt elke gemeente in haar geheel mee. Samen staan er nu 30 gemeenten op de lijst.")
+        self.assertEqual(three, "Kern, Midden-Brabant, West-Brabant en Zeeland. De kern is alles binnen 15 km hemelsbreed van De Heuvel, Tilburg-centrum: 17 gemeenten, "
+                                "waarvan de meeste maar voor een deel. Van de gekozen regio's telt elke gemeente in haar geheel mee. Samen staan er nu 43 gemeenten op de lijst.")
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
 class KaartjeTeksten(unittest.TestCase):
     """Where the texts on the small map go (site/logic.js, radarLabels): no name over another name,
     no ring label behind a dot or over a name. Units: km from the centre, x east, y south."""
@@ -912,6 +942,60 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(seen["withAll"]["line"], "Met " + sentence + " erbij. Alleen de kern")
         self.assertEqual(sorted(seen["askedForAll"]), sorted(regio["bestand"] for regio in data["overview"]), "een regiobestand is twee keer gelezen")
 
+    # --- The line under the name of the app and the introduction on the tab Gebied follow the choice.
+
+    @staticmethod
+    def with_core(names):
+        names = ["Kern"] + list(names)
+        return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " en " + names[-1]
+
+    def test_the_line_under_the_name_follows_the_chosen_regions(self):
+        self.in_both(self.check_the_line_under_the_name_follows_the_chosen_regions)
+
+    def check_the_line_under_the_name_follows_the_chosen_regions(self, seen):
+        data, first = seen["data"], seen["first"]
+        names = [button["name"] for button in seen["start"]["buttons"]]
+        core = "Kern: binnen %d km van %s" % (data["straalKm"], data["centrum"])
+        self.assertEqual((seen["morning"]["scope"], seen["start"]["scope"]["text"]), (core, core))
+        self.assertEqual((seen["one"]["scope"]["text"], seen["withOne"]["scope"]), ("Kern en " + first, "Kern en " + first), "op beide tabbladen dezelfde regel")
+        self.assertEqual((seen["all"]["scope"]["text"], seen["withAll"]["scope"]), (self.with_core(names), self.with_core(names)))
+        self.assertEqual(seen["reversed"]["scope"]["text"], self.with_core(names), "de volgorde van kiezen bepaalt de volgorde van de namen")
+        self.assertEqual((seen["back"]["scope"], seen["backGebied"]["scope"]["text"], seen["reopened"]["scope"], seen["reopenedGebied"]["scope"]["text"]), (core,) * 4)
+        for moment in ("start", "one", "all", "backGebied", "reopenedGebied", "reversed"):
+            with self.subTest(moment=moment):
+                line = seen[moment]["scope"]
+                self.assertEqual(line["name"], "Tilburg Signalen")
+                self.assertLessEqual(line["lines"], 2, "de regel onder de naam loopt op 320 pixels over meer dan twee regels: " + line["text"])
+                self.assertLessEqual(line["right"], line["updatedLeft"], "de regel loopt door het tijdstip heen")
+                self.assertLessEqual(seen[moment]["overflow"], 0)
+
+    def test_the_introduction_of_the_area_follows_the_chosen_regions(self):
+        self.in_both(self.check_the_introduction_of_the_area_follows_the_chosen_regions)
+
+    def check_the_introduction_of_the_area_follows_the_chosen_regions(self, seen):
+        data, first = seen["data"], seen["first"]
+        names = [button["name"] for button in seen["start"]["buttons"]]
+        centre = "alles binnen %d km hemelsbreed van %s" % (data["straalKm"], data["centrum"])
+        self.assertTrue(seen["start"]["intro"].startswith("Kern: " + centre + ". Daarin liggen "), seen["start"]["intro"])
+        one = seen["one"]["intro"]
+        self.assertTrue(one.startswith("Kern en " + first + ". De kern is " + centre + ": %d gemeenten" % len(seen["start"]["rows"])), one)
+        self.assertIn("Van " + first + " telt elke gemeente in haar geheel mee.", one)
+        self.assertTrue(one.endswith("Samen staan er nu %d gemeenten op de lijst." % len(seen["one"]["rows"])), one)
+        every = seen["all"]["intro"]
+        self.assertTrue(every.startswith(self.with_core(names) + ". De kern is "), every)
+        if len(names) > 1:
+            self.assertIn("Van de gekozen regio's telt elke gemeente in haar geheel mee.", every)
+        self.assertTrue(every.endswith("Samen staan er nu %d gemeenten op de lijst." % len(seen["all"]["rows"])), every)
+        self.assertEqual((seen["backGebied"]["intro"], seen["reopenedGebied"]["intro"]), (seen["start"]["intro"],) * 2)
+
+    def test_in_the_fixed_situation_the_lines_read_as_written_here(self):
+        _, seen = self.fixed()
+        self.assertEqual(seen["start"]["scope"]["text"], "Kern: binnen 15 km van De Heuvel, Tilburg-centrum")
+        self.assertEqual(seen["one"]["scope"]["text"], "Kern en Zeeland")
+        self.assertEqual(seen["all"]["scope"]["text"], "Kern, Midden-Brabant, West-Brabant en Zeeland")
+        self.assertEqual(seen["reversed"]["scope"]["text"], "Kern, Midden-Brabant, West-Brabant en Zeeland")
+        self.assertTrue(seen["one"]["intro"].startswith("Kern en Zeeland. De kern is alles binnen 15 km hemelsbreed van De Heuvel, Tilburg-centrum: "), seen["one"]["intro"])
+
     def test_the_fixed_situation_is_what_the_page_was_given(self):
         fixture, seen = self.fixed()
         self.assertEqual(seen["data"]["overview"], fixture["regios"])
@@ -986,8 +1070,8 @@ class InDeBrowser(unittest.TestCase):
     def test_a_refresh_keeps_the_region_the_search_the_filter_and_the_opened_card(self):
         seen = self.seen["verversen"]
         before = self.kept("before")
-        self.assertEqual((before["pressed"], before["line"], before["zoek"], before["type"], before["filtersOpen"], len(before["open"])),
-                         (["Zeeland"], "Met Zeeland erbij. Alleen de kern", "Goes", "vergunning", True, 1))
+        self.assertEqual((before["pressed"], before["line"], before["zoek"], before["type"], before["filtersOpen"], len(before["open"]), before["scope"]),
+                         (["Zeeland"], "Met Zeeland erbij. Alleen de kern", "Goes", "vergunning", True, 1, "Kern en Zeeland"))
         for moment in ("after", "sameRun", "noConnection", "connectionBack", "regionDown"):
             with self.subTest(moment=moment):
                 self.assertEqual(self.kept(moment), before)

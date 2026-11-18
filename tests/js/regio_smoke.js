@@ -31,8 +31,20 @@ module.exports = async function (browser, base, options) {
   }
 
   function overflow() { return page.evaluate(function () { return document.documentElement.scrollWidth - window.innerWidth; }); }
+  /* The line under the name of the app, and whether it fits: on how many lines it stands. */
+  function scope() {
+    return page.$eval("#scope", function (node) {
+      var range = document.createRange();
+      range.selectNodeContents(node);
+      var tops = [].map.call(range.getClientRects(), function (box) { return Math.round(box.top); });
+      return { text: node.textContent, lines: tops.filter(function (top, index) { return tops.indexOf(top) === index; }).length,
+        right: Math.round(node.getBoundingClientRect().right), updatedLeft: Math.round(document.getElementById("updated").getBoundingClientRect().left),
+        name: document.querySelector(".masthead h1").textContent };
+    });
+  }
   async function berichten() {
     return {
+      scope: (await scope()).text,
       count: await page.textContent("#result-count"), brief: await page.textContent("#brief-title"),
       tiles: await page.$$eval(".tile b", function (nodes) { return nodes.map(function (node) { return node.textContent; }); }),
       cards: await page.$$eval("#list .card", function (nodes) { return nodes.length; }),
@@ -44,6 +56,7 @@ module.exports = async function (browser, base, options) {
   }
   async function gebied() {
     return {
+      scope: await scope(),
       buttons: await page.$$eval("#regios .regio", function (nodes) {
         return nodes.map(function (node) {
           var box = node.getBoundingClientRect();
@@ -92,7 +105,7 @@ module.exports = async function (browser, base, options) {
       return Promise.all(overview.map(function (regio) { return json("data/" + regio.bestand); })).then(function (files) {
         var berichten = both[0].berichten.map(slim());
         files.forEach(function (file, index) { berichten = berichten.concat(file.berichten.map(slim(overview[index].naam))); });
-        return { straalKm: both[0].straalKm, regios: overview.map(function (regio) { return regio.naam; }), overview: overview,
+        return { straalKm: both[0].straalKm, centrum: both[0].centrum.naam, regios: overview.map(function (regio) { return regio.naam; }), overview: overview,
           core: both[0].berichten.length, inFiles: files.map(function (file) { return file.berichten.length; }),
           gemeenten: both[1].gemeenten.map(function (g) { return { naam: g.naam, land: g.land, regio: g.regio || "kern", buitenStraal: g.buitenStraal || null, dekking: g.dekking, opmerking: g.opmerking || null }; }),
           berichten: berichten };
@@ -171,6 +184,12 @@ module.exports = async function (browser, base, options) {
   await page.click("#tab-gebied");
   await page.waitForSelector("#view-gebied:not([hidden])");
   result.reopenedGebied = await gebied();
+  // Chosen in the opposite order: the line under the name keeps the order of the buttons.
+  for (var j = names.length - 1; j >= 0; j--) {
+    await page.click('#regios .regio:has-text("' + names[j] + '")');
+    await pressed(names[j], true);
+  }
+  result.reversed = await gebied();
 
   result.errors = errors;
   await context.close();

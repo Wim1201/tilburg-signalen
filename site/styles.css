@@ -82,8 +82,15 @@ a { color: var(--link); }
 .brand-text { min-width: 0; }
 .masthead h1 { font: 800 19px/1.1 var(--font-display); letter-spacing: -.01em; white-space: nowrap; }
 .masthead h1 span { color: var(--bar-signal); }
-.masthead-sub { font-size: 11.5px; line-height: 1.3; opacity: .82; }
+.masthead-sub { font-size: 11.5px; line-height: 1.3; opacity: .82; text-wrap: balance; }
 .updated { flex: none; max-width: 92px; font: 500 10.5px/1.35 var(--font-data); text-align: right; opacity: .9; }
+/* The narrowest phones: a little less air around the mark, so that the line under the name ("Kern:
+   binnen 15 km van ...", or the core with three regions) takes two lines and not three. */
+@media (max-width: 350px) {
+  .masthead-inner { gap: 8px; }
+  .brand { gap: 8px; }
+  .mark { width: 34px; height: 34px; }
+}
 
 main.wrap { padding-block: 18px calc(var(--tabs-height) + 32px); display: flex; flex-direction: column; }
 .view { display: flex; flex-direction: column; gap: 12px; }
