@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 17-11-2026, 20:22 – 20:53 uur |
+| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) |
 | Versie | versie 2 van de app met het tabblad Adres, branch `claude/optimistic-gauss-sb0xpy`, gestart vanaf `main` op commit `edf4150` (na PR #16) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | officielebekendmakingen.nl (zoekdienst SRU), opgevraagd 17-11-2026 tussen 20:25 en 20:37 uur; gemeente-indeling van het CBS, "Gebieden in Nederland 2026" (tabel 86247NED) |
@@ -27,6 +27,9 @@ gemeten; zie "Open punten".
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 08:37 uur | **Op GitHub is de eerste run met de regio's over de tien minuten gegaan, met 173 weigeringen; "De stopregel is niet geraakt" onder "Stand" geldt alleen voor de meting vanuit de container.** Run 22 (handmatig, vanaf de werkbranch, door Wim gestart) deed in de stap "Berichten ophalen" 1.404 verzoeken in 12 minuten en 49 seconden; 35 teksten kwamen niet binnen. De run eindigde zonder fout. Volgens de afspraak is er niet verder uitgebreid; zie "Run 22 op GitHub" met het voorstel. |
+| 18-11-2026, 08:37 uur | **Mijn schatting voor die eerste run was te laag.** Ik schatte 1.300 verzoeken "rond de tien minuten" en ging uit van de 43 weigeringen van run 5. Het werden 1.404 verzoeken, bijna 13 minuten en 173 weigeringen. |
+| 18-11-2026, 08:37 uur | **Gevonden gebrek in de uitbreiding: de melding bovenaan het ochtendscherm telt ook niet-gelezen teksten uit de regio's.** In run 22 zaten alle teruggevonden niet-gelezen teksten in de regio's en geen in de kern, maar de app zou na publiceren melden dat 35 bekendmakingen niet volledig gelezen konden worden. Niet hersteld; zie het voorstel. |
 | 17-11-2026, 21:21 uur | **De handmatige run vanaf de werkbranch kon ik niet starten; "Graag je akkoord voordat ik die start" onder "Open punten" is daarmee achterhaald.** Wim gaf akkoord, maar de koppeling van deze sessie mag geen workflow starten (GitHub antwoordde met 403). Niet omzeild. Wim kan de run zelf starten; zie het voorstel hieronder, "Buiten dit voorstel". |
 | 17-11-2026, 21:21 uur | **Het open punt over Roosendaal is uitgewerkt in een apart voorstel**, `tilburg-signalen_voorstel_andere-rubrieken_17-11-2026.md`. Daarin staat ook een correctie: van de vijf berichten van Vught ligt er één in de kern, en bij Dongen zit de afwijking in de titel en niet in de rubriek. |
 | 17-11-2026, 21:21 uur | **De stap "Gebied bijwerken" meldt nu verzoeken, duur en weigeringen** (commit `d5ab774`), zodat het log van een run per stap de cijfers geeft. |
@@ -319,6 +322,71 @@ de run van 20:31 uur. Op de live site kan het pas na samenvoegen.
 Het tabblad Gebied zonder en met West-Brabant gekozen, de rij van Roosendaal met de opmerking over de
 aanvragen, en het tabblad Berichten met de regel "Met West-Brabant erbij." Geen afbreking of
 overlap gezien.
+
+# Run 22 op GitHub (18-11-2026, 08:19 – 08:33 uur)
+
+De handmatige run vanaf de werkbranch (commit `6075815`), zonder "volledig". Ik kon hem niet zelf
+starten: de koppeling van deze sessie mag geen workflow starten (403, twee keer geprobeerd). Wim
+heeft hem gestart; ik heb het log en het resultaat gelezen. De run begon met de cache van `main` van
+17-11, die de regio's nog niet kent: dit is dus de situatie van de eerste run na samenvoegen.
+
+| Stap | Duur | Verzoeken | Weigeringen (HTTP 429) | Uitkomst |
+|---|---:|---:|---:|---|
+| Tests | 11 s | geen | | 336 tests geslaagd; 55 overgeslagen, omdat de browser in die stap nog niet klaarstaat |
+| Browser klaarzetten | 18 s | | | Geslaagd; Chromium uit de bewaarde map |
+| Browsertests | 34 s | geen naar de bronnen (PDOK wordt nagespeeld) | | 44 tests geslaagd, met die van het regiofilter en het adres buiten de kern |
+| Gebied bijwerken | 17 s | 29 | 0 | Geslaagd |
+| **Berichten ophalen** | **12 min 49 s** | **1.404** | **173** | Geslaagd, met een waarschuwing: 35 teksten niet opgehaald |
+| Cache bewaren | | | | Overgeslagen: alleen vanaf `main` |
+| publiceren, live-controleren | | | | Overgeslagen: alleen vanaf `main` |
+| **Hele run** | **14 min 20 s** | **1.433** | **173** | **Geslaagd (groen), niets gepubliceerd, geen cache geschreven** |
+
+### De stap "Berichten ophalen" in cijfers
+
+| | |
+|---|---:|
+| Verzoeken aan de bron (repository.overheid.nl) | 1.191 |
+| Verzoeken aan PDOK | 209 |
+| Verzoeken aan de Vlaamse bron | 4 (de bron antwoordde uiteindelijk; 8 berichten) |
+| Teksten gevraagd | 1.461, waarvan 480 uit de cache |
+| Teksten in de eerste ronde mislukt | 49: 37 door een weigering, 12 door "netwerk onbereikbaar" op de runner |
+| Daarvan bij herhaling gelukt | 14 |
+| **Teksten definitief niet opgehaald** | **35** |
+| Percelen gevraagd / mislukt | 192 / 0 |
+| Berichten | 3.699: kern 1.080, Midden-Brabant 187, West-Brabant 1.363, Zeeland 1.069 |
+
+De 173 weigeringen tellen elke geweigerde poging, ook de pogingen die bij herhaling slaagden; daarom
+zijn het er meer dan de 37 in de regel over de teksten.
+
+### Wat er met de 35 niet-gelezen teksten gebeurt
+
+Het resultaat van de run is opgehaald en nagelezen (het bestand dat de run voor de site klaarzet).
+De berichten waarvan de tekst niet kwam, staan tijdelijk onder Onzeker met die reden. Ik vond er 31
+terug: 20 in West-Brabant, 9 in Zeeland, 2 in Midden-Brabant en **geen in de kern**. De kern is in
+deze run heel: 1.080 berichten, 80 ontwikkellocaties, 22 onzeker. De volgende run probeert de
+ontbrekende teksten opnieuw; vanaf de branch kan dat niet worden aangetoond, omdat de cache daar
+niet bewaard wordt.
+
+### Wat dit betekent voor de afspraak
+
+De afspraak was: stoppen met uitbreiden als een gewone run de tien minuten overschrijdt of er
+structureel weigeringen komen. **Deze run ging erover.** Het is de eerste run met een cache zonder
+regio's, niet de dagelijkse toestand; maar of de dagelijkse toestand op GitHub binnen de grens
+blijft, heb ik niet gemeten en kan vanaf een branch ook niet gemeten worden. Er is daarom niets meer
+toegevoegd.
+
+### Voorstel (niet doorgevoerd)
+
+| Voorstel | Wat het oplost | Prijs |
+|---|---|---|
+| **1. Een grens per run aan het aantal nieuwe teksten voor de regio's**, bijvoorbeeld 300 | De eerste vulling verspreidt zich over vier runs in plaats van één run van 13 minuten; een dag met veel nieuws loopt niet uit. De kern gaat altijd voor en wordt nooit begrensd | Een regiobericht waarvan de tekst nog niet gelezen is, staat tot de volgende run onder Onzeker met die reden, of blijft zolang weg. Dat is een keuze |
+| **2. Niet-gelezen teksten per regio tellen** | De melding bovenaan het ochtendscherm gaat dan alleen over de kern. Nu zou ze na deze run "35 bekendmakingen" melden terwijl de kern heel is | Klein; de regio's melden hun eigen tekort bij de regio |
+| 3. Minder verzoeken tegelijk als er veel te halen is (2 in plaats van 4) | Minder weigeringen | De run duurt langer; lost de tien minuten niet op |
+| 4. De wekelijkse volledige run in delen | Die run zou anders ruim twee keer zo zwaar zijn als run 22 | Elke regio eens per drie weken volledig ververst |
+| 5. Regio's één voor één toevoegen | De eerste vulling is per keer een derde | Drie keer samenvoegen; lost dagen met veel nieuws niet op |
+
+Mijn advies: 1 en 2 samen, en 4 voordat de eerste zondag aanbreekt. Daarna opnieuw meten met een
+handmatige run. Ik bouw hiervan niets zonder akkoord.
 
 # De Vlaamse bron
 
