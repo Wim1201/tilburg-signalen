@@ -319,3 +319,17 @@ module.exports = async function (browser, base) {
 
   return result;
 };
+
+/* For verversen_smoke.js: the same played-back registers and the same notices about the test address. */
+module.exports.typed = TYPED;
+module.exports.addNotices = addNotices;
+module.exports.pdok = function (page, seen) {
+  return page.route(/^https:\/\/(api|service)\.pdok\.nl\//, function (route) {
+    var url = route.request().url(), which = part(url);
+    seen.push(which);
+    if (which === "kaart") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
+    var body = answer(url);
+    return body ? route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(body) })
+      : route.fulfill({ status: 404, contentType: "text/plain", body: "onbekend in de test" });
+  });
+};

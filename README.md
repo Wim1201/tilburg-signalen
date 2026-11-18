@@ -19,6 +19,10 @@ Het tabblad **Adres** staat daar los van: typ een adres en zie het pand (BAG), h
 met een kaartje, en de publicaties over dat adres uit de berichten die de app al heeft. Het vraagt
 de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel.
 
+Blijft de app open staan, dan haalt hij de berichten opnieuw op zodra hij weer in beeld komt en de
+laatste keer meer dan een kwartier geleden is. "Bijgewerkt" volgt dan mee; een gekozen regio, een
+zoekopdracht, de filters en een opgezocht adres blijven staan.
+
 ## Hoe het werkt
 
 | Onderdeel | Wat het doet |
