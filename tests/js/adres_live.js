@@ -12,18 +12,22 @@ var ADDRESSES = [
   { typed: "Tilburgseweg 172e Goirle", label: "Tilburgseweg 172e, 5051AM Goirle" },
   { typed: "Tilburgseweg 172 Goirle", label: "Tilburgseweg 172, 5051AM Goirle" },
   { typed: "Heuvelring 67-12 Tilburg", label: "Heuvelring 67-12, 5038CJ Tilburg" },
+  // Outside the core: the notices come from the file of the region (Zeeland, West-Brabant).
+  { typed: "Noordweg 402 Middelburg", label: "Noordweg 402, 4333KK Middelburg" },
+  { typed: "Prinsenkade 10 Breda", label: "Prinsenkade 10, 4811VB Breda" },
 ];
 
 (async function () {
   var base = process.argv[2], shots = process.argv[3], proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
   var browser = await chromium.launch(proxy ? { proxy: { server: proxy, bypass: "127.0.0.1,localhost" } } : {});
   var context = await browser.newContext({ viewport: { width: 320, height: 844 }, deviceScaleFactor: shots ? 2 : 1, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
-  var page = await context.newPage(), errors = [], asked = [], results = [];
+  var page = await context.newPage(), errors = [], asked = [], regionFiles = [], results = [];
   page.on("pageerror", function (error) { errors.push(error.message); });
   page.on("console", function (message) { if (message.type() === "error") errors.push(message.text()); });
   page.on("request", function (request) {
     var url = request.url();
     if (url.indexOf(base) !== 0 && !/^(data:|blob:|https:\/\/fonts\.)/.test(url)) asked.push(new URL(url).host);
+    if (/\/data\/regio-[a-z-]+\.json/.test(url)) regionFiles.push(url.split("/").pop());
   });
   await page.goto(base + "/index.html#adres");
   await page.waitForSelector("#view-adres:not([hidden])");
@@ -60,6 +64,8 @@ var ADDRESSES = [
       var image = box.querySelector(".kaartvlak img");
       return { image: !!image && image.naturalWidth > 0, shapes: box.querySelectorAll(".p-perceel").length };
     });
+    // The notices of a region arrive a moment after the core was searched.
+    await page.waitForTimeout(1500);
     entry.notices = await page.$$eval("#adres-publicaties > .pubs", function (groups) {
       var out = {};
       groups.forEach(function (group) {
@@ -70,6 +76,8 @@ var ADDRESSES = [
       });
       return out;
     });
+    entry.searched = await page.$$eval("#adres-publicaties .bronregel", function (nodes) { return nodes.map(function (node) { return node.textContent; }).filter(function (text) { return /^Doorzocht/.test(text); })[0]; });
+    entry.regionFiles = regionFiles.splice(0);
     entry.links = await page.$$eval("#adres-energie a, #adres-plan a", function (nodes) { return nodes.map(function (a) { return a.href; }); });
     entry.overflow = await page.evaluate(function () { return document.documentElement.scrollWidth - window.innerWidth; });
     if (shots) await page.screenshot({ path: path.join(shots, "adres-" + (i + 1) + ".png"), fullPage: true });

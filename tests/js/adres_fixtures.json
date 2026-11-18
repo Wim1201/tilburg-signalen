@@ -160,5 +160,214 @@
     }
    ]
   }
+ },
+ "buitenKern": {
+  "suggest": {
+   "response": {
+    "numFound": 1,
+    "docs": [
+     {
+      "woonplaatsnaam": "Middelburg",
+      "weergavenaam": "Noordweg 402, 4333KK Middelburg",
+      "id": "adr-743b89b7bf70163ec6941a8a96cd80a1",
+      "gekoppeld_perceel": [
+       "MDB01-T-3010"
+      ],
+      "gemeentenaam": "Middelburg",
+      "postcode": "4333KK",
+      "centroide_ll": "POINT(3.60663762 51.51942095)",
+      "adresseerbaarobject_id": "0687010000009625",
+      "huisnummer": 402,
+      "centroide_rd": "POINT(31425.025 393778.813)",
+      "straatnaam": "Noordweg"
+     }
+    ]
+   }
+  },
+  "vbo": {
+   "type": "FeatureCollection",
+   "features": [
+    {
+     "type": "Feature",
+     "properties": {
+      "gebruiksdoel": "industriefunctie,woonfunctie",
+      "huisletter": null,
+      "huisnummer": 402,
+      "identificatie": "0687010000009625",
+      "oppervlakte": 391,
+      "pand.href": [
+       "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items/6b723e78-09e5-5dd0-b054-3990f96a5c9d"
+      ],
+      "postcode": "4333KK",
+      "status": "Verblijfsobject in gebruik",
+      "toevoeging": null,
+      "openbare_ruimte_naam": "Noordweg",
+      "woonplaats_naam": "Middelburg"
+     },
+     "geometry": {
+      "type": "Point",
+      "coordinates": [
+       3.6066376240651112,
+       51.519420950865864
+      ]
+     }
+    }
+   ]
+  },
+  "pand": {
+   "6b723e78-09e5-5dd0-b054-3990f96a5c9d": {
+    "type": "Feature",
+    "properties": {
+     "bouwjaar": 1622,
+     "status": "Pand in gebruik",
+     "identificatie": "0687100000027879",
+     "aantal_verblijfsobjecten": 1
+    }
+   }
+  },
+  "perceel": {
+   "3010": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "properties": {
+       "akr_kadastrale_gemeente_code_waarde": "MDB01",
+       "kadastrale_gemeente_waarde": "Middelburg",
+       "sectie": "T",
+       "perceelnummer": 3010,
+       "kadastrale_grootte_waarde": 6249,
+       "soort_grootte_waarde": "Vastgesteld"
+      },
+      "geometry": {
+       "type": "MultiPolygon",
+       "coordinates": [
+        [
+         [
+          [
+           3.606967184711104,
+           51.51924908735052
+          ],
+          [
+           3.6075519088334493,
+           51.519241834347824
+          ],
+          [
+           3.6071872019251523,
+           51.52031162728114
+          ],
+          [
+           3.606574708044111,
+           51.5200731499691
+          ],
+          [
+           3.6065573955575227,
+           51.52006591838526
+          ],
+          [
+           3.6065374471524008,
+           51.52005350405407
+          ],
+          [
+           3.606523288119861,
+           51.520041555591895
+          ],
+          [
+           3.6065130208951426,
+           51.52002958555352
+          ],
+          [
+           3.6065109996250855,
+           51.51974459248131
+          ],
+          [
+           3.6064745120277757,
+           51.51974862127711
+          ],
+          [
+           3.6064502867364734,
+           51.519713692486924
+          ],
+          [
+           3.6065876691347163,
+           51.51970991642834
+          ],
+          [
+           3.606541935022847,
+           51.51976641655352
+          ],
+          [
+           3.606740627665699,
+           51.51978197861817
+          ],
+          [
+           3.6067330454875606,
+           51.519705875490374
+          ],
+          [
+           3.606729081243892,
+           51.519627912546994
+          ],
+          [
+           3.6064640230100538,
+           51.5196352711969
+          ],
+          [
+           3.606462467233884,
+           51.51960472479414
+          ],
+          [
+           3.6064172258778995,
+           51.51960597689288
+          ],
+          [
+           3.606409159049938,
+           51.51946280635358
+          ],
+          [
+           3.606410920337845,
+           51.5194627253246
+          ],
+          [
+           3.6064052063206935,
+           51.51938419625277
+          ],
+          [
+           3.6064050719854945,
+           51.51938173980318
+          ],
+          [
+           3.6065257881173234,
+           51.519380703521726
+          ],
+          [
+           3.606524505683275,
+           51.51932257849393
+          ],
+          [
+           3.6065260635759695,
+           51.51932253931446
+          ],
+          [
+           3.6066675999312325,
+           51.5193193749306
+          ],
+          [
+           3.606661418998897,
+           51.51925459419079
+          ],
+          [
+           3.606967184711104,
+           51.51924908735052
+          ]
+         ]
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "_toelichting": "Echte antwoorden van PDOK voor Noordweg 402 in Middelburg (Zeeland, buiten de kern), opgehaald op 17-11-2026 en ingekort."
  }
 }

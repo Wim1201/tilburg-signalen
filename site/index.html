@@ -42,6 +42,7 @@
         <button type="button" class="tile" id="tile-onzeker" data-view="onzeker" aria-pressed="false"><b></b><span>Onzeker</span><em class="badge" id="onzeker-nieuw" hidden></em></button>
       </div>
       <div id="notices" class="notices"></div>
+      <p class="regio-regel" id="regio-regel" hidden></p>
     </div>
 
     <div class="toolbar">
@@ -97,6 +98,8 @@
   <section id="view-gebied" class="view" hidden aria-labelledby="tab-gebied">
     <h2>Het gebied</h2>
     <p class="lede" id="gebied-intro"></p>
+    <div class="regios" id="regios" role="group" aria-label="Regio erbij tonen" hidden></div>
+    <p class="hint" id="regio-uitleg" hidden></p>
     <figure class="radar">
       <svg id="radar" viewBox="-18.5 -18.5 37 37" role="img" aria-label="Kaartje met de ontwikkellocaties rond Tilburg-centrum"></svg>
       <figcaption><span class="dot dot-locatie"></span> ontwikkellocatie <span class="dot dot-onzeker"></span> onzeker. Noord is boven.</figcaption>

@@ -12,6 +12,7 @@ MAX_WACHT = 30  # seconds; the wait between attempts never grows beyond this
 RETRY_SECONDEN = 180  # time allowed for trying failed downloads once more
 MAX_RETRY_WACHT = 20  # seconds; longest pause before such a retry
 VERZOEKEN = collections.Counter()  # requests sent in this process, per host (every attempt counts)
+GEWEIGERD = collections.Counter()  # answers "HTTP 429" (too many requests) per host, also the ones a retry made good
 
 
 class OphaalFout(RuntimeError):
@@ -56,6 +57,8 @@ def get(url, params=None, timeout=90, attempts=4, slaap=time.sleep):
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return response.read()
         except urllib.error.HTTPError as error:
+            if error.code == 429:
+                GEWEIGERD[host] += 1
             if error.code < 500 and error.code != 429:
                 raise OphaalFout(url, reden(error), attempt + 1) from error
             last = error

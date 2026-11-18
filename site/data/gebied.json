@@ -1,5 +1,5 @@
 {
- "bijgewerkt": "2026-11-16T09:02:55+00:00",
+ "bijgewerkt": "2026-11-17T19:30:16+00:00",
  "centrum": {
   "naam": "De Heuvel, Tilburg-centrum",
   "rd": [
@@ -10,6 +10,11 @@
   "lon": 5.0910001
  },
  "straalKm": 15,
+ "regios": [
+  "Midden-Brabant",
+  "West-Brabant",
+  "Zeeland"
+ ],
  "gemeenten": [
   {
    "naam": "Tilburg",
@@ -54,7 +59,9 @@
      "maxKm": 11.5,
      "dekking": "geheel"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Hilvarenbeek",
@@ -107,7 +114,9 @@
      "maxKm": 15.7,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Goirle",
@@ -136,7 +145,9 @@
      "maxKm": 10.9,
      "dekking": "geheel"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Oisterwijk",
@@ -181,7 +192,9 @@
      "maxKm": 14.1,
      "dekking": "geheel"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Loon op Zand",
@@ -218,7 +231,9 @@
      "maxKm": 14.9,
      "dekking": "geheel"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Gilze en Rijen",
@@ -263,7 +278,9 @@
      "maxKm": 16.6,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Dongen",
@@ -292,7 +309,9 @@
      "maxKm": 17.4,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Alphen-Chaam",
@@ -321,7 +340,9 @@
      "maxKm": 20.0,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Ravels",
@@ -333,7 +354,9 @@
    "minKm": 8.7,
    "maxKm": 23.9,
    "dekking": "gedeeltelijk",
-   "woonplaatsen": []
+   "woonplaatsen": [],
+   "regio": "kern",
+   "buitenStraal": null
   },
   {
    "naam": "Heusden",
@@ -370,7 +393,9 @@
      "maxKm": 17.7,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": null
   },
   {
    "naam": "Oirschot",
@@ -399,7 +424,9 @@
      "maxKm": 19.9,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": null
   },
   {
    "naam": "Vught",
@@ -436,7 +463,9 @@
      "maxKm": 18.2,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": null
   },
   {
    "naam": "Boxtel",
@@ -465,7 +494,9 @@
      "maxKm": 17.5,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": null
   },
   {
    "naam": "Waalwijk",
@@ -502,7 +533,9 @@
      "maxKm": 21.7,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Baarle-Nassau",
@@ -523,7 +556,9 @@
      "maxKm": 25.1,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "Midden-Brabant"
   },
   {
    "naam": "Oosterhout",
@@ -560,7 +595,9 @@
      "maxKm": 22.8,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": "West-Brabant"
   },
   {
    "naam": "Reusel-De Mierden",
@@ -581,7 +618,374 @@
      "maxKm": 19.5,
      "dekking": "gedeeltelijk"
     }
-   ]
+   ],
+   "regio": "kern",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Breda",
+   "code": "GM0758",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.564546,
+   "lon": 4.765293,
+   "minKm": 15.2,
+   "maxKm": 30.8,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Geertruidenberg",
+   "code": "GM0779",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.695986,
+   "lon": 4.878392,
+   "minKm": 17.2,
+   "maxKm": 25.2,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Altena",
+   "code": "GM1959",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.769404,
+   "lon": 4.909125,
+   "minKm": 17.4,
+   "maxKm": 34.3,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Midden-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Drimmelen",
+   "code": "GM1719",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.697581,
+   "lon": 4.749625,
+   "minKm": 22.0,
+   "maxKm": 35.7,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Zundert",
+   "code": "GM0879",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.485689,
+   "lon": 4.636862,
+   "minKm": 24.4,
+   "maxKm": 41.4,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Etten-Leur",
+   "code": "GM0777",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.575936,
+   "lon": 4.642282,
+   "minKm": 27.5,
+   "maxKm": 34.8,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Moerdijk",
+   "code": "GM1709",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.662619,
+   "lon": 4.535938,
+   "minKm": 28.6,
+   "maxKm": 51.9,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Rucphen",
+   "code": "GM0840",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.521184,
+   "lon": 4.562531,
+   "minKm": 31.3,
+   "maxKm": 42.9,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Halderberge",
+   "code": "GM1655",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.589599,
+   "lon": 4.520678,
+   "minKm": 33.5,
+   "maxKm": 46.4,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Roosendaal",
+   "code": "GM1674",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.510348,
+   "lon": 4.415704,
+   "minKm": 39.4,
+   "maxKm": 54.4,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null,
+   "opmerking": "Aanvragen ontbreken: Roosendaal publiceert ze onder een andere rubriek dan de app leest."
+  },
+  {
+   "naam": "Steenbergen",
+   "code": "GM0851",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.602889,
+   "lon": 4.316708,
+   "minKm": 44.9,
+   "maxKm": 62.7,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Woensdrecht",
+   "code": "GM0873",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.410636,
+   "lon": 4.347414,
+   "minKm": 49.9,
+   "maxKm": 60.4,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Bergen op Zoom",
+   "code": "GM0748",
+   "land": "NL",
+   "provincie": "Noord-Brabant",
+   "lat": 51.505432,
+   "lon": 4.295601,
+   "minKm": 50.4,
+   "maxKm": 60.8,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "West-Brabant",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Reimerswaal",
+   "code": "GM0703",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.443843,
+   "lon": 4.105618,
+   "minKm": 58.5,
+   "maxKm": 81.2,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Tholen",
+   "code": "GM0716",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.569274,
+   "lon": 4.085381,
+   "minKm": 59.3,
+   "maxKm": 81.0,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Schouwen-Duiveland",
+   "code": "GM1676",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.688642,
+   "lon": 3.905916,
+   "minKm": 62.6,
+   "maxKm": 103.0,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Hulst",
+   "code": "GM0677",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.332592,
+   "lon": 4.08153,
+   "minKm": 63.7,
+   "maxKm": 84.4,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Kapelle",
+   "code": "GM0678",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.499421,
+   "lon": 3.962271,
+   "minKm": 74.7,
+   "maxKm": 82.7,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Goes",
+   "code": "GM0664",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.516302,
+   "lon": 3.83843,
+   "minKm": 77.7,
+   "maxKm": 96.3,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Noord-Beveland",
+   "code": "GM1695",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.565473,
+   "lon": 3.795933,
+   "minKm": 78.4,
+   "maxKm": 101.4,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Borsele",
+   "code": "GM0654",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.430112,
+   "lon": 3.82997,
+   "minKm": 79.8,
+   "maxKm": 97.6,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Terneuzen",
+   "code": "GM0715",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.299418,
+   "lon": 3.824866,
+   "minKm": 81.6,
+   "maxKm": 103.4,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Middelburg",
+   "code": "GM0687",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.502125,
+   "lon": 3.661479,
+   "minKm": 93.4,
+   "maxKm": 105.3,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Veere",
+   "code": "GM0717",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.556675,
+   "lon": 3.591562,
+   "minKm": 93.6,
+   "maxKm": 115.1,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Vlissingen",
+   "code": "GM0718",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.4965,
+   "lon": 3.519706,
+   "minKm": 95.5,
+   "maxKm": 124.6,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
+  },
+  {
+   "naam": "Sluis",
+   "code": "GM1714",
+   "land": "NL",
+   "provincie": "Zeeland",
+   "lat": 51.326123,
+   "lon": 3.534963,
+   "minKm": 98.8,
+   "maxKm": 123.5,
+   "dekking": "buiten",
+   "woonplaatsen": [],
+   "regio": "Zeeland",
+   "buitenStraal": null
   }
  ]
 }

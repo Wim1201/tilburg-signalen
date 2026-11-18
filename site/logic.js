@@ -12,6 +12,7 @@
   var NEW_HOURS = 14; // an item counts as "new" for this long after this device first saw it
   var TOP = 10;       // what the list shows before "Toon alle"
   var RANKED = ["ontwikkellocatie", "onzeker"];
+  var KERN = "kern";  // the label of everything within the radius
   var TYPE_LABEL = { vergunning: "Vergunning", plan: "Plan", faillissement: "Faillissement", verkoop: "Verkoop overheid" };
   var VIEW_KLASSE = { ranglijst: "ontwikkellocatie", nieuw: "ontwikkellocatie", onzeker: "onzeker" };
 
@@ -185,7 +186,89 @@
     };
   }
 
+  /* ---------- Regions around the core ----------
+     The app opens with the core: the notices in data/berichten.json, all within the radius. Around
+     it lie regions, each with a file of its own that is read when someone chooses the region.
+     Every municipality carries `regio`: "kern" or the name of its region. Data from before the
+     regions has no label and counts as the core. */
+  function regioOf(entry) { return (entry && entry.regio) || KERN; }
+
+  /* The municipalities of the area tab for a choice of regions, in the order of the file (nearest
+     first). The core is always shown. */
+  function gemeentenIn(area, chosen) {
+    return area.gemeenten.filter(function (gemeente) { var regio = regioOf(gemeente); return regio === KERN || (chosen || []).indexOf(regio) !== -1; });
+  }
+
+  /* The regions that can be chosen, with what choosing one adds. `overview` is `regios` of
+     data/berichten.json: per region its file and how many notices it holds. A region without a
+     file is left out, so data from before the regions offers no choice. */
+  function regios(area, overview) {
+    return (overview || []).filter(function (regio) { return regio && regio.naam && regio.bestand; }).map(function (regio) {
+      return {
+        naam: regio.naam, bestand: regio.bestand, berichten: regio.berichten || 0, locaties: regio.locaties || 0, onzeker: regio.onzeker || 0,
+        ongelezen: regio.ongelezen || 0, mislukt: regio.mislukt || 0,
+        gemeenten: area.gemeenten.filter(function (gemeente) { return regioOf(gemeente) === regio.naam; }).length,
+      };
+    });
+  }
+
+  /* What the chosen regions still miss, as the lines the app shows with them. The morning screen
+     reports the core only (`ophaalfouten` of the data file); a region reports its own shortfall, and
+     only when it is chosen. `ongelezen`: texts that wait for a later run, because a run reads a
+     limited number of new texts of the regions. `mislukt`: downloads that failed. */
+  function regioMeldingen(overview, chosen) {
+    var lines = [];
+    (overview || []).forEach(function (regio) {
+      if (!regio || (chosen || []).indexOf(regio.naam) === -1) return;
+      if (regio.ongelezen) {
+        lines.push(regio.ongelezen === 1
+          ? "Van " + regio.naam + " is 1 bericht nog niet gelezen. Het staat onder Onzeker met \"Tekst nog niet gelezen\"; een volgende verversing haalt het op."
+          : "Van " + regio.naam + " zijn " + regio.ongelezen + " berichten nog niet gelezen. Ze staan onder Onzeker met \"Tekst nog niet gelezen\"; de volgende verversingen halen ze op.");
+      }
+      if (regio.mislukt) {
+        lines.push(regio.mislukt === 1
+          ? "Bij de laatste verversing kon 1 bekendmaking van " + regio.naam + " niet volledig worden gelezen. Ze staat tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw."
+          : "Bij de laatste verversing konden " + regio.mislukt + " bekendmakingen van " + regio.naam + " niet volledig worden gelezen. Ze staan tijdelijk onder Onzeker; de volgende verversing probeert het opnieuw.");
+      }
+    });
+    return lines;
+  }
+
+  /* The regions whose file can hold notices about a municipality: its own region, or for a
+     municipality of the core the region of the part outside the radius. A municipality that lies
+     wholly within the radius has nothing outside it. */
+  function regiosFor(area, gemeente) {
+    var found = [];
+    area.gemeenten.forEach(function (entry) {
+      if (entry.naam !== gemeente) return;
+      var regio = regioOf(entry) === KERN ? (entry.dekking === "geheel" ? null : entry.buitenStraal) : entry.regio;
+      if (regio && found.indexOf(regio) === -1) found.push(regio);
+    });
+    return found;
+  }
+
+  /* The core and the notices of the chosen regions as one list, in the order of the data file:
+     newest first, then nearest. The core on its own is returned as it is. */
+  function merged(core, lists) {
+    var extra = (lists || []).filter(function (list) { return list && list.length; });
+    if (!extra.length) return core;
+    return extra.reduce(function (all, list) { return all.concat(list); }, core.slice()).sort(function (a, b) {
+      return (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0) || a.afstandKm - b.afstandKm || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+    });
+  }
+
+  /* The farthest the distance filter has to reach: the radius for the core, further with a region. */
+  function reachKm(items, radiusKm) {
+    return items.reduce(function (reach, item) { return item.afstandKm > reach ? Math.ceil(item.afstandKm) : reach; }, radiusKm);
+  }
+
+  /* "Midden-Brabant", "Midden-Brabant en Zeeland", "Midden-Brabant, West-Brabant en Zeeland". */
+  function nameList(names) {
+    return names.length > 1 ? names.slice(0, -1).join(", ") + " en " + names[names.length - 1] : names.join("");
+  }
+
   return {
+    KERN: KERN, regioOf: regioOf, gemeentenIn: gemeentenIn, regios: regios, regioMeldingen: regioMeldingen, regiosFor: regiosFor, merged: merged, reachKm: reachKm, nameList: nameList,
     NEW_HOURS: NEW_HOURS, TOP: TOP, TYPE_LABEL: TYPE_LABEL,
     isoDay: isoDay, daysAgoIso: daysAgoIso, shortDate: shortDate, km: km, safeUrl: safeUrl, hasPoint: hasPoint,
     latestDay: latestDay, byRelevance: byRelevance, sorted: sorted, rankMap: rankMap, markNew: markNew,

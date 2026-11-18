@@ -11,6 +11,10 @@ tot Tilburg en de bron.
 
 De app gebruikt alleen openbare gegevens van overheden en heeft geen server of database nodig.
 
+Rond die kern liggen drie **regio's**: Midden-Brabant, West-Brabant en Zeeland (indeling van het CBS).
+De app haalt hun berichten ook op, maar opent altijd met alleen de kern. Op het tabblad Gebied kies
+je een regio erbij; bij een volgend bezoek staat de app weer op de kern.
+
 Het tabblad **Adres** staat daar los van: typ een adres en zie het pand (BAG), het kadastrale perceel
 met een kaartje, en de publicaties over dat adres uit de berichten die de app al heeft. Het vraagt
 de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel.
@@ -19,8 +23,8 @@ de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel.
 
 | Onderdeel | Wat het doet |
 |---|---|
-| `signalen/gebied.py` | Bepaalt welke gemeenten en plaatsen binnen de straal vallen en schrijft `site/data/gebied.json` |
-| `signalen/update.py` | Haalt de berichten op bij alle bronnen en schrijft `site/data/berichten.json` |
+| `signalen/gebied.py` | Bepaalt welke gemeenten en plaatsen binnen de straal vallen (de kern), meet de gemeenten van de regio's uit `config.json` en schrijft `site/data/gebied.json` |
+| `signalen/update.py` | Haalt de berichten op bij alle bronnen en schrijft `site/data/berichten.json` (de kern) en per regio een eigen bestand, zoals `site/data/regio-zeeland.json` |
 | `signalen/bekendmakingen.py` | Leest officielebekendmakingen.nl (Gemeenteblad, Provinciaal blad, Waterschapsblad, Staatscourant) |
 | `signalen/vlaanderen.py` | Leest Vlaamse omgevingsvergunningen voor het Belgische deel van de straal |
 | `signalen/relevantie.py` | De regels: wat is een ontwikkellocatie, wat is onzeker, wat valt af, en de zin waarom |
@@ -53,11 +57,28 @@ python -m signalen.gebied
 python -m signalen.update
 ```
 
-Een gewone run haalt alleen op wat nog niet in de cache staat. Alles opnieuw ophalen
-(wekelijks gebeurt dat vanzelf) kan met:
+Een gewone run haalt alleen op wat nog niet in de cache staat. Van de regio's leest een run
+hoogstens 300 nieuwe teksten (`grens_regioteksten` in `config.json`); de kern wordt altijd eerst en
+helemaal gelezen. Een regiobericht dat op zijn tekst wacht, staat onder Onzeker met "Tekst nog niet
+gelezen" tot een volgende run het ophaalt.
+
+De volledige verversing (wekelijks gebeurt dat vanzelf) leest de kern opnieuw en één regio, bij
+toerbeurt per week; de andere regio's komen uit de cache:
 
 ```bash
 python -m signalen.update --volledig
+```
+
+Een bepaalde regio opnieuw lezen in plaats van de regio van de week:
+
+```bash
+python -m signalen.update --volledig --regio Zeeland
+```
+
+Echt alles opnieuw, zonder cache en zonder grens (zwaar voor de bron; niet voor de dagelijkse gang):
+
+```bash
+python -m signalen.update --alles
 ```
 
 ```bash
@@ -122,6 +143,22 @@ in `docs/tilburg-signalen_verslag_tabblad-adres_17-11-2026.md`.
 
 In `config.json` staan het middelpunt, de straal (`straal_km`), de bewaartermijnen
 (`venster_dagen`) en de drempel voor de perceelgrootte (`drempel_perceel_m2`). Draai na een wijziging van middelpunt of straal eerst `signalen.gebied`.
+
+### Gemeenten en regio's
+
+`gemeenten` in `config.json` is de lijst van gemeenten met per gemeente een regio:
+
+| Veld | Betekenis |
+|---|---|
+| `regio` | `kern`, of een van de regio's uit `regios` (Midden-Brabant, West-Brabant, Zeeland) |
+| `buiten_straal` | Alleen bij een gemeente van de kern: de regio waar de rest van die gemeente, buiten de straal, bij hoort |
+| `opmerking` | Een beperking van de bron voor die gemeente; de app toont haar op het tabblad Gebied |
+
+De kern is en blijft wat binnen de straal ligt; de lijst verandert dat niet. Een gemeente met een
+andere regio dan `kern` telt in haar geheel mee. Elk bericht krijgt `regio`: `kern` binnen de straal,
+anders de regio van zijn gemeente. Faillissementen en de Vlaamse bron blijven bij de kern. Draai na
+een wijziging van de lijst `signalen.gebied`. Waarom deze gemeenten, en wat de bron per gemeente
+levert, staat in `docs/tilburg-signalen_verslag_dekking-en-regios_17-11-2026.md`.
 
 ## Huisstijl
 

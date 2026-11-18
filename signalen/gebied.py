@@ -1,4 +1,5 @@
-"""Determine which municipalities and towns lie within the radius around the centre.
+"""Determine which municipalities and towns lie within the radius around the centre (the core),
+and measure the municipalities of the regions that config.json adds around it.
 
 Sources (public, no key needed):
 - PDOK, BRK Bestuurlijke Gebieden (Dutch municipal boundaries)
@@ -11,6 +12,7 @@ import datetime
 import json
 import math
 import pathlib
+import time
 
 from . import geo, http
 
@@ -59,6 +61,42 @@ def _measure(feature, centre_rd, radius_m):
     }
 
 
+def _named(name):
+    """The boundary of one Dutch municipality by its name, or None when PDOK does not know it."""
+    page = http.get_json(PDOK_GEMEENTEN, {"f": "json", "limit": 5, "crs": RD_CRS, "naam": name})
+    return next((feature for feature in page["features"] if feature["properties"]["naam"] == name), None)
+
+
+def regions(config, core, centre_rd, radius_m, fetch=_named):
+    """Label the core and add the municipalities of the regions in config.json. Returns the entries to add.
+
+    The core is what lies within the radius, exactly as before; the list in config.json does not
+    change it. A core municipality can name the region that the rest of it, outside the radius,
+    belongs to (`buiten_straal`). A municipality with another label than "kern" is taken whole. Its
+    towns are not listed: that would mean reading the boundaries of every town in three regions.
+    """
+    listed = {entry["naam"]: entry for entry in config.get("gemeenten", [])}
+    for gemeente in core.values():
+        gemeente["regio"] = "kern"
+        gemeente["buitenStraal"] = listed.get(gemeente["naam"], {}).get("buiten_straal") if gemeente["land"] == "NL" else None
+    added = []
+    for entry in listed.values():
+        if entry["regio"] == "kern" or entry["naam"] in core:
+            continue  # a core municipality keeps its place, whatever the list says
+        feature = fetch(entry["naam"])
+        if feature is None:
+            raise RuntimeError(f'Gemeente {entry["naam"]} uit config.json is niet gevonden bij PDOK')
+        props = feature["properties"]
+        measured = _measure(feature, centre_rd, radius_m)
+        measured.pop("_binnen")
+        added.append({
+            "naam": props["naam"], "code": props["identificatie"], "land": "NL", "provincie": props["ligt_in_provincie_naam"],
+            **measured, "dekking": "buiten", "woonplaatsen": [], "regio": entry["regio"], "buitenStraal": None,
+            **({"opmerking": entry["opmerking"]} if entry.get("opmerking") else {}),
+        })
+    return added
+
+
 def build(config):
     centre_rd = tuple(config["centrum"]["rd"])
     radius_m = config["straal_km"] * 1000
@@ -98,13 +136,15 @@ def build(config):
                 "provincie": "Antwerpen (Vlaanderen)", **measured, "woonplaatsen": [],
             }
 
-    result = sorted(gemeenten.values(), key=lambda g: (g["minKm"], g["naam"]))
+    extra = regions(config, gemeenten, centre_rd, radius_m)
+    result = sorted(list(gemeenten.values()) + extra, key=lambda g: (g["minKm"], g["naam"]))
     for gemeente in result:
         gemeente["woonplaatsen"].sort(key=lambda w: (w["minKm"], w["naam"]))
     return {
         "bijgewerkt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "centrum": config["centrum"],
         "straalKm": config["straal_km"],
+        "regios": config.get("regios", []),
         "gemeenten": result,
     }
 
@@ -115,13 +155,19 @@ def load():
 
 def main():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    http.VERZOEKEN.clear()
+    http.GEWEIGERD.clear()
+    started = time.monotonic()
     area = build(config)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(area, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     for gemeente in area["gemeenten"]:
         towns = ", ".join(w["naam"] for w in gemeente["woonplaatsen"])
-        print(f'{gemeente["naam"]:20} {gemeente["land"]} {gemeente["minKm"]:5.1f}-{gemeente["maxKm"]:4.1f} km '
-              f'{gemeente["dekking"]:12} {towns}')
+        print(f'{gemeente["naam"]:20} {gemeente["land"]} {gemeente["minKm"]:5.1f}-{gemeente["maxKm"]:5.1f} km '
+              f'{gemeente["dekking"]:12} {gemeente["regio"]:15} {towns}')
+    # The same line as the refresh prints, so the log of a run gives the figures of every step.
+    print(f'  gebied: {sum(http.VERZOEKEN.values())} verzoeken in {time.monotonic() - started:.0f} seconden, '
+          f'{sum(http.GEWEIGERD.values())} keer geweigerd (HTTP 429)')
 
 
 if __name__ == "__main__":

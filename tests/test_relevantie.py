@@ -278,8 +278,8 @@ class TekstEnVerrijkingTest(unittest.TestCase):
 
         items, stats = update.verrijk([self.item()], 400, haal_tekst=flaky, perceel_m2=lambda x, y: None, slaap=lambda s: None)
         self.assertEqual((items[0]["klasse"], len(attempts)), (W, 2))
-        self.assertEqual(stats["tekst"], {"gevraagd": 1, "eersteRondeMislukt": 1, "hersteld": 1, "definitiefMislukt": 0,
-                                          "redenen": {"HTTP 429": 1}})
+        self.assertEqual({key: stats["tekst"][key] for key in ("gevraagd", "eersteRondeMislukt", "hersteld", "definitiefMislukt", "redenen")},
+                         {"gevraagd": 1, "eersteRondeMislukt": 1, "hersteld": 1, "definitiefMislukt": 0, "redenen": {"HTTP 429": 1}})
 
     def test_text_that_cannot_be_fetched_is_uncertain_and_counted(self):
         def down(url, titel, limiet):

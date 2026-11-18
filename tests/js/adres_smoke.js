@@ -9,6 +9,9 @@ var A = require("../../site/adres.js");
 var PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 var ADDRESS = A.addresses(fixtures.suggest)[0];
 var TYPED = "Burg. van de Mortelplein 118a";
+// An address outside the core: Noordweg 402 in Middelburg, a municipality of the region Zeeland.
+var OUTSIDE = A.addresses(fixtures.buitenKern.suggest)[0];
+var TYPED_OUTSIDE = "Noordweg 402 Middelburg";
 
 /* A point inside the second parcel of the address, away from the address point itself. */
 function insideParcel() {
@@ -24,12 +27,15 @@ function addNotices(data) {
   function notice(id, titel, extra) {
     return Object.assign({}, base, {
       id: id, titel: titel, omschrijving: null, plaats: "", gemeente: "Tilburg", overheid: "Tilburg", publicatie: "Gemeenteblad",
-      bron: "officielebekendmakingen", type: "vergunning", soort: null, fase: "Aanvraag", datum: "2026-11-10", klasse: "weggefilterd", score: 0,
+      bron: "officielebekendmakingen", type: "vergunning", soort: null, fase: "Aanvraag", datum: "2026-11-10", klasse: "weggefilterd", score: 0, regio: "kern",
       waarom: "Geen nieuwbouw van woningen en geen ontwikkelsignaal in de bekendmaking.", signalen: [], woningen: null, perceelM2: null,
       locatieSoort: "exact", lat: ADDRESS.lat, lon: ADDRESS.lon, afstandKm: 2.4, reactieTot: null,
       url: "https://zoek.officielebekendmakingen.nl/" + id + ".html", urlTekst: null,
     }, extra || {});
   }
+  // A notice about the address outside the core: it belongs in the file of its region, not in the core.
+  data.regioTest = notice("test-regio-zeeland", "Aanvraag omgevingsvergunning reguliere procedure Noordweg 402, 4333 KK Middelburg",
+    { gemeente: "Middelburg", overheid: "Middelburg", regio: "Zeeland", lat: OUTSIDE.lat, lon: OUTSIDE.lon, afstandKm: 103.1 });
   data.berichten = [
     notice("test-adres-zelf", "Aanvraag omgevingsvergunning, Burg. van de Mortelplein 118A, 5037 PL Tilburg"),
     notice("test-adres-zonder", "Besluit omgevingsvergunning, Burgemeester van de Mortelplein 118 te Tilburg", { fase: "Verleend", klasse: "onzeker", waarom: "Sloop, maar de perceelgrootte is niet te bepalen.", datum: "2026-11-03" }),
@@ -58,11 +64,11 @@ function part(url) {
 }
 
 function answer(url) {
-  var which = part(url);
-  if (which === "zoeker") return fixtures.suggest;
-  if (which === "adresobject") return fixtures.vbo;
-  if (which === "pand") return fixtures.pand[url.split("?")[0].split("/").pop()];
-  if (which === "perceel") return fixtures.perceel[new URL(url).searchParams.get("perceelnummer")];
+  var which = part(url), params = new URL(url).searchParams, outside = fixtures.buitenKern;
+  if (which === "zoeker") return /middelburg/i.test(params.get("q")) ? outside.suggest : fixtures.suggest;
+  if (which === "adresobject") return params.get("identificatie") === OUTSIDE.objectId ? outside.vbo : fixtures.vbo;
+  if (which === "pand") { var id = url.split("?")[0].split("/").pop(); return fixtures.pand[id] || outside.pand[id]; }
+  if (which === "perceel") return fixtures.perceel[params.get("perceelnummer")] || outside.perceel[params.get("perceelnummer")];
   return null;
 }
 
@@ -87,7 +93,16 @@ module.exports = async function (browser, base) {
     await page.route("**/data/berichten.json", async function (route) {
       var data = await (await route.fetch()).json();
       if (withoutNotices) removeNotices(data); else addNotices(data);
+      seen.regioTest = data.regioTest;
+      seen.regios = (data.regios || []).map(function (regio) { return regio.naam; });
+      delete data.regioTest;
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+    });
+    await page.route("**/data/regio-zeeland.json", async function (route) {
+      seen.regionFile = (seen.regionFile || 0) + 1;
+      var file = await (await route.fetch()).json();
+      if (seen.regioTest) file.berichten = [seen.regioTest].concat(file.berichten);
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(file) });
     });
     await page.route(/^https:\/\/(api|service)\.pdok\.nl\//, function (route) {
       var url = route.request().url(), which = part(url);
@@ -105,8 +120,8 @@ module.exports = async function (browser, base) {
     return { page: page, seen: seen, context: context };
   }
 
-  async function choose(page) {
-    await page.fill("#adres-zoek", TYPED);
+  async function choose(page, typed) {
+    await page.fill("#adres-zoek", typed || TYPED);
     await page.waitForSelector("#adres-suggesties .suggestie");
     await page.click("#adres-suggesties .suggestie");
     await page.waitForFunction(function () { return !document.getElementById("adres-uitkomst").hidden && !document.querySelector("#adres-uitkomst .bezig"); });
@@ -272,6 +287,25 @@ module.exports = async function (browser, base) {
     lines: await page.$$eval("#adres-publicaties > *", function (nodes) { return nodes.map(function (node) { return { cls: node.className, text: node.textContent }; }); }),
     rows: await page.$$eval("#adres-publicaties .pub", function (nodes) { return nodes.length; }), overflow: await overflow(page), errors: session.seen.errors,
   };
+  await session.context.close();
+
+  // --- An address outside the core, while the app itself shows the core: its notices are found.
+  session = await open(320, []); page = session.page;
+  await page.click("#tab-adres");
+  await choose(page, TYPED_OUTSIDE);
+  await page.waitForSelector("#adres-perceel .feiten");
+  if (session.seen.regios.indexOf("Zeeland") !== -1) await page.waitForSelector('#adres-publicaties [data-id="test-regio-zeeland"]');
+  result.outside = {
+    name: await text(page, "#adres-naam"), sub: await text(page, "#adres-sub"), bag: (await facts(page, "#adres-bag"))[0], parcels: await facts(page, "#adres-perceel"),
+    notices: await notices(page), overflow: await overflow(page), errors: session.seen.errors,
+    regionLine: await page.$eval("#regio-regel", function (node) { return !node.hidden; }),
+    pressed: await page.$$eval('#regios .regio[aria-pressed="true"]', function (nodes) { return nodes.length; }),
+    searched: await text(page, "#adres-publicaties .bronregel:last-of-type"), regios: session.seen.regios, regionFile: session.seen.regionFile || 0,
+  };
+  await page.click("#tab-berichten");
+  await page.waitForSelector("#view-berichten:not([hidden])");
+  result.outside.coreCards = await page.$$eval("#list .card", function (nodes) { return nodes.length; });
+  result.outside.coreCount = await page.textContent("#result-count");
   await session.context.close();
 
   // --- The address search accepts the request and then stays silent: the app stops waiting.
