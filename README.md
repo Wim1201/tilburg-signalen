@@ -57,7 +57,7 @@ zoekopdracht, de filters en een opgezocht adres blijven staan.
 | `package.json`, `package-lock.json` | Leggen Playwright op één versie vast. Alleen voor de tests in een echte browser; de app zelf heeft geen pakketten nodig |
 | `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
 | `tools/planner/` | Voorbereid, niet live: een Cloudflare Worker die de workflow op de tijden van het schema start als GitHub dat zelf niet doet. Zie `tools/planner/README.md` |
-| `tools/energielabel/` | Voorbereid, niet live: een tweede Cloudflare Worker, los van de planner, die voor het tabblad Adres het energielabel van één adres opvraagt bij EP-Online. Zie `tools/energielabel/README.md` |
+| `tools/energielabel/` | Geplaatst, nog niet aan de app gekoppeld: een tweede Cloudflare Worker, los van de planner, die voor het tabblad Adres het energielabel van één adres opvraagt bij EP-Online. Zie `tools/energielabel/README.md` |
 | `tools/video/` | Maakt de video van de ochtendronde door de app zelf te bedienen. De film zelf staat niet in de repo; hij komt in `tools/video/uit/`, dat git overslaat. Zie het verslag over de video in `docs/` |
 
 ## Zelf draaien
@@ -155,14 +155,15 @@ pagina en kies "Zet op beginscherm" om hem als app te installeren.
 | Pand | BAG (Kadaster, via PDOK) | Bouwjaar, gebruiksdoel, oppervlakte, pandstatus |
 | Perceel | Kadastrale kaart (Kadaster, via PDOK) | Het perceel dat het Kadaster aan het adres koppelt. De kaart geeft alleen een indicatie; er zijn geen maten aan te ontlenen |
 | Publicaties | `data/berichten.json`, zoals de app het al geladen heeft | Ook de weggefilterde berichten. Er wordt niets opgehaald en niets weggeschreven |
-| Energielabel | EP-Online (RVO), via de Worker in `tools/energielabel/` | Alleen als `energielabel_worker` in `config.json` is ingevuld. Zonder die instelling: alleen een link naar EP-Online |
+| Energielabel | EP-Online (RVO), via de Worker in `tools/energielabel/` | Alleen als `energielabel_worker` in `config.json` is ingevuld. Zonder die instelling: alleen een link naar EP-Online. Het adres gaat in de inhoud van de vraag aan de Worker, niet in het webadres; Cloudflare bewaart van de Worker geen logboek |
 | Bestemmingsplan | Niet aangesloten | Alleen een link naar het Omgevingsloket |
 
 Adres, pand, perceel en publicaties gaan zonder sleutel en zonder tussenserver. Het energielabel is de
 uitzondering: EP-Online vraagt een sleutel, en die staat als geheim bij Cloudflare, niet in deze repo
 en niet in de app. De keuzes en de beperkingen van het koppelen van publicaties staan in
 `docs/tilburg-signalen_verslag_tabblad-adres_17-11-2026.md`; het energielabel in
-`docs/tilburg-signalen_verslag_energielabel_18-11-2026.md`.
+`docs/tilburg-signalen_verslag_energielabel_18-11-2026.md`, en wat Cloudflare van een vraag vastlegt in
+`docs/tilburg-signalen_verslag_energielabel-logboek-en-diagnose_18-11-2026.md`.
 
 ## Instellingen aanpassen
 
@@ -170,8 +171,8 @@ In `config.json` staan het middelpunt, de straal (`straal_km`), de bewaartermijn
 (`venster_dagen`) en de drempel voor de perceelgrootte (`drempel_perceel_m2`). Draai na een wijziging van middelpunt of straal eerst `signalen.gebied`.
 
 `energielabel_worker` is het adres van de Worker voor het energielabel (`tools/energielabel/`), bijvoorbeeld
-`https://tilburg-signalen-energielabel.<jouw-subdomein>.workers.dev`. Leeg betekent: de Worker is nog niet
-geplaatst, en het vak Energielabel toont alleen de link naar EP-Online. De volgende verversing na het
+`https://tilburg-signalen-energielabel.<jouw-subdomein>.workers.dev`. Leeg betekent: de app roept de Worker
+niet aan, en het vak Energielabel toont alleen de link naar EP-Online. De volgende verversing na het
 invullen zet het adres in de app.
 
 ### Gemeenten en regio's

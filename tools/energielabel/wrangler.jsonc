@@ -9,8 +9,16 @@
   "workers_dev": true,
   "preview_urls": false,
 
-  // Keep the logs. A line says how a request ended; it never holds the address or the key.
-  "observability": { "enabled": true },
+  // Cloudflare keeps nothing of a request to this Worker: no log, no trace. A stored log would hold,
+  // for every request, its address, its headers and with them the IP address of the visitor
+  // (found on 18-11-2026, when the logs were still on). Watching live stays possible, with
+  // `npx wrangler tail`; that is shown and not kept.
+  "observability": {
+    "enabled": false,
+    "redact_query_string": true,
+    "logs": { "enabled": false, "invocation_logs": false, "persist": false },
+    "traces": { "enabled": false, "persist": false }
+  },
 
   "vars": {
     // The only site whose pages may read the answers (the Origin header of a browser).

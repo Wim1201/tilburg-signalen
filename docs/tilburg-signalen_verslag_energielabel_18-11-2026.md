@@ -23,6 +23,9 @@ documentatie en uit een nagebootst EP-Online.
 
 | Tijdstip | Wat |
 |---|---|
+| 18-11-2026, 22:44 uur | **"Het logboek: geen adres, geen sleutel, geen IP-adres" onder de afscherming klopte niet.** Het gold alleen voor de regel die de Worker zelf schrijft. Wim stelde na het plaatsen vast dat Cloudflare per verzoek zelf ook een regel bewaart, met de volledige vraag (postcode en huisnummer in het webadres) en het IP-adres van de bezoeker. Ik had niet nagezocht wat Cloudflare zelf vastlegt. Hersteld in `tilburg-signalen_verslag_energielabel-logboek-en-diagnose_18-11-2026.md`: het adres staat nu in de inhoud van de vraag en Cloudflare bewaart geen logboek meer. |
+| 18-11-2026, 22:44 uur | **De Worker is inmiddels geplaatst, door Wim, met een echte sleutel; "niets geplaatst, geen sleutel" in dit verslag is daarmee achterhaald.** De sleutel wordt aangenomen. Twee adressen gaven "geen" waar één zeker een geldig label heeft; de oorzaak is nog niet gevonden. Zie hetzelfde nieuwe verslag. |
+| 18-11-2026, 22:44 uur | **De vraag aan de Worker is geen `GET` met het adres in het webadres meer, maar een `POST` met het adres in de inhoud.** Waar dit verslag de vorm van de vraag beschrijft, geldt de README van de Worker. |
 | 18-11-2026, 16:24 uur | **PR 26 is samengevoegd op verzoek van Wim (16:17 uur, merge-commit `132d044`) en run 36 is groen; "open blijft en niet is samengevoegd" onder "Stand" en "Buiten dit verslag" is daarmee achterhaald.** Zie "Run 36 op GitHub". |
 | 18-11-2026, 16:24 uur | **De Worker is nog steeds niet geplaatst en er is geen sleutel.** Samenvoegen heeft alleen de code en de lege instelling in `main` gezet. Op de live site staat het vak Energielabel zoals het was. |
 | 18-11-2026, 16:10 uur | **De nieuwe tests hebben op GitHub gedraaid, op de pull request (PR 26), en zijn geslaagd; "De nieuwe tests op GitHub" onder "Niet getest of nog open" is daarmee afgehandeld.** Zie "De testrun op de pull request". |

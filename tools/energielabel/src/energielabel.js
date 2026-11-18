@@ -4,6 +4,9 @@
    what comes in, what is asked of EP-Online and what goes out. index.js holds the two pieces that
    only exist at Cloudflare: the handler and the counter object.
 
+   The address comes in the body of a POST, never in the address of the request: Cloudflare can
+   record the address of every request (logs, traces, a live tail), and never records a body.
+
    EP-Online, public REST API version 5 (public.ep-online.nl/swagger, read on 18-11-2026):
      GET /api/v5/PandEnergielabel/Adres?postcode=&huisnummer=&huisletter=&huisnummertoevoeging=
      header Authorization: <API key>
@@ -11,6 +14,7 @@
 
 export const PAD = "/api/v5/PandEnergielabel/Adres";
 export const WACHT_MS = 8000; // how long EP-Online gets to answer
+export const MAX_INVOER = 400; // bytes of a request body; an address needs about 80
 
 // The formats EP-Online documents. The documentation gives exactly four characters for the addition
 // (^[a-zA-Z0-9]{4}$); additions in the BAG are one to four long, so one to four are let through
@@ -27,11 +31,47 @@ export function dagVan(ms) {
   return DAG.format(new Date(ms));
 }
 
-/* The address as asked, checked. Returns { adres } or { fout } with the name of the field. */
-export function leesAdres(zoek) {
+/* The text of a request body, read up to `grens` bytes. `stroom` is the body (a ReadableStream) or
+   null. Returns the text, or null when the body is longer or is no UTF-8: such a body is not read
+   to its end. */
+export async function leesTekst(stroom, grens) {
+  if (!stroom) return "";
+  const lezer = stroom.getReader(), stukken = [];
+  let lengte = 0;
+  for (;;) {
+    const { done, value } = await lezer.read();
+    if (done) break;
+    lengte += value.byteLength;
+    if (lengte > grens) {
+      await lezer.cancel().catch(() => {});
+      return null;
+    }
+    stukken.push(value);
+  }
+  const bytes = new Uint8Array(lengte);
+  let plek = 0;
+  for (const stuk of stukken) { bytes.set(stuk, plek); plek += stuk.byteLength; }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (fout) {
+    return null;
+  }
+}
+
+/* The address as asked, checked. `invoer` is the body of the request as text: a JSON object with
+   postcode and huisnummer, and huisletter and toevoeging when the address has them, all as text.
+   Returns { adres } or { fout } with the name of the field ("invoer" when the body is no such object). */
+export function leesAdres(invoer) {
+  let gevraagd;
+  try {
+    gevraagd = JSON.parse(invoer);
+  } catch (fout) {
+    return { fout: "invoer" };
+  }
+  if (!gevraagd || typeof gevraagd !== "object" || Array.isArray(gevraagd)) return { fout: "invoer" };
   const een = (naam) => {
-    const waarden = zoek.getAll(naam);
-    return waarden.length === 1 ? waarden[0].trim() : waarden.length ? null : "";
+    const waarde = Object.prototype.hasOwnProperty.call(gevraagd, naam) ? gevraagd[naam] : "";
+    return typeof waarde === "string" ? waarde.trim() : null;
   };
   const postcode = een("postcode"), huisnummer = een("huisnummer"), huisletter = een("huisletter"), toevoeging = een("toevoeging");
   if (postcode === null || !POSTCODE.test((postcode || "").replace(/\s+/g, "").toUpperCase())) return { fout: "postcode" };
@@ -61,18 +101,34 @@ function tekst(waarde, lengte) {
   return typeof waarde === "string" && waarde.trim() && waarde.trim().length <= lengte ? waarde.trim() : null;
 }
 
-/* The label to show from what EP-Online registered at the address: of the registrations that are
-   still valid on `vandaag`, the one registered last. Returns the four values the tab shows, or
-   null when there is no valid label. Nothing else of a registration leaves this function. */
-export function kiesLabel(registraties, vandaag) {
-  const geldig = (Array.isArray(registraties) ? registraties : []).map((registratie) => ({
-    klasse: tekst(registratie && registratie.Energieklasse, 10),
-    registratiedatum: datum(registratie && registratie.Registratiedatum),
-    geldigTot: datum(registratie && registratie.Geldig_tot),
-    gebouw: tekst(registratie && registratie.Gebouwklasse, 40),
-  })).filter((label) => label.klasse && label.registratiedatum && label.geldigTot && label.geldigTot >= vandaag);
+/* What EP-Online registered at the address, weighed: of the registrations that are still valid on
+   `vandaag`, the one registered last. Returns { label, telling }: the four values the tab shows (or
+   null when there is no valid label), and for the log how many registrations there were and why
+   the others do not count: no label class, no readable date, or expired. Only counts, so that a
+   log line can say why an answer of EP-Online gave no label without saying anything of the answer.
+   Nothing else of a registration leaves this function. */
+export function weeg(registraties, vandaag) {
+  const telling = { registraties: 0, zonderKlasse: 0, zonderDatum: 0, verlopen: 0 }, geldig = [];
+  for (const registratie of Array.isArray(registraties) ? registraties : []) {
+    telling.registraties++;
+    const label = {
+      klasse: tekst(registratie && registratie.Energieklasse, 10),
+      registratiedatum: datum(registratie && registratie.Registratiedatum),
+      geldigTot: datum(registratie && registratie.Geldig_tot),
+      gebouw: tekst(registratie && registratie.Gebouwklasse, 40),
+    };
+    if (!label.klasse) telling.zonderKlasse++;
+    else if (!label.registratiedatum || !label.geldigTot) telling.zonderDatum++;
+    else if (label.geldigTot < vandaag) telling.verlopen++;
+    else geldig.push(label);
+  }
   geldig.sort((a, b) => (a.registratiedatum < b.registratiedatum ? 1 : a.registratiedatum > b.registratiedatum ? -1 : 0));
-  return geldig[0] || null;
+  return { label: geldig[0] || null, telling };
+}
+
+/* The label to show, or null: see weeg. */
+export function kiesLabel(registraties, vandaag) {
+  return weeg(registraties, vandaag).label;
 }
 
 /* The counter: at most `perMinuut` in a clock minute and `perDag` in a Dutch calendar day, counted
@@ -99,14 +155,16 @@ function getal(waarde, anders) {
   return Number.isFinite(n) && n > 0 ? n : anders;
 }
 
-/* One line in the log of Cloudflare: how the request ended. Never the address and never the key. */
+/* One log line: how the request ended. Never the address and never the key. Cloudflare keeps no
+   log of this Worker (wrangler.jsonc); the line is there for whoever watches live (wrangler tail). */
 export function meld(uitkomst, extra) {
   console.log(JSON.stringify(Object.assign({ energielabel: uitkomst }, extra || {})));
 }
 
-/* One request. `verzoek` is { method, url, herkomst } (the Origin header), `env` the settings and
-   the secret, `hulp` what the Worker brings: { fetch, neem(perMinuut, perDag, nu), nu }.
-   Returns { status, headers, body } with body an object or null. */
+/* One request. `verzoek` is { method, herkomst, tekst } with herkomst the Origin header and tekst()
+   the body as text (null when it is too long); the address of the request is not looked at. `env`
+   holds the settings and the secret, `hulp` what the Worker brings: { fetch, neem(perMinuut, perDag,
+   nu), nu }. Returns { status, headers, body } with body an object or null. */
 export async function behandel(verzoek, env, hulp) {
   const toegestaan = env.HERKOMST, herkomst = verzoek.herkomst || "";
   const klaar = (status, uitkomst, body, extra) => {
@@ -120,11 +178,19 @@ export async function behandel(verzoek, env, hulp) {
 
   // 1. Only from the page of the app. Exactly that origin: no other scheme, host or port.
   if (!toegestaan || herkomst !== toegestaan) return klaar(403, "geweigerd", { status: "geweigerd" });
-  if (verzoek.method === "OPTIONS") return klaar(204, "voorvraag", null, { headers: { "Access-Control-Allow-Methods": "GET", "Access-Control-Max-Age": "86400" } });
-  if (verzoek.method !== "GET") return klaar(405, "methode", { status: "ongeldig" }, { headers: { Allow: "GET, OPTIONS" } });
+  if (verzoek.method === "OPTIONS") {
+    return klaar(204, "voorvraag", null, { headers: { "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400" } });
+  }
+  if (verzoek.method !== "POST") return klaar(405, "methode", { status: "ongeldig" }, { headers: { Allow: "POST, OPTIONS" } });
 
-  // 2. The address, in the form EP-Online documents.
-  const gelezen = leesAdres(new URL(verzoek.url).searchParams);
+  // 2. The address, from the body, in the form EP-Online documents.
+  let invoer;
+  try {
+    invoer = await verzoek.tekst();
+  } catch (fout) {
+    invoer = null;
+  }
+  const gelezen = typeof invoer === "string" ? leesAdres(invoer) : { fout: "invoer" };
   if (gelezen.fout) return klaar(400, "ongeldig", { status: "ongeldig", veld: gelezen.fout });
 
   if (!env.EP_ONLINE_KEY) return klaar(503, "sleutel ontbreekt", { status: "onbereikbaar" });
@@ -162,8 +228,8 @@ export async function behandel(verzoek, env, hulp) {
     return klaar(502, "bron onleesbaar", { status: "onbereikbaar" }, { log: { bron: 200 } });
   }
   if (!Array.isArray(registraties)) return klaar(502, "bron onleesbaar", { status: "onbereikbaar" }, { log: { bron: 200 } });
-  const label = kiesLabel(registraties, dagVan(hulp.nu));
-  if (!label) return klaar(404, "geen geldig label", { status: "geen" }, { log: { bron: 200, registraties: registraties.length } });
+  const { label, telling } = weeg(registraties, dagVan(hulp.nu));
+  if (!label) return klaar(404, "geen geldig label", { status: "geen" }, { log: Object.assign({ bron: 200 }, telling) });
   return klaar(200, "gevonden", { status: "gevonden", klasse: label.klasse, registratiedatum: label.registratiedatum, geldigTot: label.geldigTot, gebouw: label.gebouw },
-    { log: { bron: 200, registraties: registraties.length } });
+    { log: Object.assign({ bron: 200 }, telling) });
 }

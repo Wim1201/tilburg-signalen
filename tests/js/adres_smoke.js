@@ -93,7 +93,7 @@ module.exports = async function (browser, base) {
     });
     page.on("request", function (request) {
       var url = request.url();
-      if (label && url.indexOf(LABEL_WORKER + "/") === 0) { (seen.label = seen.label || []).push({ url: url, method: request.method(), headers: Object.keys(request.headers()).sort() }); return; }
+      if (label && url.indexOf(LABEL_WORKER + "/") === 0) { (seen.label = seen.label || []).push({ url: url, method: request.method(), headers: Object.keys(request.headers()).sort(), contentType: request.headers()["content-type"] || null, body: request.postData() }); return; }
       if (url.indexOf(base) !== 0 && !/^(data:|blob:|https:\/\/fonts\.|https:\/\/(api|service)\.pdok\.nl\/)/.test(url)) seen.elsewhere.push(url);
     });
     await page.route(/^https:\/\/fonts\./, function (route) { route.fulfill({ status: 200, contentType: "text/css", body: "" }); });

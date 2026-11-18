@@ -639,11 +639,16 @@ class Tabblad(unittest.TestCase):
 
     def test_tab_only_reads(self):
         for text in (self.logic, self.page):
-            self.assertNotRegex(text, r"localStorage|sessionStorage|indexedDB|ophaalcache|method:|\.setItem\(|sendBeacon")
-        # Two places ask something: the registers of PDOK (getJson) and, when it is set, the energy
-        # label Worker. Both are a plain GET without anything sent along.
-        self.assertEqual(re.findall(r"\bfetch\(([^)]*)\)", self.page), ["url, controller ? { signal: controller.signal } : {}"] * 2)
-        self.assertNotIn("fetch(", self.logic)
+            self.assertNotRegex(text, r"localStorage|sessionStorage|indexedDB|ophaalcache|\.setItem\(|sendBeacon")
+        # Two places ask something: the registers of PDOK (getJson), a plain GET without anything
+        # sent along, and, when it is set, the energy label Worker. That one is a POST, and still
+        # only a question: the address goes in the body so that it is not in the url of the request
+        # (a url can end up in a log on the way). It is the only request with a method or a body.
+        self.assertEqual(re.findall(r"\bfetch\(([^)]*)\)", self.page), ["url, controller ? { signal: controller.signal } : {}", "ask.url, options"])
+        self.assertEqual(re.findall(r"method:[^,}]*", self.page), ['method: "POST"'])
+        self.assertEqual(re.findall(r"\{ method:[^}]*\}", self.page), ['{ method: "POST", body: ask.body, credentials: "omit", cache: "no-store" }'])
+        self.assertNotRegex(self.page, r"headers:|credentials: \"include\"")
+        self.assertNotRegex(self.logic, r"method:|fetch\(")
 
     def test_size_of_the_parcel_carries_the_warning(self):
         self.assertIn("de kadastrale kaart geeft alleen een indicatie van de ligging en de grootte. Er zijn geen maten aan te ontlenen.", self.page)
@@ -654,7 +659,7 @@ class Tabblad(unittest.TestCase):
         self.assertNotIn("getJson", block)
         # The energy label says the same as long as no Worker is set (config.json, energielabel_worker).
         label = re.search(r"function loadLabel\(address, mine\) \{(.*?)\n  \}", self.page, flags=re.S).group(1)
-        self.assertRegex(label, r'if \(!url\) \{\s+renderEnergy\(address, function \(box\) \{ box\.appendChild\(el\("p", null, "Nog niet beschikbaar in de app\."\)\); \}\);\s+return;')
+        self.assertRegex(label, r'if \(!ask\) \{\s+renderEnergy\(address, function \(box\) \{ box\.appendChild\(el\("p", null, "Nog niet beschikbaar in de app\."\)\); \}\);\s+return;')
         links, = adres(["viewerLinks", {"huisnummer": 118, "huisletter": "a", "toevoeging": "", "postcode": "5037PL", "rd": {"x": 132133.035, "y": 395879.872}}]) if NODE else [None]
         if links:
             self.assertEqual(links["energielabel"], {"url": "https://www.ep-online.nl/Energylabel/Search", "label": "Zoek op EP-Online", "zoekwaarde": "5037PL 118 a"})
@@ -670,8 +675,13 @@ class Energielabel(unittest.TestCase):
     ADDRESS = {"postcode": "5037PL", "huisnummer": 118, "huisletter": "a", "toevoeging": ""}
     TODAY = "2026-11-18"
 
+    def ask(self, worker, address=None):
+        """What the tab asks the Worker: (url, body as an object), or None."""
+        asked = adres(["energielabelVraag", worker, address or self.ADDRESS])[0]
+        return asked and (asked["url"], json.loads(asked["body"]))
+
     def url(self, worker, address=None):
-        return adres(["energielabelUrl", worker, address or self.ADDRESS])[0]
+        return self.ask(worker, address)
 
     def test_without_a_setting_nothing_is_asked(self):
         for worker in ("", None, 0, " ", "http://onveilig.voorbeeld", "javascript:alert(1)", "//voorbeeld.example", "https://", "https://voorbeeld.example/?a=b",
@@ -679,17 +689,30 @@ class Energielabel(unittest.TestCase):
             with self.subTest(instelling=worker):
                 self.assertIsNone(self.url(worker))
 
-    def test_the_address_goes_along_as_the_worker_expects_it(self):
-        self.assertEqual(self.url(self.WORKER), self.WORKER + "/?postcode=5037PL&huisnummer=118&huisletter=a")
-        self.assertEqual(self.url(self.WORKER + "/"), self.WORKER + "/?postcode=5037PL&huisnummer=118&huisletter=a")
-        self.assertEqual(self.url(self.WORKER, {"postcode": "4333KK", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}), self.WORKER + "/?postcode=4333KK&huisnummer=402&toevoeging=2")
-        self.assertEqual(self.url(self.WORKER, {"postcode": "5037PL", "huisnummer": 12, "huisletter": "B", "toevoeging": "bis"}),
-                         self.WORKER + "/?postcode=5037PL&huisnummer=12&huisletter=B&toevoeging=bis")
+    def test_the_address_goes_along_in_the_body_as_the_worker_expects_it(self):
+        self.assertEqual(self.ask(self.WORKER), (self.WORKER + "/", {"postcode": "5037PL", "huisnummer": "118", "huisletter": "a"}))
+        self.assertEqual(self.ask(self.WORKER + "/"), (self.WORKER + "/", {"postcode": "5037PL", "huisnummer": "118", "huisletter": "a"}))
+        self.assertEqual(self.ask(self.WORKER, {"postcode": "4333KK", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}),
+                         (self.WORKER + "/", {"postcode": "4333KK", "huisnummer": "402", "toevoeging": "2"}))
+        self.assertEqual(self.ask(self.WORKER, {"postcode": "5037PL", "huisnummer": 12, "huisletter": "B", "toevoeging": "bis"}),
+                         (self.WORKER + "/", {"postcode": "5037PL", "huisnummer": "12", "huisletter": "B", "toevoeging": "bis"}))
+
+    def test_the_address_is_never_in_the_url_of_the_request(self):
+        # The url of a request can be recorded on the way (Cloudflare did so on 18-11-2026); a body is not.
+        for address in (self.ADDRESS, {"postcode": "4333KK", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}):
+            url = adres(["energielabelVraag", self.WORKER + "/pad/", address])[0]["url"]
+            self.assertEqual(url, self.WORKER + "/pad/")
+            for part in ("?", "postcode", str(address["huisnummer"]), address["postcode"]):
+                self.assertNotIn(part, url)
+        with open(os.path.join(ROOT, "site", "adres-app.js"), encoding="utf-8") as handle:
+            app = handle.read()
+        self.assertIn('var options = { method: "POST", body: ask.body, credentials: "omit", cache: "no-store" };', app)
+        self.assertIn("fetch(ask.url, options)", app)
 
     def test_an_address_without_postcode_or_house_number_is_not_asked(self):
         for address in ({"postcode": "", "huisnummer": 118}, {"postcode": "5037PL", "huisnummer": None}, {"postcode": "5037 PL", "huisnummer": 118}, {"postcode": "5037PL", "huisnummer": 0}, None):
             with self.subTest(adres=address):
-                self.assertIsNone(adres(["energielabelUrl", self.WORKER, address])[0])
+                self.assertIsNone(adres(["energielabelVraag", self.WORKER, address])[0])
 
     def model(self, status, body=None):
         return adres(["energielabelModel", status, body, self.TODAY])[0]

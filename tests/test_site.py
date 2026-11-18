@@ -1580,8 +1580,14 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(label["errors"], [])
         self.assertEqual(label["elsewhere"], [], "de app roept nog een andere dienst aan")
         first = label["asked"][0]
-        self.assertEqual(first["url"], "https://energielabel.worker.test/?postcode=5037PL&huisnummer=118&huisletter=a")
-        self.assertEqual(first["method"], "GET")
+        self.assertEqual(first["url"], "https://energielabel.worker.test/", "het adres hoort niet in het webadres van de vraag: dat kan in een logboek komen")
+        self.assertEqual(first["method"], "POST")
+        self.assertEqual(json.loads(first["body"]), {"postcode": "5037PL", "huisnummer": "118", "huisletter": "a"})
+        for asked in label["asked"]:
+            for part in ("5037", "118", "postcode", "huisnummer", "?"):
+                self.assertNotIn(part, asked["url"])
+        # Plain text and no headers of the app's own: the browser then asks without a preflight.
+        self.assertTrue(first["contentType"].lower().startswith("text/plain"), first["contentType"])
         for header in ("authorization", "cookie", "x-api-key"):
             self.assertNotIn(header, first["headers"], "de app stuurt geen sleutel of cookie mee")
         self.assertEqual(len(label["asked"]), 1, "één adres kiezen is één vraag aan de Worker")

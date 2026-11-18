@@ -6,7 +6,7 @@
    in energielabel.js; this file holds only what exists at Cloudflare. */
 
 import { DurableObject } from "cloudflare:workers";
-import { behandel, telOp } from "./energielabel.js";
+import { MAX_INVOER, behandel, leesTekst, telOp } from "./energielabel.js";
 
 /* The counter for the limits per minute and per day: one object for the whole Worker. Cloudflare
    handles the calls to one object one at a time, so two requests can never take the same turn. */
@@ -20,7 +20,8 @@ export default {
   async fetch(request, env) {
     const teller = env.TELLER.get(env.TELLER.idFromName("alle"));
     const antwoord = await behandel(
-      { method: request.method, url: request.url, herkomst: request.headers.get("Origin") },
+      // Not the address of the request: the address asked for is in the body, and nowhere else.
+      { method: request.method, herkomst: request.headers.get("Origin"), tekst: () => leesTekst(request.body, MAX_INVOER) },
       env,
       { fetch: (url, opties) => fetch(url, opties), neem: (perMinuut, perDag, nu) => teller.neem(perMinuut, perDag, nu), nu: Date.now() },
     );
