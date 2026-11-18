@@ -175,3 +175,71 @@ class LiveSite(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestsBijEenPullRequest(unittest.TestCase):
+    """.github/workflows/tests.yml: at every pull request only the tests and the browser tests, so
+    that a fault shows before the merge. It fetches nothing, publishes nothing and writes nothing;
+    the daily workflow and its schedule are not involved."""
+
+    FILE = ROOT / ".github" / "workflows" / "tests.yml"
+
+    def setUp(self):
+        self.text = self.FILE.read_text(encoding="utf-8")
+        self.daily = WORKFLOW.read_text(encoding="utf-8")
+
+    @staticmethod
+    def code(text):
+        """The workflow without its comments."""
+        return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+
+    def test_it_starts_at_a_pull_request_and_at_nothing_else(self):
+        triggers = re.search(r"(?m)^on:\n((?:(?:  .*|\s*)\n)*)", self.code(self.text)).group(1)
+        self.assertEqual(re.findall(r"(?m)^  (\w+):", triggers), ["pull_request"])
+        for other in ("schedule", "cron", "workflow_dispatch", "push:"):
+            self.assertNotIn(other, self.code(self.text))
+
+    def test_the_daily_workflow_does_not_start_at_a_pull_request(self):
+        self.assertNotIn("pull_request", self.daily)
+        self.assertNotIn("tests.yml", self.daily)
+
+    def test_it_runs_the_same_tests_with_the_same_commands_as_the_daily_workflow(self):
+        self.assertEqual(step_names(self.text), ["actions/checkout@v4", "actions/setup-python@v5", "Tests", "Browser klaarzetten", "Browsertests"])
+        self.assertEqual(step(self.text, "Tests").strip(), step(self.daily, "Tests").strip())
+        self.assertEqual(self.code(step(self.text, "Browsertests")).split("run: |")[1], self.code(step(self.daily, "Browsertests")).split("run: |")[1])
+        self.assertIn("uses: ./.github/actions/browser", step(self.text, "Browser klaarzetten"))
+        self.assertIn('python-version: "3.12"', self.text)
+        self.assertIn('python-version: "3.12"', self.daily)
+
+    def test_every_pull_request_gets_both_steps(self):
+        # No condition on any step: unlike the daily workflow nothing is skipped here.
+        self.assertNotIn("if:", self.code(self.text))
+        self.assertNotIn("paths", self.code(self.text))
+
+    def test_it_fetches_nothing_publishes_nothing_and_writes_nothing(self):
+        code = self.code(self.text)
+        for forbidden in ("signalen.update", "signalen.gebied", "git push", "git commit", "git add", "ophaalcache", "configure-pages", "upload-pages-artifact",
+                          "deploy-pages", "pages: write", "id-token", "contents: write", "secrets."):
+            with self.subTest(verboden=forbidden):
+                self.assertNotIn(forbidden, code)
+        self.assertEqual(re.findall(r"(?m)^permissions:\n((?:  .*\n)+)", code), ["  contents: read\n"])
+        self.assertEqual(re.findall(r"(?m)^  (\w+):\n    runs-on", code), ["testen"], "één job, die alleen test")
+
+    def test_it_never_waits_for_a_refresh_and_a_refresh_never_waits_for_it(self):
+        group = re.search(r"(?m)^concurrency:\n  group: (.+)\n  cancel-in-progress: (\w+)", self.code(self.text))
+        self.assertTrue(group.group(1).startswith("tests-pull-request-"))
+        self.assertNotIn("dagelijkse-verversing", self.code(self.text))
+        self.assertEqual(group.group(2), "true")
+        self.assertIn("group: dagelijkse-verversing", self.daily)
+
+    def test_a_hanging_run_stops_by_itself(self):
+        self.assertIn("    timeout-minutes: 20", self.text)
+        self.assertIn("timeout-minutes: 10", step(self.text, "Browser klaarzetten"))
+        self.assertIn("timeout-minutes: 10", step(self.text, "Browsertests"))
+
+    def test_the_planner_knows_only_the_daily_workflow(self):
+        config = (ROOT / "tools" / "planner" / "wrangler.jsonc").read_text(encoding="utf-8")
+        self.assertIn('"WORKFLOW": "dagelijks.yml"', config)
+        self.assertNotIn("tests.yml", config)
+        self.assertNotIn("tests.yml", (ROOT / "tools" / "planner" / "src" / "planner.js").read_text(encoding="utf-8"))
+
