@@ -6,9 +6,10 @@ sleutel; die kent alleen deze Worker. De app vraagt de Worker, de Worker vraagt 
 
 Dit is een tweede Worker, los van de planner in `tools/planner/`. De planner is niet gewijzigd.
 
-**Stand 19-11-2026, 08:58 uur: geplaatst door Wim, nog niet aan de app gekoppeld.** De Worker staat
-bij Cloudflare met een echte sleutel van EP-Online, in de versie van vóór de wijziging hieronder. De
-instelling `energielabel_worker` in `config.json` is leeg; de app roept de Worker dus niet aan.
+**Stand 19-11-2026, 10:06 uur: geplaatst en getoetst door Wim, en aan de app gekoppeld.** Versie
+`3fc2d2fa`, met het adres in de inhoud. Stap 5: een `POST` met de herkomst van de app gaf `200` met
+`"status":"gevonden"` en alle vier de gegevens. Stap 8: Observability staat bij Cloudflare op
+*Disabled*, met 0 events na de toets. `energielabel_worker` in `config.json` is ingevuld (`https://tilburg-signalen-energielabel.wim-snoeren.workers.dev`).
 
 **Gewijzigd op 18-11-2026 (na het plaatsen):** het adres staat niet meer in het webadres van de vraag
 maar in de inhoud, en Cloudflare bewaart geen logboek meer. Zie "Wat Cloudflare vastlegt". Na het
