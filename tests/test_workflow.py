@@ -204,12 +204,39 @@ class TestsBijEenPullRequest(unittest.TestCase):
         self.assertNotIn("tests.yml", self.daily)
 
     def test_it_runs_the_same_tests_with_the_same_commands_as_the_daily_workflow(self):
-        self.assertEqual(step_names(self.text), ["actions/checkout@v4", "actions/setup-python@v5", "Tests", "Browser klaarzetten", "Browsertests"])
+        self.assertEqual(step_names(self.text), ["actions/checkout@v4", "actions/setup-python@v5", "Tests", "Browser klaarzetten", "Instellingen in de gegevens", "Browsertests"])
         self.assertEqual(step(self.text, "Tests").strip(), step(self.daily, "Tests").strip())
         self.assertEqual(self.code(step(self.text, "Browsertests")).split("run: |")[1], self.code(step(self.daily, "Browsertests")).split("run: |")[1])
         self.assertIn("uses: ./.github/actions/browser", step(self.text, "Browser klaarzetten"))
         self.assertIn('python-version: "3.12"', self.text)
         self.assertIn('python-version: "3.12"', self.daily)
+
+    def test_the_browser_tests_see_the_settings_that_go_live(self):
+        """Run 46 (19-11-2026): green on the pull request, red after merging, because the data in the
+        repository get a changed setting only at a refresh. The extra step puts the settings from
+        config.json in the copy of the data, without fetching, before the browser tests."""
+        self.assertEqual(self.code(step(self.text, "Instellingen in de gegevens")).split("run: ")[1].strip(), "python -m signalen.instellingen")
+        names = step_names(self.text)
+        self.assertEqual(names.index("Instellingen in de gegevens") + 1, names.index("Browsertests"))
+        self.assertNotIn("signalen.instellingen", self.daily, "de verversing zet de instellingen zelf, bij het ophalen")
+        # The schedule and the triggers are not touched by it.
+        self.assertNotIn("schedule", self.code(self.text))
+
+    def test_the_settings_step_writes_only_the_settings(self):
+        from signalen import instellingen, update
+        config = {"centrum": {"naam": "x"}, "straal_km": 15, "venster_dagen": {"plan": 180}, "drempel_perceel_m2": 400,
+                  "energielabel_worker": "https://tilburg-signalen-energielabel.voorbeeld.workers.dev"}
+        document = {"bijgewerkt": "2026-11-19T10:00:00+01:00", "berichten": [{"id": "a"}], "straalKm": 10, "energielabelWorker": ""}
+        result = instellingen.zet(document, config)
+        self.assertEqual(result, dict(document, centrum={"naam": "x"}, straalKm=15, vensterDagen={"plan": 180}, drempelPerceelM2=400,
+                                      energielabelWorker="https://tilburg-signalen-energielabel.voorbeeld.workers.dev"))
+        self.assertEqual(document["straalKm"], 10, "het origineel blijft ongewijzigd")
+        # Exactly the settings a refresh writes, from one function.
+        self.assertEqual(sorted(update.instellingen(config)), ["centrum", "drempelPerceelM2", "energielabelWorker", "straalKm", "vensterDagen"])
+        self.assertIn("**instellingen(config),", (ROOT / "signalen" / "update.py").read_text(encoding="utf-8"))
+        source = (ROOT / "signalen" / "instellingen.py").read_text(encoding="utf-8")
+        for fetching in ("urlopen", "http.", "run(", "Cache(", "bron_ophalers"):
+            self.assertNotIn(fetching, source)
 
     def test_every_pull_request_gets_both_steps(self):
         # No condition on any step: unlike the daily workflow nothing is skipped here.

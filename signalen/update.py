@@ -165,6 +165,18 @@ def worker_adres(waarde):
     return waarde.rstrip("/") if re.fullmatch(r"https://[A-Za-z0-9.-]+(:\d+)?(/[A-Za-z0-9._~/-]*)?", waarde) else ""
 
 
+def instellingen(config):
+    """The settings from config.json as the site reads them from berichten.json. One place, so that
+    a refresh and the step in tests.yml (signalen/instellingen.py) write exactly the same."""
+    return {
+        "centrum": config["centrum"],
+        "straalKm": config["straal_km"],
+        "vensterDagen": config["venster_dagen"],
+        "drempelPerceelM2": config["drempel_perceel_m2"],
+        "energielabelWorker": worker_adres(config.get("energielabel_worker")),
+    }
+
+
 def kern_fouten(statistiek):
     """Downloads that failed for good, counted for the core only: what the morning screen reports.
 
@@ -225,11 +237,7 @@ def run(config, area, now, fetchers=None, verrijker=None, dagcontrole=volledighe
         source.update(statuses.get(source["id"], {}))
     return {
         "bijgewerkt": now.isoformat(timespec="seconds"),
-        "centrum": config["centrum"],
-        "straalKm": config["straal_km"],
-        "vensterDagen": config["venster_dagen"],
-        "drempelPerceelM2": config["drempel_perceel_m2"],
-        "energielabelWorker": worker_adres(config.get("energielabel_worker")),
+        **instellingen(config),
         "onvolledigeDagen": incomplete,
         "ophaalfouten": kern_fouten(statistiek),
         "ophaalstatistiek": statistiek,
