@@ -753,9 +753,14 @@ class Energielabel(unittest.TestCase):
             with self.subTest(instelling=odd):
                 self.assertEqual(update.worker_adres(odd), "")
 
-    def test_the_setting_is_empty_until_the_worker_is_placed(self):
+    def test_the_setting_is_the_placed_worker(self):
+        # Placed and checked by Wim on 19-11-2026 (version 3fc2d2fa). An https address that the
+        # pipeline lets through unchanged.
         with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as handle:
-            self.assertEqual(json.load(handle)["energielabel_worker"], "")
+            setting = json.load(handle)["energielabel_worker"]
+        self.assertEqual(setting, "https://tilburg-signalen-energielabel.wim-snoeren.workers.dev")
+        from signalen import update
+        self.assertEqual(update.worker_adres(setting), setting)
         app = read("app.js")
         self.assertIn('shared.energielabelWorker = data.energielabelWorker || "";', app)
         with open(os.path.join(ROOT, "signalen", "update.py"), encoding="utf-8") as handle:

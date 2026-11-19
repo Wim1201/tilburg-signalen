@@ -46,7 +46,7 @@
     ]
   ],
   "grens_regioteksten": 300,
-  "energielabel_worker": "",
+  "energielabel_worker": "https://tilburg-signalen-energielabel.wim-snoeren.workers.dev",
   "regios": [
     "Midden-Brabant",
     "West-Brabant",

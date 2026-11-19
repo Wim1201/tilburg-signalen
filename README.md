@@ -57,7 +57,7 @@ zoekopdracht, de filters en een opgezocht adres blijven staan.
 | `package.json`, `package-lock.json` | Leggen Playwright op één versie vast. Alleen voor de tests in een echte browser; de app zelf heeft geen pakketten nodig |
 | `config.json` | Middelpunt, straal en hoe lang berichten in de lijst blijven |
 | `tools/planner/` | Voorbereid, niet live: een Cloudflare Worker die de workflow op de tijden van het schema start als GitHub dat zelf niet doet. Zie `tools/planner/README.md` |
-| `tools/energielabel/` | Geplaatst, nog niet aan de app gekoppeld: een tweede Cloudflare Worker, los van de planner, die voor het tabblad Adres het energielabel van één adres opvraagt bij EP-Online. Zie `tools/energielabel/README.md` |
+| `tools/energielabel/` | Geplaatst en aan de app gekoppeld: een tweede Cloudflare Worker, los van de planner, die voor het tabblad Adres het energielabel van één adres opvraagt bij EP-Online. Zie `tools/energielabel/README.md` |
 | `tools/video/` | Maakt de video van de ochtendronde door de app zelf te bedienen. De film zelf staat niet in de repo; hij komt in `tools/video/uit/`, dat git overslaat. Zie het verslag over de video in `docs/` |
 
 ## Zelf draaien

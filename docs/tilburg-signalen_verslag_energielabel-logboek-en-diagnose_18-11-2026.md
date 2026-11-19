@@ -37,6 +37,7 @@ is niet samengevoegd.
 
 | Tijdstip | Wat |
 |---|---|
+| 19-11-2026, 10:07 uur | **Geplaatst, getoetst en gekoppeld.** PR 28 is samengevoegd door Wim. Wim plaatste versie `3fc2d2fa`. Toets (stap 5): `POST` met de herkomst van de app gaf `200`, `"gevonden"`, met klasse, registratiedatum, geldig tot en soort gebouw. Stap 8: Observability bij Cloudflare op *Disabled*, 0 events na de toets. Daarmee zijn "de nieuwe versie bij Cloudflare" en "of het logboek leeg blijft" uit "Niet gecontroleerd" afgehandeld, door Wim. `energielabel_worker` is ingevuld in een nieuwe pull request; de app toont het label pas na samenvoegen en de verversing daarna. Niet door mij getoetst: het vak met de echte Worker in de browser. |
 | 19-11-2026, 09:18 uur | **De tests hebben op GitHub gedraaid voor de tekst bij "geen" (commit `c725427`) en zijn geslaagd.** Zie "De testrun op de pull request". |
 | 19-11-2026, 09:14 uur | **De tekst in het vak bij "geen" is gewijzigd, op verzoek van Wim; "Niet gewijzigd" in de tabel "Niet gecontroleerd" is daarmee achterhaald.** Zie "De tekst bij 'geen'". |
 | 19-11-2026, 09:06 uur | **De tests hebben op GitHub gedraaid voor de wijziging van 19-11 (commit `c0711a9`) en zijn geslaagd.** Zie "De testrun op de pull request". |
