@@ -18,7 +18,7 @@
 | Breedte | Variant A: gemeenten, rubrieken "andere beschikking" en "andere vergunning", "omgevingsvergunning" in de titel |
 | De zeven berichten van Dongen die geen omgevingsvergunning zijn | a: zo laten, label "Vergunning", onder weggefilterd |
 | Eenmalig "nieuw" | a: accepteren, maar in het verslag het exacte aantal noemen |
-| Aan/uit per regio | Nog open: in de opdracht stond de keuze nog als sjabloon |
+| Aan/uit per regio | Later op 19-11-2026 besloten: een instelling per regio voor deze extra zoekvraag, standaard overal aan. West-Brabant boven 1,5 MB: accepteren, met een waarschuwing vanaf 90 procent. Zie `tilburg-signalen_verslag_andere-rubrieken_19-11-2026.md` |
 | Volgorde | Eerst deze meting, daarna bouwen met een vers venster |
 
 ## Welke grens

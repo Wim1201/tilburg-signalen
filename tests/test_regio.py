@@ -77,9 +77,13 @@ class Gemeentelijst(unittest.TestCase):
         without = {entry["naam"] for entry in self.entries if entry["regio"] == "kern" and "buiten_straal" not in entry}
         self.assertEqual(without, {"Heusden", "Oirschot", "Vught", "Boxtel", "Reusel-De Mierden"})
 
-    def test_a_limited_municipality_says_why(self):
-        self.assertIn("Aanvragen ontbreken", self.by_name["Roosendaal"]["opmerking"])
-        self.assertEqual([entry["naam"] for entry in self.entries if "opmerking" in entry], ["Roosendaal"])
+    def test_no_municipality_is_limited_any_more(self):
+        # Roosendaal had "Aanvragen ontbreken" until the other rubrics were read (19-11-2026).
+        # The field stays possible (gebied.py passes it on), but no municipality needs it now.
+        self.assertEqual([entry["naam"] for entry in self.entries if "opmerking" in entry], [])
+
+    def test_the_other_rubrics_are_on_for_the_core_and_every_region(self):
+        self.assertEqual(CONFIG["andere_rubrieken"], {name: True for name in ["kern"] + CONFIG["regios"]})
 
 
 class GebiedMetRegios(unittest.TestCase):
@@ -237,6 +241,143 @@ class RegioVanEenBericht(unittest.TestCase):
     def test_region_of_a_location_outside_the_radius(self):
         self.assertEqual([bekendmakingen.region_outside(name, AREA) for name in ("Tilburg", "Oosterhout", "Vught", "Breda", "Middelburg", "Rotterdam", None)],
                          ["Midden-Brabant", "West-Brabant", None, "West-Brabant", "Zeeland", None, None])
+
+
+OTHER_AREA = {"gemeenten": [
+    {"naam": "Tilburg", "land": "NL", "minKm": 0.0, "regio": "kern", "buitenStraal": "Midden-Brabant"},
+    {"naam": "Dongen", "land": "NL", "minKm": 8.2, "regio": "kern", "buitenStraal": "Midden-Brabant"},
+    {"naam": "Vught", "land": "NL", "minKm": 10.3, "regio": "kern", "buitenStraal": None},
+    {"naam": "Roosendaal", "land": "NL", "minKm": 39.4, "regio": "West-Brabant", "buitenStraal": None},
+    {"naam": "Middelburg", "land": "NL", "minKm": 93.4, "regio": "Zeeland", "buitenStraal": None},
+    {"naam": "Ravels", "land": "BE", "minKm": 8.7, "regio": "kern"},
+]}
+OTHER_CONFIG = {"centrum": {"rd": list(CENTRE)}, "straal_km": 15, "regios": ["Midden-Brabant", "West-Brabant", "Zeeland"],
+                "extra_overheden": [{"naam": "Waterschap Brabantse Delta", "soort": "waterschap"}]}
+SINCE = {"vergunning": "2026-10-08", "plan": "2026-05-23"}
+
+
+def notice_record(id, creator, rubric, title, wkt, gemeente):
+    return ET.fromstring(f"""<record {NS}>
+      <dcterms:identifier>{id}</dcterms:identifier><dcterms:title>{title}</dcterms:title>
+      <dcterms:type scheme="OVERHEIDop.Rubriek">{rubric}</dcterms:type>
+      <dcterms:creator>{creator}</dcterms:creator><dcterms:date>2026-11-13</dcterms:date>
+      <ow:publicatienaam>Gemeenteblad</ow:publicatienaam>{marker(wkt, gemeente)}
+      <gzd:preferredUrl>https://zoek.officielebekendmakingen.nl/{id}.html</gzd:preferredUrl>
+    </record>""")
+
+
+# Under its own rubric: one permit in Tilburg. Under the other rubrics: an application of Roosendaal
+# (as Roosendaal publishes them), a draft of Middelburg, one of Dongen, and the same notice as the
+# one in Tilburg (which the source does not do, but the run must not take it twice).
+OWN = [notice_record("gmb-2026-10", "Tilburg", "omgevingsvergunning", "Verleende omgevingsvergunning, Teststraat 1",
+                     "POINT (134458.696 399511.411)", "Tilburg")]
+OTHER = [notice_record("gmb-2026-20", "Roosendaal", "andere beschikking",
+                       "Ingediende aanvraag voor een Omgevingsvergunning op de locatie Teststraat 2", "POINT (95458.696 396511.411)", "Roosendaal"),
+         notice_record("gmb-2026-21", "Middelburg", "andere beschikking",
+                       "Ontwerpbesluit omgevingsvergunning Teststraat 3", "POINT (31000 393000)", "Middelburg"),
+         notice_record("gmb-2026-22", "Dongen", "andere vergunning",
+                       "Besluit op aanvraag omgevingsvergunning voor wijzigen van winkels in woningen", "POINT (134458.696 406511.411)", "Dongen"),
+         notice_record("gmb-2026-10", "Tilburg", "andere beschikking", "Zelfde nummer, andere titel", "POINT (134458.696 399511.411)", "Tilburg")]
+
+
+class AndereRubrieken(unittest.TestCase):
+    """Permit notices that a municipality published under "andere beschikking" or "andere vergunning"."""
+
+    def fetch(self, config=OTHER_CONFIG):
+        queries, lookups = [], []
+
+        def search(query):
+            queries.append(query)
+            if 'dt.type=="andere beschikking"' in query:
+                return iter(OTHER)
+            if 'dt.type=="omgevingsvergunning"' in query and "Staatscourant" not in query:
+                return iter(OWN)
+            return iter([])
+
+        def lookup(*args):
+            lookups.append(args)
+            return None
+
+        with mock.patch.object(bekendmakingen, "search", search), mock.patch.object(bekendmakingen, "geocode_title", lookup), \
+                mock.patch.object(bekendmakingen, "reverse_gemeente", lookup):
+            found = bekendmakingen.fetch(config, OTHER_AREA, SINCE)
+        self.assertEqual(lookups, [], "alle testberichten hebben een locatie")
+        return {entry["id"]: entry for entry in found}, [query for query in queries if 'dt.type=="andere beschikking"' in query]
+
+    def test_query_asks_both_rubrics_with_the_word_in_the_title(self):
+        query = bekendmakingen.build_other_query(["Dongen", "Roosendaal"], "2026-10-08")
+        self.assertIn('(dt.type=="andere beschikking" OR dt.type=="andere vergunning")', query)
+        self.assertIn('(dt.creator=="Dongen" OR dt.creator=="Roosendaal")', query)
+        self.assertIn('dt.title any "omgevingsvergunning"', query)
+        self.assertIn("dt.date>=2026-10-08", query)
+
+    def test_one_extra_query_for_the_municipalities_only(self):
+        _, queries = self.fetch()
+        self.assertEqual(len(queries), 1)
+        self.assertIn("dt.date>=2026-10-08", queries[0], "het venster van de vergunningen")
+        for name in ["Tilburg", "Dongen", "Vught", "Roosendaal", "Middelburg"]:
+            self.assertIn(f'dt.creator=="{name}"', queries[0])
+        self.assertNotIn("Waterschap", queries[0])
+        self.assertNotIn("Ravels", queries[0])
+
+    def test_a_notice_under_another_rubric_is_a_permit_with_its_region(self):
+        found, _ = self.fetch()
+        self.assertEqual(sorted(found), ["gmb-2026-10", "gmb-2026-20", "gmb-2026-21", "gmb-2026-22"])
+        self.assertEqual({id: (entry["type"], entry["regio"], entry["fase"]) for id, entry in found.items() if id != "gmb-2026-10"},
+                         {"gmb-2026-20": ("vergunning", "West-Brabant", "Aanvraag"), "gmb-2026-21": ("vergunning", "Zeeland", "Ontwerpbesluit"),
+                          "gmb-2026-22": ("vergunning", "kern", "Besluit")})
+
+    def test_a_notice_that_came_in_under_its_own_rubric_is_not_taken_twice_or_changed(self):
+        found, _ = self.fetch()
+        self.assertEqual(found["gmb-2026-10"]["titel"], "Verleende omgevingsvergunning, Teststraat 1")
+
+    def test_what_came_in_before_stays_exactly_as_it_was(self):
+        off = dict(OTHER_CONFIG, andere_rubrieken={name: False for name in ["kern"] + OTHER_CONFIG["regios"]})
+        before, queries = self.fetch(off)
+        self.assertEqual(queries, [], "alles uit: geen extra zoekvraag")
+        after, _ = self.fetch()
+        self.assertEqual(sorted(before), ["gmb-2026-10"])
+        self.assertEqual({id: entry for id, entry in after.items() if id in before}, before)
+
+    def test_a_part_that_is_switched_off_is_not_asked_and_not_kept(self):
+        found, queries = self.fetch(dict(OTHER_CONFIG, andere_rubrieken={"Zeeland": False}))
+        self.assertNotIn("gmb-2026-21", found)
+        self.assertIn("gmb-2026-20", found)
+        self.assertNotIn('dt.creator=="Middelburg"', queries[0])
+        found, queries = self.fetch(dict(OTHER_CONFIG, andere_rubrieken={"kern": False}))
+        self.assertEqual(sorted(found), ["gmb-2026-10", "gmb-2026-20", "gmb-2026-21"])
+        self.assertNotIn('dt.creator=="Vught"', queries[0], "Vught heeft geen deel buiten de straal")
+        self.assertIn('dt.creator=="Dongen"', queries[0], "het deel van Dongen buiten de straal hoort bij Midden-Brabant")
+
+    def test_a_part_that_is_not_listed_is_on(self):
+        self.assertEqual(bekendmakingen.other_rubrics_on(OTHER_CONFIG), {"kern", "Midden-Brabant", "West-Brabant", "Zeeland"})
+        self.assertEqual(bekendmakingen.other_rubrics_on(dict(OTHER_CONFIG, andere_rubrieken={"West-Brabant": False})),
+                         {"kern", "Midden-Brabant", "Zeeland"})
+
+    def test_titles_of_these_rubrics_get_their_phase(self):
+        from signalen import classify
+        self.assertEqual(classify.permit_phase("Ingediende aanvraag voor een Omgevingsvergunning op de locatie Teststraat 2"), "Aanvraag")
+        self.assertEqual(classify.permit_phase("Verlengen beslistermijn aanvraag omgevingsvergunning Teststraat 2"), "Beslistermijn verlengd")
+        self.assertEqual(classify.permit_phase("Intrekken omgevingsvergunning Teststraat 2"), "Ingetrokken of buiten behandeling")
+
+
+class GrootteVanDeBestanden(unittest.TestCase):
+    """The log line about the data files a run writes, with a warning from 90 percent of 1,5 MB."""
+
+    def test_small_files_give_one_plain_line(self):
+        lines = update.bestand_meldingen({"berichten.json": 1_036_760, "regio-west-brabant.json": 1_349_999})
+        self.assertEqual(lines, ["  bestanden: berichten.json 1.037 kB (69 procent), regio-west-brabant.json 1.350 kB (89 procent)"])
+
+    def test_from_90_percent_the_log_warns_per_file(self):
+        lines = update.bestand_meldingen({"berichten.json": 1_036_760, "regio-west-brabant.json": 1_422_848, "regio-zeeland.json": 1_350_000})
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(lines[1].startswith("::warning::regio-west-brabant.json is 1.423 kB, 94 procent van de 1.500 kB"))
+        self.assertTrue(lines[2].startswith("::warning::regio-zeeland.json is 1.350 kB, 90 procent"))
+        self.assertIn("De run gaat door", lines[1])
+        self.assertIn("vernieuw de momentopname in de repository niet met een bestand boven 1.500 kB", lines[1])
+
+    def test_the_warning_is_at_90_percent_of_the_limit_of_the_repository(self):
+        self.assertEqual(update.BESTAND_WAARSCHUW_BYTES * 10, cachemodule.REPO_BYTES * 9)
 
 
 class Verversing(unittest.TestCase):
