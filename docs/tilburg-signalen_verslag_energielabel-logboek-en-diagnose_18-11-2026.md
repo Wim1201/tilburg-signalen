@@ -37,6 +37,7 @@ is niet samengevoegd.
 
 | Tijdstip | Wat |
 |---|---|
+| 19-11-2026, 09:18 uur | **De tests hebben op GitHub gedraaid voor de tekst bij "geen" (commit `c725427`) en zijn geslaagd.** Zie "De testrun op de pull request". |
 | 19-11-2026, 09:14 uur | **De tekst in het vak bij "geen" is gewijzigd, op verzoek van Wim; "Niet gewijzigd" in de tabel "Niet gecontroleerd" is daarmee achterhaald.** Zie "De tekst bij 'geen'". |
 | 19-11-2026, 09:06 uur | **De tests hebben op GitHub gedraaid voor de wijziging van 19-11 (commit `c0711a9`) en zijn geslaagd.** Zie "De testrun op de pull request". |
 | 19-11-2026, 09:00 uur | **"De oorzaak van 'geen' is niet gevonden" (onder "Stand", "Vraag 1" en "Niet getest of nog open") is afgehandeld: de `404`'s waren terecht.** Vastgesteld door Wim, niet door mij. Daarmee vervalt ook mijn redenering onder "Wat overblijft" dat geval B voor het adres zonder huisletter "goed mogelijk" was: het was geval A, en de reden was dat er geen label is. |
@@ -329,6 +330,15 @@ Voor commit `c0711a9` (het antwoord in de vorm van de echte dienst), job `testen
 De run duurde zes en een halve minuut, tegen anderhalve tot tweeënhalve minuut eerder. De
 browsertests zelf duurden 47 seconden, net als eerder; waar de rest van de tijd zat, heb ik niet
 uitgezocht.
+
+### De run van 19-11-2026, 09:14 – 09:16 uur
+
+Voor commit `c725427` (de tekst bij "geen"), job `testen`, run-id 44485967139: **groen**.
+
+| Stap | Uitkomst |
+|---|---|
+| Tests | Geslaagd. Het aantal heb ik niet uit het log gelezen; lokaal waren het er 521 |
+| Browsertests | 71 tests, geslaagd (uit het log). Hierin zit de test van de nieuwe tekst, de link en de breedte op 320 pixels |
 
 ## Niet getest of nog open
 
