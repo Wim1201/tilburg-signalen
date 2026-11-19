@@ -316,6 +316,26 @@ def cache_meldingen(saved, grens=cachemodule.GRENS_BYTES, waarschuw=cachemodule.
     return lines
 
 
+BESTAND_WAARSCHUW_BYTES = 1_350_000  # 90 percent of what a file in the repository may be
+
+
+def bestand_meldingen(sizes, waarschuw=BESTAND_WAARSCHUW_BYTES, repo=cachemodule.REPO_BYTES):
+    """Lines for the run log about the size of the data files the run wrote; "::warning::" from 90 percent.
+
+    The run does not stop on a large data file: it is written and published, and the workflow does
+    not put it in the repository. The limit only holds for the snapshot in the repository; see
+    docs/tilburg-signalen_verslag_andere-rubrieken_19-11-2026.md.
+    """
+    kb = lambda count: f"{count / 1000:,.0f}".replace(",", ".") + " kB"  # noqa: E731
+    lines = ["  bestanden: " + ", ".join(f"{name} {kb(size)} ({size * 100 // repo} procent)" for name, size in sizes.items())]
+    for name, size in sizes.items():
+        if size >= waarschuw:
+            lines.append(f"::warning::{name} is {kb(size)}, {size * 100 // repo} procent van de {kb(repo)} die een bestand in de repository "
+                         "mag zijn. De run gaat door en de site krijgt het bestand; vernieuw de momentopname in de repository niet met een "
+                         f"bestand boven {kb(repo)}")
+    return lines
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Berichten ophalen en beoordelen")
     parser.add_argument("--volledig", action="store_true",
@@ -362,6 +382,7 @@ def main(argv=None):
     OUTPUT.write_text(json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     for name, region_document in region_files.items():
         (OUTPUT.parent / name).write_text(json.dumps(region_document, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+    sizes = {name: (OUTPUT.parent / name).stat().st_size for name in [OUTPUT.name] + list(region_files)}
     counts = {}
     for item in everything:
         key = (item["klasse"], item["type"])
@@ -395,6 +416,8 @@ def main(argv=None):
     for soort, stats in document["cache"].items():
         print(f'  cache {soort}: {stats["uitCache"]} uit cache, {stats["opgehaald"]} opgehaald')
     for line in cache_meldingen(saved):
+        print(line)
+    for line in bestand_meldingen(sizes):
         print(line)
     for gap in document["onvolledigeDagen"]:
         print(f'  ONVOLLEDIG {gap["datum"]}: {gap["aantal"]} van gebruikelijk {gap["verwacht"]} Gemeenteblad-publicaties')

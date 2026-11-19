@@ -11,6 +11,10 @@ from . import classify, geo, http
 SRU_URL = "https://repository.overheid.nl/sru"
 PAGE_SIZE = 500
 RUBRICS = {"omgevingsvergunning": "vergunning", "ruimtelijk plan of omgevingsdocument": "plan"}
+# Some municipalities publish permit notices under another rubric (Roosendaal: all applications and
+# extensions, under "andere beschikking"). Those are read too, when the title names the permit.
+OTHER_RUBRICS = ("andere beschikking", "andere vergunning")
+OTHER_TITLE_WORD = "omgevingsvergunning"
 
 LOCATIESERVER = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free"
 _STREET_SUFFIX = (r"(?:straat|weg|laan|kade|dijk|plein|pad|dreef|hof|ring|steeg|baan|singel|park|"
@@ -42,6 +46,23 @@ def build_query(creators, rubric, since, publication=None):
     if publication:
         clauses.append(f'w.publicatienaam=="{publication}"')
     return " AND ".join(clauses)
+
+
+def build_other_query(creators, since):
+    """CQL query for permit notices that a municipality published under another rubric."""
+    return ("c.product-area==officielepublicaties AND dt.date>=" + since
+            + " AND (" + " OR ".join(f'dt.type=="{rubric}"' for rubric in OTHER_RUBRICS) + ")"
+            + " AND (" + " OR ".join(f'dt.creator=="{name}"' for name in creators) + ")"
+            + f' AND dt.title any "{OTHER_TITLE_WORD}"')
+
+
+def other_rubrics_on(config):
+    """The parts of the area ("kern" and the regions) for which the other rubrics are read.
+
+    `andere_rubrieken` in config.json switches it per part; a part that is not listed is on.
+    """
+    switch = config.get("andere_rubrieken") or {}
+    return {name for name in ["kern"] + list(config.get("regios", [])) if switch.get(name, True)}
 
 
 def search(query):
@@ -320,4 +341,30 @@ def fetch(config, area, since_by_kind, cache=None):
                 item = to_item(record, centre_rd, radius_m, area_by_name, *lookups(cache))
                 if item and item["id"]:
                     items[item["id"]] = item
+    for item in fetch_other_rubrics(config, area, since_by_kind["vergunning"], cache):
+        items.setdefault(item["id"], item)  # what came in under its own rubric stays as it was
+    return list(items.values())
+
+
+def fetch_other_rubrics(config, area, since, cache=None):
+    """Permit notices of the municipalities that were published under another rubric.
+
+    Only municipalities, not the extra authorities: the water boards publish their water permits
+    there, which say nothing about a building location. One query per run. A notice counts as a
+    permit and goes through the same rules as any other; it is kept only for a part of the area
+    ("kern" or a region) that is switched on in `andere_rubrieken`.
+    """
+    on = other_rubrics_on(config)
+    centre_rd = tuple(config["centrum"]["rd"])
+    radius_m = config["straal_km"] * 1000
+    area_by_name = {g["naam"]: g for g in area["gemeenten"] if g["land"] == "NL"}
+    creators = sorted(name for name, g in area_by_name.items()
+                      if g.get("regio", "kern") in on or (g.get("regio", "kern") == "kern" and g.get("buitenStraal") in on))
+    if not creators:
+        return []
+    items = {}
+    for record in search(build_other_query(creators, since)):
+        item = to_item(record, centre_rd, radius_m, area_by_name, *lookups(cache), kind="vergunning")
+        if item and item["id"] and item["regio"] in on:
+            items[item["id"]] = item
     return list(items.values())

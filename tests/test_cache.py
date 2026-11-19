@@ -427,6 +427,7 @@ class CacheGrensInDeRun(unittest.TestCase):
         self.assertEqual(len(everything), 9)
         self.assertFalse([line for line in printed if "Cache te groot" in line])
         self.assertTrue([line for line in printed if line.startswith("  cache: ") and "bewaard" in line])
+        self.assertTrue([line for line in printed if line.startswith("  bestanden: berichten.json ") and "regio-west-brabant.json" in line])
 
         texts, printed, size = self.run_main(limit=full - 600)
         self.assertLessEqual(size, full - 600)

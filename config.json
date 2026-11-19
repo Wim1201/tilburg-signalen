@@ -52,6 +52,12 @@
     "West-Brabant",
     "Zeeland"
   ],
+  "andere_rubrieken": {
+    "kern": true,
+    "Midden-Brabant": true,
+    "West-Brabant": true,
+    "Zeeland": true
+  },
   "gemeenten": [
     {"naam": "Tilburg", "regio": "kern", "buiten_straal": "Midden-Brabant"},
     {"naam": "Hilvarenbeek", "regio": "kern", "buiten_straal": "Midden-Brabant"},
@@ -77,7 +83,7 @@
     {"naam": "Geertruidenberg", "regio": "West-Brabant"},
     {"naam": "Halderberge", "regio": "West-Brabant"},
     {"naam": "Moerdijk", "regio": "West-Brabant"},
-    {"naam": "Roosendaal", "regio": "West-Brabant", "opmerking": "Aanvragen ontbreken: Roosendaal publiceert ze onder een andere rubriek dan de app leest."},
+    {"naam": "Roosendaal", "regio": "West-Brabant"},
     {"naam": "Rucphen", "regio": "West-Brabant"},
     {"naam": "Steenbergen", "regio": "West-Brabant"},
     {"naam": "Woensdrecht", "regio": "West-Brabant"},
