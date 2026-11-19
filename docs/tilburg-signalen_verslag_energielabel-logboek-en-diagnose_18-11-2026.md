@@ -9,6 +9,41 @@
 | Van / aan | Claude Code aan Wim |
 | Vervolg op | `tilburg-signalen_verslag_energielabel_18-11-2026.md` |
 
+## Het lek: het testadres vanaf GitHub naar de echte Worker (19-11-2026)
+
+**Wat er gebeurde (feit).** In run 46 van "Dagelijkse verversing" (na PR 29, 14:31 – 14:35 uur) draaide
+de controle van de live site de browsertests tegen `wim1201.github.io`. De live gegevens wezen voor het
+eerst naar de geplaatste Worker. De browsertests zetten die instelling toen alleen zelf in de sessie
+voor het vak Energielabel; in de andere sessies gebruikte de app de instelling van de live site. Het
+tabblad Adres vroeg daardoor vanaf de machine van GitHub de echte Worker om het energielabel van het
+vaste testadres uit de tests. Dat is een openbaar adres dat al in de repo staat, geen adres van een
+bezoeker of van Wim. De test `test_address_tab_asks_only_pdok_and_without_a_key` zag het verzoek
+en faalde.
+
+| Punt | Wat ik weet | Soort |
+|---|---|---|
+| Wat de Worker kreeg | Een `POST` met het testadres in de inhoud, met de herkomst van de live site (de pagina stond daar) | Feit, uit de opzet van de test |
+| Of EP-Online het adres kreeg | Waarschijnlijk wel: de herkomst klopte, dus de Worker vroeg EP-Online, binnen de grens per minuut en per dag | Vermoeden: de Worker bewaart geen logboek, dus achteraf niet na te gaan |
+| Hoe vaak | Minstens één keer (in de sessie die de test controleert). Vermoedelijk ook in de andere sessies die het testadres openen en in de verversingstest, samen hooguit een handvol keren | Vermoeden |
+| Wat niet lekte | De sleutel (die blijft in de Worker), gegevens van bezoekers, andere adressen | Feit |
+| Welke runs | Alleen run 46. Runs 44 en 45 draaiden op een versie zonder de instelling | Feit |
+| Tot het herstel | Elke volgende run van de verversing (ook die van de planner) herhaalt het, tot PR 30 is samengevoegd | Feit, volgt uit de opzet |
+| Mijn eigen proeven | Lokaal tegen de live site gedraaid na het herstel: nul verzoeken aan de Worker | Feit |
+
+**Waarom het kon.** De browsertests gingen er stilzwijgend van uit dat de instelling leeg was, zoals
+toen ik ze schreef. Ik heb bij het invullen van het adres in PR 29 niet nagegaan wat de controle van
+de live site daarna zou doen. De testrun op PR 29 kon het niet zien: die test de gegevens in de repo,
+en daar komt de instelling pas na een verversing in.
+
+**Het herstel (PR 30).** De tests zetten de instelling nu in elke sessie zelf (leeg, of een
+nagespeelde Worker). Daarnaast wordt elk verzoek naar een Worker op `workers.dev` in de browser
+tegengehouden en geteld, in alle browsertests; een test eist nul. Een andere test controleert dat de
+live site naar de Worker uit `config.json` wijst, zonder hem aan te roepen.
+
+**Nog te doen (met akkoord van Wim, aparte pull request).** Een stap in `tests.yml` die vóór de
+browsertests de instellingen uit `config.json` in een kopie van de gegevens zet, zonder iets op te
+halen. Dan test een pull request met de instellingen die na het samenvoegen live komen.
+
 ## Stand op 19-11-2026, 09:00 uur
 
 **De twee `404`'s waren terecht.** Wim vroeg EP-Online rechtstreeks, met hetzelfde pad, dezelfde
@@ -37,6 +72,7 @@ is niet samengevoegd.
 
 | Tijdstip | Wat |
 |---|---|
+| 19-11-2026, 14:58 uur | **PR 30 is groen op GitHub** (job `testen`, 14:51 – 14:53 uur). Het lek van run 46 staat uitgeschreven onder "Het lek". |
 | 19-11-2026, 14:51 uur | **Run 46 (na PR 29) faalde in de controle van de live site: 3 tests, één oorzaak.** De live gegevens wijzen nu naar de Worker; drie browsertests gingen uit van een lege instelling ("Nog niet beschikbaar in de app." in twee sessies, en "geen andere dienst dan PDOK"). Die laatste toont ook dat **de controle het testadres (Mortelplein 118a, een openbaar adres) vanaf GitHub naar de echte Worker stuurde**, met de herkomst van de live site, dus vermoedelijk door naar EP-Online; hoe vaak precies weet ik niet. Hersteld in een nieuwe pull request: de tests zetten de instelling zelf (leeg, of een nagespeelde Worker), elk verzoek naar `*.workers.dev` wordt in de browser tegengehouden en geteld (een test eist nul), en een test controleert dat de live site naar de Worker uit `config.json` wijst. Lokaal geslaagd tegen de checkout en tegen de live site. De testrun op de pull request zag het niet, omdat de gegevens in de repo de instelling pas na een verversing krijgen. |
 | 19-11-2026, 10:07 uur | **Geplaatst, getoetst en gekoppeld.** PR 28 is samengevoegd door Wim. Wim plaatste versie `3fc2d2fa`. Toets (stap 5): `POST` met de herkomst van de app gaf `200`, `"gevonden"`, met klasse, registratiedatum, geldig tot en soort gebouw. Stap 8: Observability bij Cloudflare op *Disabled*, 0 events na de toets. Daarmee zijn "de nieuwe versie bij Cloudflare" en "of het logboek leeg blijft" uit "Niet gecontroleerd" afgehandeld, door Wim. `energielabel_worker` is ingevuld in een nieuwe pull request; de app toont het label pas na samenvoegen en de verversing daarna. Niet door mij getoetst: het vak met de echte Worker in de browser. |
 | 19-11-2026, 09:18 uur | **De tests hebben op GitHub gedraaid voor de tekst bij "geen" (commit `c725427`) en zijn geslaagd.** Zie "De testrun op de pull request". |
