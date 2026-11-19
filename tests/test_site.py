@@ -1524,7 +1524,7 @@ class InDeBrowser(unittest.TestCase):
 
     def test_address_tab_asks_only_pdok_and_without_a_key(self):
         seen = self.seen["adres"]
-        self.assertEqual(sorted(seen["asked"]), ["adresobject", "kaart", "pand", "perceel", "perceel", "zoeker"])
+        self.assertEqual(sorted(seen["asked"]), ["adresobject", "bestemming", "kaart", "pand", "perceel", "perceel", "zoeker"])
         self.assertEqual(seen["askedHosts"], ["api.pdok.nl", "service.pdok.nl"])
         self.assertEqual(seen["keys"], 0)
         self.assertEqual(seen["elsewhere"], [], "de app roept nog een andere dienst aan")
@@ -1663,16 +1663,61 @@ class InDeBrowser(unittest.TestCase):
         label = self.seen["adres"]["label"]
         self.assertEqual(label["again"], {"klasse": "A+", "label": 1, "pdok": 0})
         self.assertEqual(label["other"]["bag"], 1)
-        self.assertTrue(label["other"]["plan"].startswith("Nog niet beschikbaar in de app."))
+        self.assertIn("Bestemming Wonen", label["other"]["plan"])
         self.assertGreater(label["other"]["notices"], 0)
 
-    def test_address_tab_marks_energy_label_and_plan_as_not_available_with_a_link(self):
+    def test_address_tab_marks_the_energy_label_as_not_available_with_a_link(self):
         seen = self.seen["adres"]
         self.assertTrue(seen["energy"]["text"].startswith("Nog niet beschikbaar in de app."))
         self.assertEqual(seen["energy"]["links"], ["https://www.ep-online.nl/Energylabel/Search"])
         self.assertIn("Vul daar in: 5037PL 118 a.", seen["energy"]["text"])
-        self.assertTrue(seen["plan"]["text"].startswith("Nog niet beschikbaar in de app."))
-        self.assertEqual(seen["plan"]["links"], ["https://omgevingswet.overheid.nl/regels-op-de-kaart/documenten?locatie-stelsel=RD&locatie-x=132133&locatie-y=395880"])
+
+    # --- The box "Bestemmingsplan en omgevingsplan". Ruimtelijke plannen (PDOK) is played back with
+    # its real answer for the test address (adres_fixtures.json): an old plan without figures.
+
+    PLAN_LINK = "https://omgevingswet.overheid.nl/regels-op-de-kaart/documenten?locatie-stelsel=RD&locatie-x=132133&locatie-y=395880"
+    PLAN_WARNING = "Let op: wijzigingen sinds 1-1-2024 (Omgevingswet, omgevingsplan) ontbreken hier. Wat nu geldt, staat in Regels op de kaart van het Omgevingsloket."
+
+    def test_the_plan_box_shows_the_zoning_its_plan_and_its_rules(self):
+        plan = self.seen["adres"]["plan"]
+        self.assertEqual(plan["uitkomst"], "gevonden")
+        self.assertEqual(plan["facts"][0], {"Bestemming": "Wonen", "Plan": "Zorgvlied 2008", "Datum": "13-03-2009", "Status": "vigerend"})
+        self.assertEqual(len(plan["facts"]), 1)
+        self.assertIn("Dubbelbestemmingen: Waarde - Appartementen; Waarde - Flitsbezorging; Waarde - Parkeren; Waarde - Terrassen.", plan["text"])
+        self.assertEqual(plan["links"], ["https://ruimtelijkeplannen.nl/documents/NL.IMRO.085500002008003e-/v_NL.IMRO.085500002008003e-_art11.html", self.PLAN_LINK])
+        self.assertIn("Lees de regels van deze bestemming", plan["text"])
+        self.assertIn("Niet getoond: 2 plannen die niet zijn vastgesteld of zijn vervallen (ontwerp, voorontwerp).", plan["text"])
+        self.assertIn("Bron: Ruimtelijke plannen (Kadaster, via PDOK), opgevraagd op ", plan["text"])
+        self.assertNotIn("Nog niet beschikbaar", plan["text"])
+        self.assertEqual(plan["buttons"], [])
+        self.assertLessEqual(plan["right"], 320)
+
+    def test_the_plan_box_says_no_figure_is_not_no_limit_and_warns_right_after_the_zoning(self):
+        plan = self.seen["adres"]["plan"]
+        self.assertIn("Bij deze bestemming staat geen getal op de kaart. Geen getal op de kaart betekent niet: geen beperking.", plan["text"])
+        # The zoning with its figures (here: the line that there are none), then at once the warning.
+        self.assertEqual(plan["block"], ["feiten", "geen-getal", "stale plan-waarschuwing", "links"])
+        self.assertEqual(plan["parts"][0], "planblok")
+        self.assertEqual(plan["text"].count(self.PLAN_WARNING), 1)
+
+    def test_a_plan_service_that_fails_or_is_gone_gives_a_message_not_an_empty_box(self):
+        down = self.seen["adres"]["registersDown"]["plan"]
+        self.assertEqual(down["uitkomst"], "onbereikbaar")
+        self.assertTrue(down["text"].startswith("De kaart met bestemmingsplannen (Ruimtelijke plannen, via PDOK) antwoordt niet."), down["text"])
+        self.assertEqual(down["buttons"], ["Opnieuw proberen"])
+        self.assertEqual(down["links"], [self.PLAN_LINK], "de link naar Regels op de kaart hoort te blijven")
+        again = self.seen["adres"]["afterRetry"]["plan"]
+        self.assertEqual(again["facts"][0]["Bestemming"], "Wonen")
+        gone = self.seen["adres"]["partsDown"]["plan"]
+        self.assertEqual(gone["uitkomst"], "gestopt")
+        self.assertIn("Mogelijk is hij verplaatst of gestopt.", gone["text"])
+        self.assertEqual(gone["links"], [self.PLAN_LINK])
+        odd = self.seen["adres"]["noNotices"]["plan"]
+        self.assertEqual(odd["uitkomst"], "onbekend")
+        self.assertIn("gaf een antwoord dat de app niet kent. Mogelijk is de dienst gewijzigd of gestopt.", odd["text"])
+        self.assertEqual((odd["buttons"], odd["links"]), (["Opnieuw proberen"], [self.PLAN_LINK]))
+        for case in (gone, odd):
+            self.assertNotIn("Bestemming", [key for facts in case["facts"] for key in facts])
 
     def test_address_search_that_does_not_answer_gives_a_message_not_an_empty_page(self):
         message = "De adreszoeker (PDOK Locatieserver) antwoordt niet. Controleer je verbinding of probeer het later opnieuw."
@@ -1698,7 +1743,6 @@ class InDeBrowser(unittest.TestCase):
         self.assertNotIn("test-adres-perceel", down["notices"]["groups"]["Mogelijk dit adres"])
         self.assertIn("worden pas gekoppeld als het perceel bekend is", down["noticesText"])
         self.assertTrue(down["energy"].startswith("Nog niet beschikbaar in de app."))
-        self.assertTrue(down["plan"].startswith("Nog niet beschikbaar in de app."))
         # Trying again once the registers are back fills the boxes.
         again = self.seen["adres"]["afterRetry"]
         self.assertEqual(again["bag"]["Bouwjaar"], "1962")

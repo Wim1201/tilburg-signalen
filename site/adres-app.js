@@ -35,14 +35,27 @@
     return node;
   }
 
-  function getJson(url) {
+  /* A plain GET to an open register; `read` turns the response into what is wanted. A register
+     that does not answer within TIMEOUT counts as not answering. */
+  function get(url, read) {
     var controller = typeof AbortController === "function" ? new AbortController() : null;
     var clock = setTimeout(function () { if (controller) controller.abort(); }, TIMEOUT);
     function done() { clearTimeout(clock); }
-    return fetch(url, controller ? { signal: controller.signal } : {}).then(function (response) {
+    return fetch(url, controller ? { signal: controller.signal } : {}).then(read).then(function (data) { done(); return data; }, function (error) { done(); throw error; });
+  }
+
+  function getJson(url) {
+    return get(url, function (response) {
       if (!response.ok) throw new Error(String(response.status));
       return response.json();
-    }).then(function (data) { done(); return data; }, function (error) { done(); throw error; });
+    });
+  }
+
+  /* The answer as text with its status; status 0 when no answer came. Never fails. */
+  function getText(url) {
+    return get(url, function (response) {
+      return response.text().then(function (text) { return { status: response.status, text: text }; });
+    }).catch(function () { return { status: 0, text: "" }; });
   }
 
   function data() { return window.TilburgSignalenGegevens || null; }
@@ -359,13 +372,67 @@
     });
   }
 
-  function renderLinks(address) {
-    var links = A.viewerLinks(address);
-    var plan = $("adres-plan"), row;
+  /* The box "Bestemmingsplan en omgevingsplan". `fill` puts what is known about the plans in the
+     box; under it the link to Regels op de kaart always stays: that is where the current rules are. */
+  function renderPlan(address, fill) {
+    var links = A.viewerLinks(address), plan = $("adres-plan"), row;
     plan.textContent = "";
-    plan.appendChild(el("p", null, "Nog niet beschikbaar in de app."));
+    fill(plan);
     row = el("p", "links"); row.appendChild(link(links.plan.url, links.plan.label)); plan.appendChild(row);
     plan.appendChild(el("p", "bronregel", "De link opent de kaart van het Omgevingsloket op de plek van dit adres."));
+  }
+
+  /* One adopted zoning with its plan, its figures, right under them the warning that changes since
+     1-1-2024 are missing, and a link to its rules. */
+  function planBlock(item, model) {
+    var block = el("div", "planblok");
+    block.appendChild(facts([
+      { label: "Bestemming", value: item.naam },
+      { label: "Plan", value: item.plan },
+      { label: "Datum", value: item.datum },
+      { label: "Status", value: item.status },
+    ].concat(item.maten)));
+    if (!item.maten.length) block.appendChild(el("p", "geen-getal", model.geenGetal));
+    // Right at the figures: what this source does not have.
+    block.appendChild(el("p", "stale plan-waarschuwing", model.waarschuwing));
+    if (item.regels) { var row = el("p", "links"); row.appendChild(link(item.regels, "Lees de regels van deze bestemming")); block.appendChild(row); }
+    return block;
+  }
+
+  /* Ask Ruimtelijke plannen (PDOK) what applies at the point of the address. */
+  function loadPlan(address, mine) {
+    var url = A.planUrl(address.rd);
+    if (!url) {
+      renderPlan(address, function (box) {
+        box.setAttribute("data-uitkomst", "geen-punt");
+        box.appendChild(el("p", null, "Bij dit adres is geen plek op de kaart bekend; het bestemmingsplan kan niet worden opgezocht."));
+      });
+      return;
+    }
+    renderPlan(address, function (box) { box.removeAttribute("data-uitkomst"); busy(box, "Het bestemmingsplan wordt opgezocht…"); });
+    getText(url).then(function (answer) {
+      if (mine !== chosen) return;
+      var model = A.planModel(answer.status, answer.text, window.TilburgSignalen.isoDay(new Date()));
+      renderPlan(address, function (box) {
+        box.setAttribute("data-uitkomst", model.soort);
+        if (model.soort !== "gevonden" && model.soort !== "geen") {
+          failed(box, model.tekst, function () { loadPlan(address, mine); });
+          return;
+        }
+        if (model.overlap) box.appendChild(el("p", "stale", model.overlap));
+        if (model.tekst) box.appendChild(el("p", null, model.tekst));
+        model.bestemmingen.forEach(function (item) { box.appendChild(planBlock(item, model)); });
+        model.overigeMaten.forEach(function (other) {
+          box.appendChild(el("p", "bronregel", "Ook op de kaart, uit " + other.plan + ":"));
+          box.appendChild(facts(other.maten));
+        });
+        // Without a zoning the warning still comes: the current rules may well say something here.
+        if (!model.bestemmingen.length) box.appendChild(el("p", "stale plan-waarschuwing", model.waarschuwing));
+        box.appendChild(el("p", "dubbel", "Dubbelbestemmingen: " + (model.dubbel.length ? model.dubbel.join("; ") : "geen") + "."));
+        if (model.nietGetoond) box.appendChild(el("p", "bronregel", model.nietGetoond));
+        box.appendChild(el("p", "bronregel", model.bron));
+      });
+    });
   }
 
   function choose(address) {
@@ -380,13 +447,13 @@
       (address.gemeente && address.gemeente !== address.woonplaats ? " · gemeente " + address.gemeente : "");
     $("adres-uitkomst").hidden = false;
     current = { address: address, parcels: [], withParcel: false, regios: [], extra: [], regioFout: false };
-    renderLinks(address);
     $("adres-energie").removeAttribute("data-uitkomst");
     loadLabel(address, mine);
     renderNotices();
     loadRegion(address, mine);
     loadBag(address, mine);
     loadParcels(address, mine);
+    loadPlan(address, mine);
   }
 
   var input = $("adres-zoek");

@@ -63,6 +63,7 @@ function part(url) {
   if (/\/pand\/items\//.test(url)) return "pand";
   if (/\/brk-kadastrale-kaart\//.test(url)) return "perceel";
   if (/\/kadastralekaart\/wms\//.test(url)) return "kaart";
+  if (/\/kadaster\/plu\/wms\//.test(url)) return "bestemming";
   return "onbekend";
 }
 
@@ -79,7 +80,8 @@ module.exports = async function (browser, base) {
   var result = {};
 
   /* `down` lists what does not answer: a part name fails to connect, "name:503" answers with an
-     error, "name:stil" never answers. The list can be changed while the page is open. */
+     error, "name:404" is not found, "name:raar" answers with a web page, "name:stil" never
+     answers. The list can be changed while the page is open. */
   /* `label`: the energy label Worker is set, and answers as `label.antwoord` says at that moment:
      { status, body } or "weg" (no connection). Without `label` the setting is empty. The setting in
      the data the site serves is never used: on the live site it is the real Worker. */
@@ -127,7 +129,11 @@ module.exports = async function (browser, base) {
       if (down.indexOf(which) !== -1) return route.abort("connectionfailed");
       if (down.indexOf(which + ":503") !== -1) return route.fulfill({ status: 503, contentType: "text/plain", body: "Service Unavailable" });
       if (down.indexOf(which + ":stil") !== -1) return undefined; // never answered
+      if (down.indexOf(which + ":404") !== -1) return route.fulfill({ status: 404, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: "Not Found" });
+      // An answer in a form the app does not know: a web page instead of the plain text.
+      if (down.indexOf(which + ":raar") !== -1) return route.fulfill({ status: 200, contentType: "text/html", headers: { "access-control-allow-origin": "*" }, body: "<html><body>Deze dienst is beëindigd.</body></html>" });
       if (which === "kaart") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
+      if (which === "bestemming") return route.fulfill({ status: 200, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: fixtures.plan.mortelplein });
       var body = answer(url);
       return body ? route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(body) })
         : route.fulfill({ status: 404, contentType: "text/plain", body: "onbekend in de test" });
@@ -142,6 +148,23 @@ module.exports = async function (browser, base) {
     await page.waitForSelector("#adres-suggesties .suggestie");
     await page.click("#adres-suggesties .suggestie");
     await page.waitForFunction(function () { return !document.getElementById("adres-uitkomst").hidden && !document.querySelector("#adres-uitkomst .bezig"); });
+  }
+  /* The box "Bestemmingsplan en omgevingsplan" as plain values, with the order of its parts. */
+  function planBox(page) {
+    return page.evaluate(function () {
+      var box = document.getElementById("adres-plan");
+      return {
+        uitkomst: box.getAttribute("data-uitkomst"), text: box.innerText.replace(/\s+/g, " ").trim(),
+        parts: [].map.call(box.children, function (node) { return node.className || node.tagName.toLowerCase(); }),
+        block: [].map.call(box.querySelectorAll(".planblok > *"), function (node) { return node.className || node.tagName.toLowerCase(); }),
+        facts: [].map.call(box.querySelectorAll(".feiten"), function (list) {
+          var out = {}; [].forEach.call(list.querySelectorAll("dt"), function (dt) { out[dt.textContent] = dt.nextElementSibling.textContent; }); return out;
+        }),
+        links: [].map.call(box.querySelectorAll("a"), function (a) { return a.href; }),
+        buttons: [].map.call(box.querySelectorAll("button"), function (node) { return node.textContent; }),
+        right: Math.round(box.getBoundingClientRect().right),
+      };
+    });
   }
   function overflow(page) { return page.evaluate(function () { return document.documentElement.scrollWidth - window.innerWidth; }); }
   function text(page, selector) { return page.$eval(selector, function (node) { return node.innerText.replace(/\s+/g, " ").trim(); }); }
@@ -233,7 +256,7 @@ module.exports = async function (browser, base) {
       windows: window.TilburgSignalenGegevens.vensterDagen };
   });
   result.energy = { text: await text(page, "#adres-energie"), links: await page.$$eval("#adres-energie a", function (nodes) { return nodes.map(function (a) { return a.href; }); }) };
-  result.plan = { text: await text(page, "#adres-plan"), links: await page.$$eval("#adres-plan a", function (nodes) { return nodes.map(function (a) { return a.href; }); }) };
+  result.plan = await planBox(page);
   result.overflow = await overflow(page);
   result.brokenDates = await page.$$eval("#adres-publicaties .pub-datum", function (nodes) {
     return nodes.filter(function (node) { var tops = Array.from(node.getClientRects()).map(function (box) { return Math.round(box.top); }); return tops.some(function (top) { return top !== tops[0]; }); }).length;
@@ -267,7 +290,7 @@ module.exports = async function (browser, base) {
   await session.context.close();
 
   // --- The building register answers with an error and the cadastre does not connect.
-  var down = ["adresobject:503", "perceel"];
+  var down = ["adresobject:503", "perceel", "bestemming"];
   session = await open(390, down); page = session.page;
   await page.click("#tab-adres");
   await choose(page);
@@ -275,35 +298,39 @@ module.exports = async function (browser, base) {
     bag: await text(page, "#adres-bag"), bagRetry: await page.$$eval("#adres-bag button", function (nodes) { return nodes.map(function (node) { return node.textContent; }); }),
     parcel: await text(page, "#adres-perceel"), parcelRetry: await page.$$eval("#adres-perceel button", function (nodes) { return nodes.length; }),
     name: await text(page, "#adres-naam"), notices: await notices(page), noticesText: await text(page, "#adres-publicaties"),
-    energy: await text(page, "#adres-energie"), plan: await text(page, "#adres-plan"), overflow: await overflow(page),
+    energy: await text(page, "#adres-energie"), plan: await planBox(page), overflow: await overflow(page),
   };
   down.length = 0; // both registers are back
   await page.click("#adres-bag button");
   await page.waitForSelector("#adres-bag .feiten");
   await page.click("#adres-perceel button");
   await page.waitForSelector("#adres-perceel .feiten");
-  result.afterRetry = { bag: (await facts(page, "#adres-bag"))[0], parcels: (await facts(page, "#adres-perceel")).length, notices: await notices(page), errors: session.seen.errors };
+  await page.click("#adres-plan button");
+  await page.waitForSelector('#adres-plan[data-uitkomst="gevonden"]');
+  result.afterRetry = { plan: await planBox(page), bag: (await facts(page, "#adres-bag"))[0], parcels: (await facts(page, "#adres-perceel")).length, notices: await notices(page), errors: session.seen.errors };
   await session.context.close();
 
   // --- Only the building and the background map are missing: what did come is shown.
-  session = await open(390, ["pand", "kaart"]); page = session.page;
+  session = await open(390, ["pand", "kaart", "bestemming:404"]); page = session.page;
   await page.click("#tab-adres");
   await choose(page);
   await page.waitForFunction(function () { return !document.querySelector(".kaartvlak img"); });
   result.partsDown = {
     bag: (await facts(page, "#adres-bag"))[0], bagText: await text(page, "#adres-bag"),
     shapes: await page.$$eval(".kaartvlak .p-perceel", function (nodes) { return nodes.length; }), mapText: await text(page, ".perceelkaart"), errors: session.seen.errors,
+    plan: await planBox(page),
   };
   await session.context.close();
 
   // --- No notices about the address: the period comes first, then that nothing was found.
-  session = await open(320, [], true); page = session.page;
+  session = await open(320, ["bestemming:raar"], true); page = session.page;
   await page.click("#tab-adres");
   await choose(page);
   await page.waitForSelector("#adres-perceel .feiten");
   result.noNotices = {
     lines: await page.$$eval("#adres-publicaties > *", function (nodes) { return nodes.map(function (node) { return { cls: node.className, text: node.textContent }; }); }),
     rows: await page.$$eval("#adres-publicaties .pub", function (nodes) { return nodes.length; }), overflow: await overflow(page), errors: session.seen.errors,
+    plan: await planBox(page),
   };
   await session.context.close();
 
@@ -384,6 +411,7 @@ module.exports.pdok = function (page, seen) {
     var url = route.request().url(), which = part(url);
     seen.push(which);
     if (which === "kaart") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
+    if (which === "bestemming") return route.fulfill({ status: 200, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: fixtures.plan.mortelplein });
     var body = answer(url);
     return body ? route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(body) })
       : route.fulfill({ status: 404, contentType: "text/plain", body: "onbekend in de test" });
