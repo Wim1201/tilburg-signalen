@@ -1580,8 +1580,14 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(label["errors"], [])
         self.assertEqual(label["elsewhere"], [], "de app roept nog een andere dienst aan")
         first = label["asked"][0]
-        self.assertEqual(first["url"], "https://energielabel.worker.test/?postcode=5037PL&huisnummer=118&huisletter=a")
-        self.assertEqual(first["method"], "GET")
+        self.assertEqual(first["url"], "https://energielabel.worker.test/", "het adres hoort niet in het webadres van de vraag: dat kan in een logboek komen")
+        self.assertEqual(first["method"], "POST")
+        self.assertEqual(json.loads(first["body"]), {"postcode": "5037PL", "huisnummer": "118", "huisletter": "a"})
+        for asked in label["asked"]:
+            for part in ("5037", "118", "postcode", "huisnummer", "?"):
+                self.assertNotIn(part, asked["url"])
+        # Plain text and no headers of the app's own: the browser then asks without a preflight.
+        self.assertTrue(first["contentType"].lower().startswith("text/plain"), first["contentType"])
         for header in ("authorization", "cookie", "x-api-key"):
             self.assertNotIn(header, first["headers"], "de app stuurt geen sleutel of cookie mee")
         self.assertEqual(len(label["asked"]), 1, "één adres kiezen is één vraag aan de Worker")
@@ -1600,8 +1606,17 @@ class InDeBrowser(unittest.TestCase):
     def test_the_three_other_outcomes_each_have_their_own_text(self):
         label = self.seen["adres"]["label"]
         self.assertEqual((label["none"]["uitkomst"], label["none"]["klasse"]), ("geen", None))
-        self.assertTrue(label["none"]["text"].startswith("Geen geldig energielabel gevonden voor dit adres."), label["none"]["text"])
-        self.assertIsNone(label["none"]["button"])
+        none = label["none"]
+        day = "-".join(reversed(label["today"].split("-")))
+        self.assertTrue(none["text"].startswith(
+            "EP-Online vindt voor dit adres geen geldig label. Mogelijk staat het label onder een andere schrijfwijze (huisletter of toevoeging). "
+            "Zoek het na op ep-online.nl. Opgevraagd op " + day + "."), none["text"])
+        self.assertIsNone(none["button"])
+        # The link to the search screen of EP-Online stays under it, with what to fill in there.
+        self.assertEqual(none["links"], [self.EP_ONLINE])
+        self.assertIn("Zoek op EP-Online", none["text"])
+        self.assertTrue(any("5037PL 118 a" in note for note in none["notes"]), none["notes"])
+        self.assertLessEqual(none["overflow"], 0, "de tekst past niet op 320 pixels")
         self.assertEqual(label["minute"]["uitkomst"], "teveel")
         self.assertTrue(label["minute"]["text"].startswith("Er worden op dit moment te veel energielabels opgevraagd. Probeer het over een minuut opnieuw."))
         self.assertEqual(label["minute"]["button"], "Opnieuw proberen")

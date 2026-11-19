@@ -318,15 +318,19 @@
   /* Ask the energy label Worker, when its address is set (config.json, energielabel_worker).
      Without that setting the box stays as it was before the Worker existed. */
   function loadLabel(address, mine) {
-    var loaded = data(), url = A.energielabelUrl(loaded && loaded.energielabelWorker, address);
-    if (!url) {
+    var loaded = data(), ask = A.energielabelVraag(loaded && loaded.energielabelWorker, address);
+    if (!ask) {
       renderEnergy(address, function (box) { box.appendChild(el("p", null, "Nog niet beschikbaar in de app.")); });
       return;
     }
     renderEnergy(address, function (box) { box.appendChild(el("p", "bezig", "Energielabel wordt opgezocht bij EP-Online ...")); });
     var controller = typeof AbortController === "function" ? new AbortController() : null;
     var clock = setTimeout(function () { if (controller) controller.abort(); }, TIMEOUT);
-    fetch(url, controller ? { signal: controller.signal } : {}).then(function (response) {
+    // A POST with the address in the body. No headers of our own: the browser then sends it as plain
+    // text, without a question beforehand (a preflight); the Worker reads the body as JSON.
+    var options = { method: "POST", body: ask.body, credentials: "omit", cache: "no-store" };
+    if (controller) options.signal = controller.signal;
+    fetch(ask.url, options).then(function (response) {
       // Every answer of the Worker is JSON; a body that is not, with a fault status, still says enough.
       return response.json().then(function (body) { return { status: response.status, body: body }; }, function () { return { status: response.ok ? 0 : response.status, body: null }; });
     }, function () { return { status: 0, body: null }; }).then(function (answer) {

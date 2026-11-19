@@ -426,18 +426,19 @@
 
   /* ---------- Energy label ---------- */
 
-  /* The address to ask the energy label Worker (tools/energielabel) for this address, or null:
-     when no Worker is set, when the setting is not an https address, or when the address has no
-     postcode and house number in the form EP-Online knows. The Worker asks EP-Online; the key is
-     known there and never here. */
-  function energielabelUrl(worker, address) {
+  /* What to ask the energy label Worker (tools/energielabel) for this address, as { url, body }, or
+     null: when no Worker is set, when the setting is not an https address, or when the address has
+     no postcode and house number in the form EP-Online knows. The address goes in the body and
+     never in the url: the url of a request can end up in a log, the body does not. The Worker asks
+     EP-Online; the key is known there and never here. */
+  function energielabelVraag(worker, address) {
     if (typeof worker !== "string" || !/^https:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~\/-]*)?$/.test(worker)) return null;
     var postcode = String((address && address.postcode) || ""), number = String((address && address.huisnummer) || "");
     if (!/^[1-9][0-9]{3}[A-Z]{2}$/.test(postcode) || !/^[1-9][0-9]{0,4}$/.test(number)) return null;
-    var params = { postcode: postcode, huisnummer: number };
-    if (address.huisletter) params.huisletter = address.huisletter;
-    if (address.toevoeging) params.toevoeging = address.toevoeging;
-    return query(worker.replace(/\/+$/, "") + "/", params);
+    var asked = { postcode: postcode, huisnummer: number };
+    if (address.huisletter) asked.huisletter = String(address.huisletter);
+    if (address.toevoeging) asked.toevoeging = String(address.toevoeging);
+    return { url: worker.replace(/\/+$/, "") + "/", body: JSON.stringify(asked) };
   }
 
   function dutchDate(iso) {
@@ -462,8 +463,10 @@
       };
     }
     if (status === 404) {
-      return { soort: "geen", tekst: "Geen geldig energielabel gevonden voor dit adres.",
-        bron: "EP-Online heeft voor dit adres geen label, of het laatste label is verlopen. Opgevraagd op " + dutchDate(today) + "." };
+      // EP-Online answers the same for "no label" and for an address it does not know in this
+      // spelling (seen with the real service on 19-11-2026), so the text names both.
+      return { soort: "geen", tekst: "EP-Online vindt voor dit adres geen geldig label.",
+        bron: "Mogelijk staat het label onder een andere schrijfwijze (huisletter of toevoeging). Zoek het na op ep-online.nl. Opgevraagd op " + dutchDate(today) + "." };
     }
     if (status === 429) {
       return { soort: "teveel", tekst: body.grens === "dag"
@@ -477,7 +480,7 @@
   }
 
   return {
-    energielabelUrl: energielabelUrl, energielabelModel: energielabelModel,
+    energielabelVraag: energielabelVraag, energielabelModel: energielabelModel,
     MAX_PANDEN: MAX_PANDEN, MAX_PERCELEN: MAX_PERCELEN, NEAR_M: NEAR_M,
     normalise: normalise, streetKey: streetKey, suffix: suffix, searchText: searchText,
     parcelCode: parcelCode, suggestUrl: suggestUrl, addressFromDoc: addressFromDoc, addresses: addresses, houseNumber: houseNumber,
