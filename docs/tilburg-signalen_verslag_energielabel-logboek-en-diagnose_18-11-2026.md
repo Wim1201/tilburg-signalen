@@ -37,6 +37,7 @@ is niet samengevoegd.
 
 | Tijdstip | Wat |
 |---|---|
+| 19-11-2026, 09:06 uur | **De tests hebben op GitHub gedraaid voor de wijziging van 19-11 (commit `c0711a9`) en zijn geslaagd.** Zie "De testrun op de pull request". |
 | 19-11-2026, 09:00 uur | **"De oorzaak van 'geen' is niet gevonden" (onder "Stand", "Vraag 1" en "Niet getest of nog open") is afgehandeld: de `404`'s waren terecht.** Vastgesteld door Wim, niet door mij. Daarmee vervalt ook mijn redenering onder "Wat overblijft" dat geval B voor het adres zonder huisletter "goed mogelijk" was: het was geval A, en de reden was dat er geen label is. |
 | 19-11-2026, 09:00 uur | **"EP-Online kent geen label voor dit adres" was te stellig:** EP-Online geeft dezelfde `404` voor "geen label" als voor "adres onbekend". De README van de Worker zegt dat nu. |
 | 19-11-2026, 09:00 uur | **Het aantal tests is 521 (was 513).** Acht erbij voor de Worker (67), met een antwoord in de vorm van de echte dienst. |
@@ -291,6 +292,20 @@ De run van "Tests bij een pull request" voor commit `49616dd` (job `testen`, run
 
 Geen regel met een fout in het log. Eén regel `FOUT bij bron officielebekendmakingen: 503` hoort bij
 een test die een bron nabootst die niet antwoordt; die stond er ook bij eerdere runs.
+
+### De run van 19-11-2026, 08:59 – 09:05 uur
+
+Voor commit `c0711a9` (het antwoord in de vorm van de echte dienst), job `testen`, run-id 44483798197:
+**groen**.
+
+| Stap | Uitkomst |
+|---|---|
+| Tests | Geslaagd. Het aantal heb ik niet uit het log gelezen (ik las alleen het einde); lokaal waren het er 521 |
+| Browsertests | 71 tests, geslaagd (uit het log) |
+
+De run duurde zes en een halve minuut, tegen anderhalve tot tweeënhalve minuut eerder. De
+browsertests zelf duurden 47 seconden, net als eerder; waar de rest van de tijd zat, heb ik niet
+uitgezocht.
 
 ## Niet getest of nog open
 
