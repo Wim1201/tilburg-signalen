@@ -105,6 +105,107 @@ class Gevonden(unittest.TestCase):
         self.assertEqual(headers["Content-Type"], "application/json; charset=utf-8")
 
 
+def real_registration(**changes):
+    """One registration exactly as the real service sent it to Wim on 19-11-2026: these 25 fields in
+    this order, Huisnummer a number, the dates without a time zone, Registratiedatum with
+    milliseconds. No Huisletter, Huisnummertoevoeging, Labelklasse or Registratienummer: fields
+    without a value are left out. All values are made up."""
+    fields = [
+        ("Registratiedatum", "2023-06-12T14:07:31.483"), ("Opnamedatum", "2023-06-01T00:00:00"), ("Geldig_tot", "2033-06-01T00:00:00"),
+        ("Certificaathouder", "Adviesbureau Voorbeeld B.V."), ("Soort_opname", "Basisopname"), ("Status", "Bestaand"),
+        ("Berekeningstype", "NTA 8800:2023 (basisopname woningbouw)"), ("Op_basis_van_referentiegebouw", False), ("Gebouwklasse", "Woningbouw"),
+        ("Gebouwtype", "Rijwoning tussen"), ("Postcode", "5037PL"), ("Huisnummer", 118), ("BAGVerblijfsobjectID", "0855010000123456"),
+        ("BAGPandIDs", ["0855100000654321"]), ("Bouwjaar", 1968), ("Gebruiksoppervlakte_thermische_zone", 112.4), ("Compactheid", 1.87),
+        ("Energieklasse", "A"), ("Energiebehoefte", 98.12), ("PrimaireFossieleEnergie", 141.55), ("Aandeel_hernieuwbare_energie", 12.3),
+        ("Temperatuuroverschrijding", 1.04), ("Warmtebehoefte", 61.7), ("BerekendeCO2Emissie", 26.9), ("BerekendeEnergieverbruik", 148.2)]
+    return dict(fields, **changes)
+
+
+# The inside of a 404 of the real service: a problem description, the same for "no label" and "address unknown".
+REAL_NOT_FOUND = {"type": "https://httpstatuses.io/404", "title": "Not Found", "status": 404, "traceId": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"}
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class EchtAntwoord(unittest.TestCase):
+    """The answer in the exact form of the real service (19-11-2026), played as the text that comes
+    over the line: a list of one registration, or a 404 with a problem description."""
+
+    def answer(self, *registrations):
+        return {"status": 200, "tekst": json.dumps(list(registrations))}
+
+    def test_the_form_is_the_one_wim_saw(self):
+        registration_ = real_registration()
+        self.assertEqual(list(registration_), [
+            "Registratiedatum", "Opnamedatum", "Geldig_tot", "Certificaathouder", "Soort_opname", "Status", "Berekeningstype", "Op_basis_van_referentiegebouw",
+            "Gebouwklasse", "Gebouwtype", "Postcode", "Huisnummer", "BAGVerblijfsobjectID", "BAGPandIDs", "Bouwjaar", "Gebruiksoppervlakte_thermische_zone",
+            "Compactheid", "Energieklasse", "Energiebehoefte", "PrimaireFossieleEnergie", "Aandeel_hernieuwbare_energie", "Temperatuuroverschrijding",
+            "Warmtebehoefte", "BerekendeCO2Emissie", "BerekendeEnergieverbruik"])
+        self.assertNotIn("Labelklasse", registration_)
+        self.assertNotIn("Registratienummer", registration_)
+        self.assertRegex(registration_["Registratiedatum"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$")
+        for field in ("Opnamedatum", "Geldig_tot"):
+            self.assertRegex(registration_[field], r"^\d{4}-\d{2}-\d{2}T00:00:00$")
+        self.assertIsInstance(registration_["Huisnummer"], int)
+        self.assertIsInstance(registration_["Op_basis_van_referentiegebouw"], bool)
+
+    def test_the_label_is_read_from_a_list_of_one_registration(self):
+        seen = one(antwoord=self.answer(real_registration()))
+        self.assertIsNone(seen["fout"])
+        self.assertEqual(seen["antwoord"]["status"], 200)
+        # The class from Energieklasse, valid until from Geldig_tot, the day of registration without its time.
+        self.assertEqual(seen["antwoord"]["body"], {"status": "gevonden", "klasse": "A", "registratiedatum": "2023-06-12", "geldigTot": "2033-06-01", "gebouw": "Woningbouw"})
+        self.assertEqual(json.loads(seen["logboek"][0]), {"energielabel": "gevonden", "bron": 200, "registraties": 1, "zonderKlasse": 0, "zonderDatum": 0, "verlopen": 0})
+
+    def test_nothing_else_of_the_registration_goes_out(self):
+        seen = one(antwoord=self.answer(real_registration()))
+        text = json.dumps(seen["antwoord"]) + "\n".join(seen["logboek"])
+        for private in ("Adviesbureau", "Basisopname", "Bestaand", "NTA 8800", "Rijwoning", "5037PL", "118", "0855010000123456", "0855100000654321", "1968",
+                        "112.4", "1.87", "98.12", "141.55", "12.3", "1.04", "61.7", "26.9", "148.2", "14:07", "483", "2023-06-01"):
+            self.assertNotIn(private, text)
+
+    def test_the_dates_are_days_as_written_and_are_not_shifted_by_a_time_zone(self):
+        # Late in the evening and just after midnight: without a time zone a conversion could move the
+        # day. The Worker takes the day as EP-Online writes it.
+        for moment, day in (("2023-06-12T23:59:59.999", "2023-06-12"), ("2023-06-13T00:00:00.000", "2023-06-13"), ("2023-01-01T00:30:00.001", "2023-01-01"),
+                            ("2023-06-12T14:07:31", "2023-06-12")):
+            with self.subTest(moment=moment):
+                seen = one(antwoord=self.answer(real_registration(Registratiedatum=moment)))
+                self.assertEqual(seen["antwoord"]["body"]["registratiedatum"], day)
+        logic = (WORKER / "src" / "energielabel.js").read_text(encoding="utf-8")
+        self.assertNotIn("Date.parse", logic, "een datum van EP-Online wordt niet omgerekend")
+        self.assertEqual(logic.count("new Date("), 1, "alleen het moment van vragen wordt een datum, voor de Nederlandse dag van vandaag")
+
+    def test_valid_until_counts_up_to_and_including_that_day_in_the_netherlands(self):
+        expiring = self.answer(real_registration(Registratiedatum="2016-11-18T09:15:02.120", Opnamedatum="2016-11-18T00:00:00", Geldig_tot="2026-11-18T00:00:00"))
+        last_day = one(antwoord=expiring, nu="2026-11-18T22:59:59Z")     # 23:59:59 in the Netherlands on the 18th
+        day_after = one(antwoord=expiring, nu="2026-11-18T23:00:00Z")    # 00:00:00 on the 19th
+        self.assertEqual((last_day["antwoord"]["status"], last_day["antwoord"]["body"]["geldigTot"]), (200, "2026-11-18"))
+        self.assertEqual((day_after["antwoord"]["status"], day_after["antwoord"]["body"]), (404, {"status": "geen"}))
+        self.assertEqual(json.loads(day_after["logboek"][0]), {"energielabel": "geen geldig label", "bron": 200, "registraties": 1, "zonderKlasse": 0, "zonderDatum": 0, "verlopen": 1})
+
+    def test_of_two_registrations_on_one_day_the_later_one_is_shown(self):
+        morning = real_registration(Registratiedatum="2023-06-12T09:00:00.000", Energieklasse="C")
+        afternoon = real_registration(Registratiedatum="2023-06-12T14:07:31.483", Energieklasse="A")
+        whole_second = real_registration(Registratiedatum="2023-06-12T14:07:31", Energieklasse="B")
+        for order in ([morning, afternoon], [afternoon, morning], [whole_second, afternoon, morning], [afternoon, whole_second]):
+            with self.subTest(volgorde=[entry["Energieklasse"] for entry in order]):
+                self.assertEqual(one(antwoord=self.answer(*order))["antwoord"]["body"]["klasse"], "A")
+
+    def test_a_404_with_a_problem_description_is_no_label(self):
+        seen = one(antwoord={"status": 404, "tekst": json.dumps(REAL_NOT_FOUND)})
+        self.assertIsNone(seen["fout"])
+        self.assertEqual((seen["antwoord"]["status"], seen["antwoord"]["body"]), (404, {"status": "geen"}))
+        self.assertEqual(json.loads(seen["logboek"][0]), {"energielabel": "geen", "bron": 404})
+        self.assertNotIn("traceId", json.dumps(seen["antwoord"]) + seen["logboek"][0])
+
+    def test_a_registration_without_class_is_not_shown_as_a_label(self):
+        # A field without a value is left out by the real service; so is the class when there is none.
+        without = real_registration()
+        del without["Energieklasse"]
+        seen = one(antwoord=self.answer(without))
+        self.assertEqual((seen["antwoord"]["status"], json.loads(seen["logboek"][0])["zonderKlasse"]), (404, 1))
+
+
 @unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
 class NietGevonden(unittest.TestCase):
     def assert_none(self, seen, logged):

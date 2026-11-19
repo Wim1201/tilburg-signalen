@@ -10,7 +10,12 @@
    EP-Online, public REST API version 5 (public.ep-online.nl/swagger, read on 18-11-2026):
      GET /api/v5/PandEnergielabel/Adres?postcode=&huisnummer=&huisletter=&huisnummertoevoeging=
      header Authorization: <API key>
-     200 a list of registrations, 400 input refused, 401 key refused, 404 nothing found. */
+     200 a list of registrations, 400 input refused, 401 key refused, 404 nothing found.
+
+   As the real service answers (seen by Wim on 19-11-2026): with a label, 200 and a list of one
+   registration; without, 404 with a problem description, the same for "no label" and "address
+   unknown". The dates carry no time zone: Registratiedatum is "yyyy-mm-ddThh:mm:ss.fff", Geldig_tot
+   "yyyy-mm-ddT00:00:00". Fields without a value are left out of a registration. */
 
 export const PAD = "/api/v5/PandEnergielabel/Adres";
 export const WACHT_MS = 8000; // how long EP-Online gets to answer
@@ -92,6 +97,8 @@ export function bronUrl(basis, adres) {
   return url.toString();
 }
 
+/* The calendar day of a date of EP-Online: its first ten characters. The dates carry no time zone
+   and are not converted: the day EP-Online writes is the day that is shown and compared. */
 function datum(waarde) {
   const gevonden = typeof waarde === "string" && /^(\d{4}-\d{2}-\d{2})/.exec(waarde);
   return gevonden ? gevonden[1] : null;
@@ -120,10 +127,12 @@ export function weeg(registraties, vandaag) {
     if (!label.klasse) telling.zonderKlasse++;
     else if (!label.registratiedatum || !label.geldigTot) telling.zonderDatum++;
     else if (label.geldigTot < vandaag) telling.verlopen++;
-    else geldig.push(label);
+    // The moment of registration as EP-Online writes it, to the millisecond: of two registrations on
+    // one day the later one is the last. Text in one form sorts as time does.
+    else geldig.push({ label, moment: registratie.Registratiedatum.trim() });
   }
-  geldig.sort((a, b) => (a.registratiedatum < b.registratiedatum ? 1 : a.registratiedatum > b.registratiedatum ? -1 : 0));
-  return { label: geldig[0] || null, telling };
+  geldig.sort((a, b) => (a.moment < b.moment ? 1 : a.moment > b.moment ? -1 : 0));
+  return { label: geldig.length ? geldig[0].label : null, telling };
 }
 
 /* The label to show, or null: see weeg. */

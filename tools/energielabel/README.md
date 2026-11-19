@@ -6,7 +6,7 @@ sleutel; die kent alleen deze Worker. De app vraagt de Worker, de Worker vraagt 
 
 Dit is een tweede Worker, los van de planner in `tools/planner/`. De planner is niet gewijzigd.
 
-**Stand 18-11-2026, 22:40 uur: geplaatst door Wim, nog niet aan de app gekoppeld.** De Worker staat
+**Stand 19-11-2026, 08:58 uur: geplaatst door Wim, nog niet aan de app gekoppeld.** De Worker staat
 bij Cloudflare met een echte sleutel van EP-Online, in de versie van vóór de wijziging hieronder. De
 instelling `energielabel_worker` in `config.json` is leeg; de app roept de Worker dus niet aan.
 
@@ -33,7 +33,7 @@ De antwoorden:
 | Status | Inhoud | Betekenis |
 |---:|---|---|
 | 200 | `{"status":"gevonden","klasse":"A","registratiedatum":"2023-06-12","geldigTot":"2033-06-12","gebouw":"Woningbouw"}` | Een geldig label |
-| 404 | `{"status":"geen"}` | EP-Online kent geen label voor dit adres, of de Worker telde geen van de registraties als geldig label. Welke van de twee zegt de logregel: zie "Als het antwoord 'geen' is" |
+| 404 | `{"status":"geen"}` | EP-Online vindt niets voor dit adres, of de Worker telde geen van de registraties als geldig label. EP-Online maakt geen verschil tussen "geen label" en "adres onbekend": beide zijn daar dezelfde `404`. Welke van de twee zegt de logregel: zie "Als het antwoord 'geen' is" |
 | 400 | `{"status":"ongeldig","veld":"postcode"}` | De invoer past niet (`"veld":"invoer"`: de inhoud is geen adres in de vorm hierboven), of EP-Online weigert haar |
 | 405 | `{"status":"ongeldig"}` | Geen `POST`. Ook de oude vorm met het adres in het webadres komt hier uit |
 | 403 | `{"status":"geweigerd"}` | Het verzoek komt niet van de pagina van de app |
@@ -45,7 +45,7 @@ De antwoorden:
 | `src/index.js` | Het hoofdbestand: de aanroep en de teller, de twee dingen die alleen bij Cloudflare bestaan |
 | `src/energielabel.js` | Alles wat de Worker met een verzoek doet |
 | `wrangler.jsonc` | De instellingen voor Cloudflare. De sleutel staat er niet in |
-| `tests/test_energielabel.py` (in de map `tests/` van de repo) | 59 tests, zonder Cloudflare, zonder netwerk en zonder sleutel |
+| `tests/test_energielabel.py` (in de map `tests/` van de repo) | 67 tests, zonder Cloudflare, zonder netwerk en zonder sleutel |
 
 ## Wat Cloudflare vastlegt
 
@@ -183,6 +183,34 @@ Doe dit in deze volgorde. Je hebt het account bij Cloudflare en `npx wrangler` v
    **Observability** hoort het logboek uit te staan. Staan er toch nieuwe regels, meld het dan: dit
    heb ik niet kunnen controleren.
 
+## Hoe EP-Online echt antwoordt
+
+Door Wim rechtstreeks opgevraagd op 19-11-2026, met hetzelfde pad, dezelfde parameters en dezelfde
+koppen als de Worker. Ik heb het antwoord zelf niet gezien; dit is zijn beschrijving.
+
+| Geval | Antwoord |
+|---|---|
+| Adres met een label | `200`, `application/json; x-api-version=5`. Een lijst met één registratie |
+| Adres zonder label, of een adres dat EP-Online niet kent | `404`, `application/problem+json` met alleen `type`, `title`, `status` en `traceId`. De twee gevallen zijn niet te onderscheiden |
+
+De velden van een registratie, in deze volgorde: `Registratiedatum`, `Opnamedatum`, `Geldig_tot`,
+`Certificaathouder`, `Soort_opname`, `Status`, `Berekeningstype`, `Op_basis_van_referentiegebouw`,
+`Gebouwklasse`, `Gebouwtype`, `Postcode`, `Huisnummer` (een getal), `BAGVerblijfsobjectID`,
+`BAGPandIDs`, `Bouwjaar`, `Gebruiksoppervlakte_thermische_zone`, `Compactheid`, `Energieklasse`,
+`Energiebehoefte`, `PrimaireFossieleEnergie`, `Aandeel_hernieuwbare_energie`,
+`Temperatuuroverschrijding`, `Warmtebehoefte`, `BerekendeCO2Emissie`, `BerekendeEnergieverbruik`. Er is
+geen veld `Labelklasse` of `Registratienummer`. Velden zonder waarde ontbreken.
+
+| Wat de Worker leest | Veld | Vorm | Wat de Worker ermee doet |
+|---|---|---|---|
+| Labelklasse | `Energieklasse` | Tekst, bijvoorbeeld `"A"` | Overgenomen |
+| Registratiedatum | `Registratiedatum` | `"JJJJ-MM-DDTuu:mm:ss.fff"`, zonder tijdzone | De eerste tien tekens zijn de dag. Het hele tijdstip bepaalt welke registratie de laatste is |
+| Geldig tot | `Geldig_tot` | `"JJJJ-MM-DDT00:00:00"`, zonder tijdzone | De eerste tien tekens zijn de dag. Geldig tot en met die dag, Nederlandse tijd |
+| Soort gebouw | `Gebouwklasse` | Tekst | Overgenomen |
+
+De datums worden niet omgerekend: een datum zonder tijdzone kan bij omrekenen een dag verschuiven. De
+dag die EP-Online schrijft, is de dag die het tabblad toont.
+
 ## Als het antwoord "geen" is terwijl je een label verwacht
 
 De Worker geeft `404` met `"status":"geen"` in twee gevallen, en de logregel zegt welke:
@@ -193,8 +221,10 @@ De Worker geeft `404` met `"status":"geen"` in twee gevallen, en de logregel zeg
 | `{"energielabel":"geen geldig label","bron":200,"registraties":2,"zonderKlasse":0,"zonderDatum":0,"verlopen":2}` | EP-Online stuurde registraties, maar de Worker telde er geen als geldig label. De tellingen zeggen waarom: geen labelklasse, geen leesbare datum, of verlopen |
 
 Staat er `zonderKlasse` of `zonderDatum` bij een adres dat een geldig label heeft, dan leest de Worker
-het antwoord verkeerd (de velden heten of zien er anders uit dan in de documentatie) en moet de Worker
-worden aangepast. Staat er `"bron":404`, dan ligt het aan de vraag: de schrijfwijze van het adres.
+het antwoord verkeerd (de velden heten of zien er anders uit dan in "Hoe EP-Online echt antwoordt") en
+moet de Worker worden aangepast. Staat er `"bron":404`, dan vindt EP-Online zelf niets: er is geen
+label, of EP-Online kent het adres niet in deze schrijfwijze. Vergelijk dan met het zoekscherm op
+ep-online.nl.
 
 **Het ruwe antwoord van EP-Online bekijken, zonder dat de sleutel in beeld komt.** In Terminal (zsh
 of bash). De eerste regel vraagt om de sleutel en toont niet wat je plakt; hij komt ook niet in de
@@ -246,8 +276,10 @@ npx wrangler delete tilburg-signalen-energielabel
 
 | Wat | Hoe | Uitkomst |
 |---|---|---|
-| Invoer, herkomst, begrenzing, keuze van het label, alle uitkomsten, de tellingen in de logregel, sleutel en adres buiten de logregel, logboek uit | `python -m unittest tests.test_energielabel`: 59 tests, EP-Online nagebootst naar zijn documentatie | Geslaagd |
+| Invoer, herkomst, begrenzing, keuze van het label, alle uitkomsten, de tellingen in de logregel, sleutel en adres buiten de logregel, logboek uit | `python -m unittest tests.test_energielabel`: 67 tests, EP-Online nagebootst naar zijn documentatie | Geslaagd |
+| Het antwoord in de vorm van de echte dienst | 8 van die tests: de 25 velden in de volgorde die Wim zag, datums zonder tijdzone, de registratiedatum met milliseconden, een `404` met een probleembeschrijving. Verzonnen waarden | Geslaagd |
 | Instellingen en bundel | `wrangler deploy --dry-run` met wrangler 4.164.0 (plaatst niets) | Geaccepteerd, 10 KiB |
+| In de runtime van Cloudflare, lokaal (19-11-2026, 08:56 uur) | `wrangler dev` tegen een nagebootst EP-Online dat antwoordt in de vorm van de echte dienst, met dezelfde `Content-Type` | Gevonden (klasse, beide datums, soort gebouw), `404` met probleembeschrijving geeft "geen" met `"bron":404`, een verlopen label geeft "geen geldig label" met `"verlopen":1` |
 | In de runtime van Cloudflare, lokaal (18-11-2026, 22:37 uur, de versie met het adres in de inhoud) | `wrangler dev` tegen een nagebootst EP-Online op dezelfde machine, met een verzonnen sleutel | Gevonden, huisletter en toevoeging, de inhoud als platte tekst zoals een browser hem stuurt, niet gevonden bij de bron, foute invoer, een inhoud die geen JSON is, een inhoud van 5000 bytes, een lege inhoud, `GET` met het adres in het webadres (405, niets gevraagd aan de bron), zonder herkomst, de voorvraag: alle zoals bedoeld |
 | In de runtime van Cloudflare, lokaal (18-11-2026, de eerste versie) | Als hierboven | Ook: een bron die een fout geeft, een bron die niet antwoordt (afgebroken na 8,0 seconden), een bron die weg is, de grens per minuut en per dag, en de teller na een herstart. Niet herhaald voor de nieuwe versie; dat deel van de code is niet gewijzigd |
 
@@ -255,16 +287,30 @@ In die lokale runtime kwam bij de eerste versie één fout aan het licht die de 
 zagen: de Worker vroeg EP-Online op een manier die Cloudflare niet kent (doorverwijzingen weigeren met
 `"error"`), waardoor elk verzoek mislukte. Hersteld; een test bewaakt het.
 
-**Met de echte dienst, door Wim (18-11-2026):** de sleutel wordt aangenomen (eerst `502` met een
-verkeerde sleutel, daarna een antwoord binnen 285 ms). Twee adressen gaven `404` met `"geen"`, waarvan
-één zeker een geldig label heeft. **De oorzaak is niet gevonden**: daarvoor is de logregel of het ruwe
-antwoord nodig, zie "Als het antwoord 'geen' is". Wat ik zonder sleutel kon nagaan: het pad van de
-vraag bestaat bij EP-Online (zonder sleutel antwoordt het `401`, een pad dat niet bestaat `404`), en de
-namen van de parameters en velden zijn die uit de documentatie.
+**Met de echte dienst, door Wim (18 en 19-11-2026):** de sleutel wordt aangenomen (eerst `502` met een
+verkeerde sleutel, daarna een antwoord binnen 285 ms). Twee adressen gaven `404` met `"geen"`. **Die
+waren terecht:** Wim vroeg EP-Online rechtstreeks en ook daar, en op de website van EP-Online, is voor
+die adressen niets te vinden. De vraag van de Worker is dus goed. Voor adressen met een label
+antwoordt EP-Online zoals onder "Hoe EP-Online echt antwoordt" staat.
+
+**De Worker las die namen en vormen al goed.** Eén ding is hersteld: van twee registraties op dezelfde
+dag koos de Worker de eerste uit de lijst en niet de laatst geregistreerde, omdat hij alleen de dag
+vergeleek. Nu vergelijkt hij het hele tijdstip. In wat Wim zag kwam dat niet voor (de lijst had één
+registratie).
 
 **Niet getest door mij: de echte sleutel en de echte dienst.** Ik heb geen sleutel en heb EP-Online
-alleen zonder sleutel aangeroepen. Niet getest is daarmee: hoe een echt antwoord eruitziet, of
-EP-Online verlopen labels meestuurt, of het een hoofdletter in de huisletter anders leest dan een
-kleine, wat het met een korte toevoeging doet, en of het zelf een grens kent. Ook niet getest: de
-nieuwe versie bij Cloudflare zelf (alleen lokaal), of het logboek daar na het plaatsen leeg blijft, en
-de teller in het echte netwerk van Cloudflare.
+alleen zonder sleutel aangeroepen; de vorm van het antwoord ken ik uit de beschrijving van Wim. Niet
+gecontroleerd is daarmee:
+
+- **De Worker zelf met een adres dat een label heeft.** Wims proef ging rechtstreeks naar EP-Online, niet
+  via de Worker. De tests en de lokale runtime gebruiken een nagebootst antwoord in dezelfde vorm.
+- Of EP-Online ooit meer dan één registratie in de lijst zet, en of het verlopen labels meestuurt of
+  dan `404` geeft.
+- Of "geldig tot" de laatste geldige dag is of de eerste dag daarna. De Worker rekent die dag nog als
+  geldig; dat scheelt één dag.
+- In welke tijdzone de datums bedoeld zijn. De Worker neemt de dag zoals hij er staat.
+- Een adres met een huisletter of een toevoeging dat een label heeft: of EP-Online een hoofdletter
+  anders leest dan een kleine, en wat het met een korte toevoeging doet.
+- Of EP-Online zelf een grens aan het aantal verzoeken kent.
+- De nieuwe versie bij Cloudflare zelf (alleen lokaal), of het logboek daar na het plaatsen leeg
+  blijft, en de teller in het echte netwerk van Cloudflare.

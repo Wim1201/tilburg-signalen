@@ -2,12 +2,21 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 22:30 – 22:47 uur; aangevuld 22:50 uur (testrun op de pull request) |
+| Datum | 18-11-2026, 22:30 – 22:47 uur; aangevuld 22:50 uur (testrun op de pull request); aangevuld 19-11-2026, 08:50 – 09:00 uur (het echte antwoord van EP-Online) |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, gelijk aan `main` op commit `33c3d11` (na PR 27) bij de start |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen`; Node 22, wrangler 4.164.0, Chromium via Playwright |
 | Brondata | De documentatie van EP-Online (`public.ep-online.nl/swagger/v5/swagger.json`, opnieuw opgehaald 22:31 uur) en vijf verzoeken aan EP-Online **zonder sleutel** (22:31 uur); de documentatie van Cloudflare over Workers Logs, Real-time logs en de instellingen van wrangler (gelezen 22:30 – 22:36 uur); de melding van Wim over de geplaatste Worker |
 | Van / aan | Claude Code aan Wim |
 | Vervolg op | `tilburg-signalen_verslag_energielabel_18-11-2026.md` |
+
+## Stand op 19-11-2026, 09:00 uur
+
+**De twee `404`'s waren terecht.** Wim vroeg EP-Online rechtstreeks, met hetzelfde pad, dezelfde
+parameters en dezelfde koppen als de Worker: voor die twee adressen vindt EP-Online niets, ook op zijn
+website niet. De vraag van de Worker is goed. Voor adressen met een label antwoordt EP-Online met
+een lijst van één registratie, en **de Worker las de namen en vormen daarvan al goed**. Eén ding is
+hersteld (twee registraties op dezelfde dag). Zie "Het echte antwoord van EP-Online". Wat hieronder
+onder "Stand" en "Vraag 1" staat, is de stand van 18-11 en op deze punten achterhaald.
 
 ## Stand
 
@@ -28,12 +37,82 @@ is niet samengevoegd.
 
 | Tijdstip | Wat |
 |---|---|
+| 19-11-2026, 09:00 uur | **"De oorzaak van 'geen' is niet gevonden" (onder "Stand", "Vraag 1" en "Niet getest of nog open") is afgehandeld: de `404`'s waren terecht.** Vastgesteld door Wim, niet door mij. Daarmee vervalt ook mijn redenering onder "Wat overblijft" dat geval B voor het adres zonder huisletter "goed mogelijk" was: het was geval A, en de reden was dat er geen label is. |
+| 19-11-2026, 09:00 uur | **"EP-Online kent geen label voor dit adres" was te stellig:** EP-Online geeft dezelfde `404` voor "geen label" als voor "adres onbekend". De README van de Worker zegt dat nu. |
+| 19-11-2026, 09:00 uur | **Het aantal tests is 521 (was 513).** Acht erbij voor de Worker (67), met een antwoord in de vorm van de echte dienst. |
 | 18-11-2026, 22:50 uur | **De tests hebben op GitHub gedraaid, op de pull request (PR 28), en zijn geslaagd.** Zie "De testrun op de pull request". |
 | 18-11-2026, 22:44 uur | **"Het logboek: geen adres, geen sleutel, geen IP-adres" (verslag energielabel en de README van de Worker) klopte niet.** Het gold voor de regel die de Worker zelf schrijft. Cloudflare bewaarde daarnaast per verzoek een eigen regel met de hele vraag. Ik had bij het bouwen `observability` aangezet zonder na te lezen wat Cloudflare dan zelf vastlegt, en de bewering alleen getest op de regel van de Worker. De correctie staat ook bovenaan het eerdere verslag. |
 | 18-11-2026, 22:44 uur | **"Niets geplaatst, geen sleutel" is achterhaald:** Wim heeft de Worker geplaatst met een echte sleutel. |
 | 18-11-2026, 22:44 uur | **De vraag aan de Worker is nu een `POST` met het adres in de inhoud**, geen `GET` met het adres in het webadres. De oude vorm geeft na het opnieuw plaatsen `405`. |
 | 18-11-2026, 22:44 uur | **Het aantal tests is 513 (was 503).** Negen erbij voor de Worker (59, was 50) en één voor het tabblad. |
 | 18-11-2026, 22:44 uur | **De naam van de opslag van de app op het toestel is `tilburg-signalen-v14` (was `v13`)**, omdat twee bestanden van het tabblad Adres zijn gewijzigd. |
+
+## Het echte antwoord van EP-Online (19-11-2026)
+
+### Wat Wim vaststelde
+
+Rechtstreeks gevraagd met `curl.exe`. Ik heb het antwoord zelf niet gezien; dit komt uit zijn bericht.
+
+| Geval | Antwoord |
+|---|---|
+| Adres met een label | `200`, `application/json; x-api-version=5`, een lijst met één registratie van 25 velden |
+| Adres zonder label of onbekend adres | `404`, `application/problem+json` met `type`, `title`, `status`, `traceId`. Niet van elkaar te onderscheiden |
+| De datums | Zonder tijdzone. `Registratiedatum` met milliseconden (`JJJJ-MM-DDTuu:mm:ss.fff`), `Opnamedatum` en `Geldig_tot` als `JJJJ-MM-DDT00:00:00` |
+| Niet aanwezig | `Labelklasse`, `Registratienummer`, en velden zonder waarde (zoals een huisletter) |
+
+### Controle van de Worker tegen deze vorm
+
+| Punt | Wat de Worker doet | Klopt het |
+|---|---|---|
+| De inhoud is een lijst | Leest een lijst; iets anders dan een lijst geeft "niet bereikbaar" | Ja |
+| De klasse | Uit `Energieklasse`, als tekst | Ja |
+| De geldigheid | Uit `Geldig_tot`: de eerste tien tekens als dag, vergeleken met de Nederlandse dag van vandaag | Ja |
+| De registratiedatum | Uit `Registratiedatum`: de eerste tien tekens als dag. De milliseconden staan daarachter en storen niet | Ja |
+| Datums zonder tijdzone | Worden niet omgerekend; er is dus geen verschuiving van een dag mogelijk | Ja |
+| Het soort gebouw | Uit `Gebouwklasse` | Ja |
+| `Huisnummer` als getal, `BAGPandIDs` als lijst | Worden niet gelezen | N.v.t. |
+| De `Content-Type` met `x-api-version=5` | De Worker leest de inhoud als JSON, wat de kop ook zegt | Ja |
+| Een `404` met een probleembeschrijving | De Worker kijkt naar de status en leest de inhoud niet | Ja |
+| **Twee registraties op dezelfde dag** | De Worker vergeleek alleen de dag en koos dan de eerste uit de lijst, niet de laatst geregistreerde | **Nee, hersteld** |
+
+### Wat er veranderd is
+
+| Bestand | Wijziging |
+|---|---|
+| `tools/energielabel/src/energielabel.js` | Van de geldige registraties wint die met het laatste tijdstip in `Registratiedatum`, tot op de milliseconde. Toelichting op de vorm van het echte antwoord |
+| `tests/test_energielabel.py` | Acht tests in de klasse `EchtAntwoord`, met een nagebootst antwoord in exact de vorm die Wim zag (25 velden in die volgorde, verzonnen waarden), aangeboden als de tekst die over de lijn komt |
+| `tools/energielabel/README.md` | "Hoe EP-Online echt antwoordt", de `404` die twee dingen kan betekenen, wat niet gecontroleerd is |
+
+In wat Wim zag kwam de herstelde fout niet voor: de lijst had één registratie. Of EP-Online ooit
+meer dan één registratie stuurt, weet ik niet.
+
+De acht tests: de vorm is die van Wim; het label wordt gelezen uit een lijst van één registratie;
+niets anders uit de registratie gaat naar buiten of in de logregel; datums verschuiven niet (ook niet
+vlak voor en na middernacht); geldig tot en met de dag zelf, Nederlandse tijd; van twee registraties
+op één dag wint de latere; een `404` met probleembeschrijving is "geen"; een registratie zonder
+`Energieklasse` wordt niet als label getoond.
+
+### Getest op 19-11-2026
+
+| Wat | Hoe | Uitkomst |
+|---|---|---|
+| Alle tests, lokaal | `python -m unittest discover tests`, 08:58 uur | 521 tests, geslaagd, 10 overgeslagen |
+| In de runtime van Cloudflare, lokaal | `wrangler dev` tegen een nagebootst EP-Online in de echte vorm, met dezelfde `Content-Type`, 08:56 uur | Gevonden met klasse, beide datums en soort gebouw; `404` met probleembeschrijving geeft "geen" en `"bron":404`; een verlopen label geeft "geen geldig label" en `"verlopen":1` |
+
+De testrun op de pull request voor deze wijziging staat onder "De testrun op de pull request".
+
+### Niet gecontroleerd
+
+| Punt | Toelichting |
+|---|---|
+| **De Worker zelf met een adres dat een label heeft, bij Cloudflare** | Wims proef ging rechtstreeks naar EP-Online. De eerste echte toets is stap 5 in de README, na het opnieuw plaatsen |
+| **Het echte antwoord zelf** | Ik ken alleen de beschrijving: de namen, de volgorde en de vorm van de datums. De test bootst die na; een afwijking die niet in de beschrijving staat, zie ik niet |
+| Meer dan één registratie in de lijst, en verlopen labels | Onbekend of EP-Online die stuurt. De Worker kan ermee omgaan; getest met nagebootste antwoorden |
+| Of "geldig tot" de laatste geldige dag is of de eerste dag daarna | De Worker rekent die dag als geldig. Scheelt één dag |
+| De tijdzone van de datums | Onbekend. De Worker neemt de dag zoals hij er staat |
+| Een adres met huisletter of toevoeging dat een label heeft | Niet geprobeerd |
+| De tekst in het vak bij "geen" | Die zegt: "EP-Online heeft voor dit adres geen label, of het laatste label is verlopen." Dat een onbekend adres hetzelfde antwoord geeft, staat er niet bij. Niet gewijzigd; zeg het als je de tekst anders wilt |
+| Het logboek bij Cloudflare na het opnieuw plaatsen | Ongewijzigd open: stap 8 in de README |
 
 ## Vraag 1: waarom "geen"?
 
