@@ -463,8 +463,10 @@
       };
     }
     if (status === 404) {
-      return { soort: "geen", tekst: "Geen geldig energielabel gevonden voor dit adres.",
-        bron: "EP-Online heeft voor dit adres geen label, of het laatste label is verlopen. Opgevraagd op " + dutchDate(today) + "." };
+      // EP-Online answers the same for "no label" and for an address it does not know in this
+      // spelling (seen with the real service on 19-11-2026), so the text names both.
+      return { soort: "geen", tekst: "EP-Online vindt voor dit adres geen geldig label.",
+        bron: "Mogelijk staat het label onder een andere schrijfwijze (huisletter of toevoeging). Zoek het na op ep-online.nl. Opgevraagd op " + dutchDate(today) + "." };
     }
     if (status === 429) {
       return { soort: "teveel", tekst: body.grens === "dag"

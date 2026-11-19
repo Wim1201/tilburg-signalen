@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 18-11-2026, 22:30 – 22:47 uur; aangevuld 22:50 uur (testrun op de pull request); aangevuld 19-11-2026, 08:50 – 09:00 uur (het echte antwoord van EP-Online) |
+| Datum | 18-11-2026, 22:30 – 22:47 uur; aangevuld 22:50 uur (testrun op de pull request); aangevuld 19-11-2026, 08:50 – 09:00 uur (het echte antwoord van EP-Online); aangevuld 19-11-2026, 09:12 – 09:14 uur (de tekst bij "geen") |
 | Versie | versie 2 van de app met de regio's, branch `claude/optimistic-gauss-sb0xpy`, gelijk aan `main` op commit `33c3d11` (na PR 27) bij de start |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen`; Node 22, wrangler 4.164.0, Chromium via Playwright |
 | Brondata | De documentatie van EP-Online (`public.ep-online.nl/swagger/v5/swagger.json`, opnieuw opgehaald 22:31 uur) en vijf verzoeken aan EP-Online **zonder sleutel** (22:31 uur); de documentatie van Cloudflare over Workers Logs, Real-time logs en de instellingen van wrangler (gelezen 22:30 – 22:36 uur); de melding van Wim over de geplaatste Worker |
@@ -37,6 +37,7 @@ is niet samengevoegd.
 
 | Tijdstip | Wat |
 |---|---|
+| 19-11-2026, 09:14 uur | **De tekst in het vak bij "geen" is gewijzigd, op verzoek van Wim; "Niet gewijzigd" in de tabel "Niet gecontroleerd" is daarmee achterhaald.** Zie "De tekst bij 'geen'". |
 | 19-11-2026, 09:06 uur | **De tests hebben op GitHub gedraaid voor de wijziging van 19-11 (commit `c0711a9`) en zijn geslaagd.** Zie "De testrun op de pull request". |
 | 19-11-2026, 09:00 uur | **"De oorzaak van 'geen' is niet gevonden" (onder "Stand", "Vraag 1" en "Niet getest of nog open") is afgehandeld: de `404`'s waren terecht.** Vastgesteld door Wim, niet door mij. Daarmee vervalt ook mijn redenering onder "Wat overblijft" dat geval B voor het adres zonder huisletter "goed mogelijk" was: het was geval A, en de reden was dat er geen label is. |
 | 19-11-2026, 09:00 uur | **"EP-Online kent geen label voor dit adres" was te stellig:** EP-Online geeft dezelfde `404` voor "geen label" als voor "adres onbekend". De README van de Worker zegt dat nu. |
@@ -114,6 +115,28 @@ De testrun op de pull request voor deze wijziging staat onder "De testrun op de 
 | Een adres met huisletter of toevoeging dat een label heeft | Niet geprobeerd |
 | De tekst in het vak bij "geen" | Die zegt: "EP-Online heeft voor dit adres geen label, of het laatste label is verlopen." Dat een onbekend adres hetzelfde antwoord geeft, staat er niet bij. Niet gewijzigd; zeg het als je de tekst anders wilt |
 | Het logboek bij Cloudflare na het opnieuw plaatsen | Ongewijzigd open: stap 8 in de README |
+
+## De tekst bij "geen" (19-11-2026)
+
+Wim gaf akkoord op de inhoud en vroeg één wijziging: de tekst moet zeggen dat ook een andere
+schrijfwijze van het adres de oorzaak kan zijn. De tekst is die uit zijn voorstel, met de datum van
+opvragen erachter zoals bij de andere uitkomsten.
+
+| | Tekst in het vak |
+|---|---|
+| Was | "Geen geldig energielabel gevonden voor dit adres." en daaronder "EP-Online heeft voor dit adres geen label, of het laatste label is verlopen. Opgevraagd op 19-11-2026." |
+| Is | "EP-Online vindt voor dit adres geen geldig label." en daaronder "Mogelijk staat het label onder een andere schrijfwijze (huisletter of toevoeging). Zoek het na op ep-online.nl. Opgevraagd op 19-11-2026." |
+
+De link "Zoek op EP-Online" staat er ongewijzigd onder, met de regel die zegt wat je daar invult
+(postcode, huisnummer en letter). Een test in de browser bewaakt dat de link er bij deze uitkomst
+staat en dat de tekst op 320 pixels past.
+
+Gewijzigd: `site/adres.js` (de tekst), `tests/test_adres.py` en `tests/test_site.py` (de tekst, de
+link, de breedte). De Worker is niet gewijzigd. De opslag blijft `tilburg-signalen-v14`: die naam is
+in deze pull request al verhoogd en nog niet gepubliceerd.
+
+Getest: alle tests lokaal, 521, geslaagd, 10 overgeslagen. Niet bekeken op een schermafbeelding of
+op een echte telefoon. De testrun op de pull request staat onder "De testrun op de pull request".
 
 ## Vraag 1: waarom "geen"?
 

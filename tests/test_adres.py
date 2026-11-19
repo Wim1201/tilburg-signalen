@@ -727,8 +727,11 @@ class Energielabel(unittest.TestCase):
         none, minute, day, gone, fault, refused = (self.model(404, {"status": "geen"}), self.model(429, {"status": "teveel", "grens": "minuut"}),
                                                    self.model(429, {"status": "teveel", "grens": "dag"}), self.model(0), self.model(502, {"status": "onbereikbaar"}),
                                                    self.model(400, {"status": "ongeldig"}))
-        self.assertEqual((none["soort"], none["tekst"]), ("geen", "Geen geldig energielabel gevonden voor dit adres."))
-        self.assertIn("opgevraagd op 18-11-2026", none["bron"].lower())
+        # EP-Online gives one answer for "no label" and for an address it does not know in this
+        # spelling; the text says so and sends the reader to its search screen.
+        self.assertEqual((none["soort"], none["tekst"]), ("geen", "EP-Online vindt voor dit adres geen geldig label."))
+        self.assertEqual(none["bron"], "Mogelijk staat het label onder een andere schrijfwijze (huisletter of toevoeging). Zoek het na op ep-online.nl. Opgevraagd op 18-11-2026.")
+        self.assertNotIn("opnieuw", none)
         self.assertEqual((minute["soort"], minute["tekst"], minute["opnieuw"]), ("teveel", "Er worden op dit moment te veel energielabels opgevraagd. Probeer het over een minuut opnieuw.", True))
         self.assertEqual((day["soort"], day["tekst"], day["opnieuw"]), ("teveel", "Er zijn vandaag te veel energielabels opgevraagd. Probeer het morgen opnieuw.", False))
         for model in (gone, fault):
