@@ -1505,6 +1505,23 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(seen["sub"], "5037PL Tilburg")
         self.assertEqual(seen["input"], "Burgemeester van de Mortelplein 118a, 5037PL Tilburg")
 
+    def test_no_test_asks_the_real_energy_label_worker(self):
+        # Found in run 46 (19-11-2026): with the Worker set in the live data, the live check sent the
+        # test address to the real Worker, and so to EP-Online, from GitHub. The tests now set the
+        # setting themselves; any request to a Worker on workers.dev is stopped and counted.
+        self.assertEqual(self.seen["realWorker"], [], "een test vroeg de echte Worker")
+
+    def test_the_site_points_the_energy_label_at_the_worker_in_the_settings(self):
+        """What the site serves, read and not used: on the live site the address of the placed
+        Worker from config.json; in the checkout that, or empty until a refresh has written it."""
+        with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as handle:
+            setting = json.load(handle)["energielabel_worker"]
+        served = self.seen["adres"].get("servedWorker")
+        if self.url:
+            self.assertEqual(served, setting, "de live site wijst niet naar de Worker uit config.json")
+        else:
+            self.assertIn(served, (None, "", setting))
+
     def test_address_tab_asks_only_pdok_and_without_a_key(self):
         seen = self.seen["adres"]
         self.assertEqual(sorted(seen["asked"]), ["adresobject", "kaart", "pand", "perceel", "perceel", "zoeker"])

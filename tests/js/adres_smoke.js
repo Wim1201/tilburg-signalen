@@ -81,8 +81,8 @@ module.exports = async function (browser, base) {
   /* `down` lists what does not answer: a part name fails to connect, "name:503" answers with an
      error, "name:stil" never answers. The list can be changed while the page is open. */
   /* `label`: the energy label Worker is set, and answers as `label.antwoord` says at that moment:
-     { status, body } or "weg" (no connection). Without `label` the setting is empty, as on the site
-     before the Worker is placed. */
+     { status, body } or "weg" (no connection). Without `label` the setting is empty. The setting in
+     the data the site serves is never used: on the live site it is the real Worker. */
   async function open(width, down, withoutNotices, label) {
     var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
     var page = await context.newPage(), seen = { errors: [], pdok: [], elsewhere: [] };
@@ -103,7 +103,8 @@ module.exports = async function (browser, base) {
       seen.regioTest = data.regioTest;
       seen.regios = (data.regios || []).map(function (regio) { return regio.naam; });
       delete data.regioTest;
-      if (label) data.energielabelWorker = LABEL_WORKER;
+      seen.servedWorker = data.energielabelWorker;
+      data.energielabelWorker = label ? LABEL_WORKER : "";
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
     });
     if (label) {
@@ -246,6 +247,7 @@ module.exports = async function (browser, base) {
   result.askedHosts = session.seen.pdok.map(function (entry) { return new URL(entry.url).host; }).filter(function (host, i, all) { return all.indexOf(host) === i; }).sort();
   result.keys = session.seen.pdok.filter(function (entry) { return /key|token|apikey|authorization/i.test(entry.url); }).length;
   result.elsewhere = session.seen.elsewhere;
+  result.servedWorker = session.seen.servedWorker;
 
   // Back to the morning screen: nothing there has changed.
   await page.click("#tab-berichten");
