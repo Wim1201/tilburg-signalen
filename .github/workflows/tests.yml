@@ -33,6 +33,12 @@ jobs:
       - name: Browser klaarzetten
         timeout-minutes: 10
         uses: ./.github/actions/browser
+      # De gegevens in de repo krijgen een gewijzigde instelling pas bij een verversing. Deze stap zet
+      # de instellingen uit config.json in de kopie van de gegevens op deze machine, zonder iets op te
+      # halen, zodat de browsertests zien wat na het samenvoegen live komt. Zonder deze stap was run 46
+      # (19-11-2026) groen op de pull request en rood na het samenvoegen.
+      - name: Instellingen in de gegevens
+        run: python -m signalen.instellingen
       - name: Browsertests
         timeout-minutes: 10
         run: |
