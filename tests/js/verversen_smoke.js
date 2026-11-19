@@ -38,6 +38,8 @@ module.exports = async function (browser, base) {
     var data = await (await route.fetch()).json();
     adres.addNotices(data);
     delete data.regioTest;
+    // The energy label is not what this test is about; the live data points at the real Worker.
+    data.energielabelWorker = "";
     data.regios = fixture.regios;
     if (served.version) {
       // A later run: a new moment, a new location in the core and a new notice about the test address.

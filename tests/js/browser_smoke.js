@@ -12,6 +12,18 @@ var SEEN = "tilburg-signalen.gezien";
   var PROXY = process.env.HTTPS_PROXY || process.env.https_proxy || "";
   var browser = await chromium.launch(PROXY ? { proxy: { server: PROXY, bypass: "127.0.0.1,localhost" } } : {});
 
+  // A Worker on workers.dev (the energy label Worker, tools/energielabel) is never asked from a test,
+  // in no page of any script: the live site points the app at the real one, and that would send the
+  // test address to EP-Online from GitHub (it did in run 46, 19-11-2026). Every such request is
+  // stopped here and counted; the tests set the setting themselves and play the answers.
+  var realWorker = [];
+  var newContext = browser.newContext.bind(browser);
+  browser.newContext = async function (options) {
+    var context = await newContext(options);
+    await context.route(/^https:\/\/[^\/]+\.workers\.dev(\/|$)/, function (route) { realWorker.push(route.request().method()); return route.abort("blockedbyclient"); });
+    return context;
+  };
+
   async function open(width, changeData) {
     var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
     var page = await context.newPage();
@@ -277,6 +289,7 @@ var SEEN = "tilburg-signalen.gezien";
   }
 
   result.errors = errors;
+  result.realWorker = realWorker;
   await browser.close();
   process.stdout.write(JSON.stringify(result));
 })().catch(function (error) { console.error(error); process.exit(1); });
