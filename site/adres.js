@@ -15,6 +15,14 @@
   var KAART = "https://service.pdok.nl/kadaster/kadastralekaart/wms/v5_0";
   var EP_ONLINE = "https://www.ep-online.nl/Energylabel/Search";
   var REGELS_OP_DE_KAART = "https://omgevingswet.overheid.nl/regels-op-de-kaart";
+  var PLANKAART = "https://service.pdok.nl/kadaster/plu/wms/v1_0";         // Ruimtelijke plannen (Kadaster, via PDOK), without a key
+  var RP_DOCUMENTEN = "https://ruimtelijkeplannen.nl/documents/";            // the rules of a plan, as a plain link
+  var PLAN_LAGEN = ["enkelbestemming", "dubbelbestemming", "maatvoering", "bestemmingsplangebied"];
+  /* The plan statuses that count as adopted. Every other status (ontwerp, voorontwerp, concept, or
+     one this list does not know yet) is left out and counted, never shown as if it applied. */
+  var VASTGESTELD = ["vastgesteld", "onherroepelijk", "vigerend", "goedgekeurd", "geconsolideerd"];
+  /* A dossier in one of these states no longer applies, whatever the status of the plan says. */
+  var VERVALLEN = ["afgebroken", "vernietigd", "geheel vernietigd", "niet in werking"];
   var FIELDS = ["id", "weergavenaam", "straatnaam", "huisnummer", "huisletter", "huisnummertoevoeging", "postcode", "woonplaatsnaam",
     "gemeentenaam", "centroide_rd", "centroide_ll", "adresseerbaarobject_id", "gekoppeld_perceel"].join(",");
   var MAX_PANDEN = 3;      // buildings read for one address
@@ -411,7 +419,148 @@
     return period + " \"Geen publicaties\" betekent dus niet dat er nooit iets is geweest.";
   }
 
-  /* ---------- Not connected yet: plain links to public viewers ---------- */
+  /* ---------- Zoning plan (Ruimtelijke plannen, through PDOK) ---------- */
+
+  var PLAN_WAARSCHUWING = "Let op: wijzigingen sinds 1-1-2024 (Omgevingswet, omgevingsplan) ontbreken hier. Wat nu geldt, staat in Regels op de kaart van het Omgevingsloket.";
+  var PLAN_GEEN_GETAL = "Bij deze bestemming staat geen getal op de kaart. Geen getal op de kaart betekent niet: geen beperking. Bouwhoogte, bebouwingspercentage en andere maten kunnen in de regels staan.";
+  var PLAN_ONBEREIKBAAR = "De kaart met bestemmingsplannen (Ruimtelijke plannen, via PDOK) antwoordt niet. Bestemming en getallen ontbreken daardoor.";
+  var PLAN_GESTOPT = "De dienst Ruimtelijke plannen van PDOK is niet gevonden op het bekende adres. Mogelijk is hij verplaatst of gestopt. Bestemming en getallen ontbreken daardoor; gebruik zolang Regels op de kaart.";
+  var PLAN_ONBEKEND = "De dienst Ruimtelijke plannen van PDOK gaf een antwoord dat de app niet kent. Mogelijk is de dienst gewijzigd of gestopt. Bestemming en getallen ontbreken daardoor; gebruik zolang Regels op de kaart.";
+  var UNITS = { m: " m", "%": "%", m2: " m²", "m²": " m²", graden: " graden" };
+
+  /* One question for the four layers at the point of the address: a square of 2 by 2 metres in RD
+     around it. Plain text, because the JSON answer carries the whole outline of every plan (close
+     to 1 MB for a plan over the whole municipality); the text is a few kB. Null without a point. */
+  function planUrl(rd) {
+    if (!rd || typeof rd.x !== "number" || typeof rd.y !== "number" || !isFinite(rd.x) || !isFinite(rd.y)) return null;
+    var layers = PLAN_LAGEN.join(",");
+    return query(PLANKAART, {
+      service: "WMS", version: "1.3.0", request: "GetFeatureInfo", layers: layers, query_layers: layers, styles: "", crs: "EPSG:28992",
+      bbox: [rd.x - 1, rd.y - 1, rd.x + 1, rd.y + 1].map(function (v) { return v.toFixed(3); }).join(","),
+      width: 101, height: 101, i: 50, j: 50, info_format: "text/plain", feature_count: 50,
+    });
+  }
+
+  /* The plain text answer of the map service, as { layer: [ { field: value } ] }. Null when the text
+     is not such an answer (an error report, a web page, nothing): the service has then changed. */
+  function parsePlanText(text) {
+    var lines = String(text === null || text === undefined ? "" : text).split(/\r?\n/);
+    if (!/^GetFeatureInfo results:\s*$/.test(lines[0])) return null;
+    var layers = {}, layer = null, feature = null;
+    lines.slice(1).forEach(function (line) {
+      var found;
+      if ((found = /^Layer '([^']+)'\s*$/.exec(line))) { layer = layers[found[1]] = layers[found[1]] || []; feature = null; }
+      else if (layer && /^\s+Feature [^:]*:\s*$/.test(line)) { feature = {}; layer.push(feature); }
+      else if (feature && (found = /^\s+([a-z_]+) = '(.*)'\s*$/.exec(line))) feature[found[1]] = found[2];
+    });
+    return layers;
+  }
+
+  function lower(value) { return String(value || "").trim().toLowerCase(); }
+
+  /* Whether a plan object counts: an adopted plan, not marked as history, in a dossier that has not
+     been broken off or annulled. Anything else, an unknown status too, does not count. */
+  function adopted(feature) {
+    return VASTGESTELD.indexOf(lower(feature.planstatus)) !== -1 && !/^(1|true|ja)$/.test(lower(feature.historisch)) &&
+      VERVALLEN.indexOf(lower(feature.dossierstatus)) === -1;
+  }
+
+  /* The figures of one object of the layer "maatvoering": '"maximum bouwhoogte (m)"="40"' becomes
+     { label: "Maximum bouwhoogte", value: "40 m" }. Several in one object are all read. */
+  function maten(text) {
+    var out = [], pattern = /"([^"]+)"="([^"]*)"/g, found;
+    while ((found = pattern.exec(String(text || ""))) !== null) {
+      var name = found[1].split(";").pop().trim(), value = found[2].trim(), unit = /\(([^()]+)\)\s*$/.exec(name), extra = "";
+      if (!name || !value) continue;
+      if (unit) {
+        name = name.slice(0, unit.index).trim();
+        extra = Object.prototype.hasOwnProperty.call(UNITS, lower(unit[1])) ? UNITS[lower(unit[1])] : " " + unit[1].trim();
+      }
+      out.push({ label: name.charAt(0).toUpperCase() + name.slice(1), value: value.replace(/^(\d+)\.(\d+)$/, "$1,$2") + extra });
+    }
+    return out;
+  }
+
+  /* The link to the rules: only to ruimtelijkeplannen.nl, a web page before a PDF. */
+  function rulesUrl(feature) {
+    var urls = String((feature && feature.verwijzingnaartekst) || "").split(",").map(function (url) { return url.trim(); }).filter(function (url) {
+      return url.indexOf(RP_DOCUMENTEN) === 0 && /^https:\/\/[^\s"'<>\\]+$/.test(url);
+    });
+    return urls.filter(function (url) { return /\.html?(#|$)/.test(url); })[0] || urls[0] || null;
+  }
+
+  function planStatusText(feature) { return String(feature.dossierstatus || feature.planstatus || "").trim(); }
+
+  /* What the box "Bestemmingsplan en omgevingsplan" shows. `status` is the HTTP status of the answer
+     (0 when none came), `text` its body, `today` the day of asking as "jjjj-mm-dd". Outcomes:
+     gevonden, geen (no adopted plan at this point), onbereikbaar, gestopt (the service is gone from
+     its address) and onbekend (an answer the app does not know). Where adopted plans overlap, all
+     are listed, newest first, and the model says so: the app does not choose one. */
+  function planModel(status, text, today) {
+    if (status === 404 || status === 410) return { soort: "gestopt", tekst: PLAN_GESTOPT, opnieuw: true };
+    if (status !== 200) return { soort: "onbereikbaar", tekst: PLAN_ONBEREIKBAAR, opnieuw: true };
+    var layers = parsePlanText(text);
+    if (!layers) return { soort: "onbekend", tekst: PLAN_ONBEKEND, opnieuw: true };
+
+    var left = {}, kept = {}, plans = {};
+    function counts(feature) {
+      if (adopted(feature)) { kept[feature.plangebied || feature.identificatie || "?"] = true; return true; }
+      // Say why: the status of the plan, or else the state of its dossier, or that it is history.
+      left[feature.plangebied || feature.identificatie || "?"] = VASTGESTELD.indexOf(lower(feature.planstatus)) === -1 ? lower(feature.planstatus) || "zonder status"
+        : VERVALLEN.indexOf(lower(feature.dossierstatus)) !== -1 ? lower(feature.dossierstatus) : "historisch";
+      return false;
+    }
+    (layers.bestemmingsplangebied || []).forEach(function (plan) { if (counts(plan)) plans[plan.identificatie] = plan; });
+    var seen = {}, enkel = (layers.enkelbestemming || []).filter(counts).filter(function (feature) {
+      var key = feature.plangebied + "|" + feature.identificatie;
+      return seen[key] ? false : (seen[key] = true);
+    }).sort(function (a, b) { return String(b.datum || "").localeCompare(String(a.datum || "")); });
+    var figures = (layers.maatvoering || []).filter(counts), dubbel = (layers.dubbelbestemming || []).filter(counts);
+
+    // A figure belongs to the zoning area it names, or else to the zoning of its own plan.
+    function owner(figure) {
+      var named = /^Enkelbestemming=(.+)$/.exec(String(figure.bestemmingsvlak || "").trim());
+      var match = enkel.filter(function (feature) { return named && feature.identificatie === named[1] && feature.plangebied === figure.plangebied; })[0];
+      return match || enkel.filter(function (feature) { return feature.plangebied === figure.plangebied; })[0] || null;
+    }
+    function dedupe(rows) {
+      var keys = {};
+      return rows.filter(function (row) { var key = row.label + "=" + row.value; return keys[key] ? false : (keys[key] = true); });
+    }
+    function planName(id) { return (plans[id] && plans[id].naam) || id || ""; }
+
+    var bestemmingen = enkel.map(function (feature) {
+      return {
+        naam: feature.naam || "", plan: planName(feature.plangebied), datum: shortDate(feature.datum), status: planStatusText(feature),
+        maten: dedupe(figures.filter(function (figure) { return owner(figure) === feature; }).reduce(function (all, figure) { return all.concat(maten(figure.maatvoering)); }, [])),
+        regels: rulesUrl(feature),
+      };
+    });
+    var overige = {};
+    figures.filter(function (figure) { return !owner(figure); }).forEach(function (figure) {
+      var name = planName(figure.plangebied);
+      overige[name] = dedupe((overige[name] || []).concat(maten(figure.maatvoering)));
+    });
+    // A plan of which something is shown is not also counted as left out.
+    var leftOut = Object.keys(left).filter(function (key) { return !kept[key]; });
+    var statuses = unique(leftOut.map(function (key) { return left[key]; })).sort(), notShown = leftOut.length;
+    return {
+      soort: bestemmingen.length ? "gevonden" : "geen",
+      tekst: bestemmingen.length ? "" : "Op dit punt staat geen vastgesteld bestemmingsplan op de kaart van Ruimtelijke plannen.",
+      bestemmingen: bestemmingen,
+      overlap: bestemmingen.length > 1 ? "Op dit punt liggen " + bestemmingen.length + " vastgestelde plannen over elkaar. Ze staan hieronder allemaal, nieuwste eerst. " +
+        "De app kiest er geen uit: welk plan voorgaat, staat in de plannen zelf." : "",
+      dubbel: unique(dubbel.map(function (feature) { return String(feature.naam || "").trim(); }).filter(Boolean)).sort(),
+      overigeMaten: Object.keys(overige).filter(function (name) { return overige[name].length; }).map(function (name) { return { plan: name, maten: overige[name] }; }),
+      geenGetal: PLAN_GEEN_GETAL,
+      waarschuwing: PLAN_WAARSCHUWING,
+      nietGetoond: notShown ? "Niet getoond: " + notShown + (notShown === 1 ? " plan dat niet is vastgesteld of is vervallen" : " plannen die niet zijn vastgesteld of zijn vervallen") +
+        " (" + statuses.join(", ") + ")." : "",
+      bron: "Bron: Ruimtelijke plannen (Kadaster, via PDOK), opgevraagd op " + dutchDate(today) + ". Alleen vastgestelde plannen. De getallen zijn de maten op de plankaart; de regels kunnen meer zeggen.",
+    };
+  }
+
+  /* ---------- Plain links to public viewers ---------- */
 
   function viewerLinks(address) {
     var number = [address.huisnummer, address.huisletter, address.toevoeging].filter(Boolean).join(" ");
@@ -489,5 +638,6 @@
     mapModel: mapModel, m2: m2,
     numbersAfter: numbersAfter, mentions: mentions, matchNotice: matchNotice, noticeRow: noticeRow, findNotices: findNotices, periodLine: periodLine,
     viewerLinks: viewerLinks,
+    planUrl: planUrl, parsePlanText: parsePlanText, planModel: planModel, maten: maten, rulesUrl: rulesUrl, adopted: adopted,
   };
 });

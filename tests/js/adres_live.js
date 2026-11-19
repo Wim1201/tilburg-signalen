@@ -1,6 +1,7 @@
 /* The tab "Adres" against the real registers of PDOK, at the width of the narrowest phone.
    Usage: node adres_live.js <base url> [map with screenshots]. Not part of the normal test run,
-   because it depends on PDOK answering; see tests/test_adres.py (EchteBronnen). Reports per
+   because it depends on PDOK answering; see tests/test_adres.py (EchteBronnen). Ruimtelijke plannen
+   is played back, never asked. Reports per
    address what the page showed, as JSON. Uses HTTPS_PROXY when the machine needs a proxy. */
 "use strict";
 var chromium = require("playwright").chromium;
@@ -28,6 +29,13 @@ var ADDRESSES = [
     var url = request.url();
     if (url.indexOf(base) !== 0 && !/^(data:|blob:|https:\/\/fonts\.)/.test(url)) asked.push(new URL(url).host);
     if (/\/data\/regio-[a-z-]+\.json/.test(url)) regionFiles.push(url.split("/").pop());
+  });
+  // Ruimtelijke plannen is never asked for real, not even here: its answer is played back as "no
+  // plan at this point". The box itself is tested with played-back answers in adres_smoke.js.
+  var plans = 0;
+  await page.route(/^https:\/\/service\.pdok\.nl\/kadaster\/plu\//, function (route) {
+    plans++;
+    return route.fulfill({ status: 200, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: "GetFeatureInfo results:\n\n  Search returned no results.\n" });
   });
   await page.goto(base + "/index.html#adres");
   await page.waitForSelector("#view-adres:not([hidden])");
@@ -84,5 +92,5 @@ var ADDRESSES = [
     results.push(entry);
   }
   await browser.close();
-  process.stdout.write(JSON.stringify({ addresses: results, errors: errors, hosts: asked.filter(function (host, i) { return asked.indexOf(host) === i; }).sort() }));
+  process.stdout.write(JSON.stringify({ addresses: results, errors: errors, plansPlayedBack: plans, hosts: asked.filter(function (host, i) { return asked.indexOf(host) === i; }).sort() }));
 })().catch(function (error) { console.error(error); process.exit(1); });

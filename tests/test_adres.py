@@ -554,6 +554,8 @@ class EchteBronnen(unittest.TestCase):
         self.assertEqual(self.seen["errors"], [])
         self.assertEqual(self.seen["hosts"], ["api.pdok.nl", "service.pdok.nl"])
         self.assertEqual(len(self.seen["addresses"]), 7)
+        # Ruimtelijke plannen is played back here too, once per address: never asked for real.
+        self.assertEqual(self.seen["plansPlayedBack"], 7)
         for entry in self.seen["addresses"]:
             with self.subTest(adres=entry["label"]):
                 self.assertIn(entry["label"], entry["suggestions"])
@@ -600,6 +602,186 @@ class EchteBronnen(unittest.TestCase):
         self.assertRegex(dongen["links"][1], r"^https://omgevingswet\.overheid\.nl/regels-op-de-kaart/documenten\?locatie-stelsel=RD&locatie-x=\d+&locatie-y=\d+$")
 
 
+def plan_text(**layers):
+    """An answer of Ruimtelijke plannen in the plain text form the service gives, for made-up plans."""
+    lines = ["GetFeatureInfo results:", ""]
+    number = 1
+    for layer, features in layers.items():
+        lines.append("Layer '%s'" % layer)
+        for feature in features:
+            lines.append("  Feature %d: " % number)
+            number += 1
+            lines.extend("    %s = '%s'" % (key, value) for key, value in feature.items())
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def zoning(naam="Wonen", plan="NL.IMRO.0855.TEST-e001", status="onherroepelijk", datum="2015-06-01", ident="EP1", **extra):
+    feature = {"naam": naam, "identificatie": ident, "plangebied": plan, "planstatus": status, "historisch": "0", "datum": datum,
+               "dossierstatus": "", "verwijzingnaartekst": "https://ruimtelijkeplannen.nl/documents/%s/r_%s.html#art3" % (plan, plan)}
+    feature.update(extra)
+    return feature
+
+
+def plan_area(naam, plan="NL.IMRO.0855.TEST-e001", status="onherroepelijk", **extra):
+    feature = {"naam": naam, "identificatie": plan, "plangebied": plan, "planstatus": status, "historisch": "0", "dossierstatus": ""}
+    feature.update(extra)
+    return feature
+
+
+def figure(text, plan="NL.IMRO.0855.TEST-e001", status="onherroepelijk", vlak="Enkelbestemming=EP1", **extra):
+    feature = {"maatvoering": text, "plangebied": plan, "planstatus": status, "historisch": "0", "bestemmingsvlak": vlak, "dossierstatus": ""}
+    feature.update(extra)
+    return feature
+
+
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class Bestemmingsplan(unittest.TestCase):
+    """The box "Bestemmingsplan en omgevingsplan": one question to Ruimtelijke plannen (PDOK) and
+    what the box shows for each answer. The answers are played back (adres_fixtures.json, made-up
+    plans below); no test asks PDOK itself."""
+
+    TODAY = "2026-11-19"
+    SHOWN = ("vastgesteld", "onherroepelijk", "vigerend", "goedgekeurd", "geconsolideerd")
+    LEFT_OUT = ("ontwerp", "voorontwerp", "concept", "", "in onderzoek")
+
+    def model(self, text, status=200):
+        return adres(["planModel", status, text, self.TODAY])[0]
+
+    def test_one_question_to_pdok_without_a_key_and_none_without_a_point(self):
+        url, none, nan = adres(["planUrl", {"x": 132133.035, "y": 395879.872}], ["planUrl", None], ["planUrl", {"x": None, "y": 1}])
+        parts = urlsplit(url)
+        params = {key: value[0] for key, value in parse_qs(parts.query, keep_blank_values=True).items()}
+        self.assertEqual((parts.scheme, parts.netloc, parts.path), ("https", "service.pdok.nl", "/kadaster/plu/wms/v1_0"))
+        self.assertEqual(params["request"], "GetFeatureInfo")
+        self.assertEqual(params["layers"], "enkelbestemming,dubbelbestemming,maatvoering,bestemmingsplangebied")
+        self.assertEqual(params["query_layers"], params["layers"])
+        # Plain text: the JSON answer carries the outline of every plan, close to 1 MB.
+        self.assertEqual(params["info_format"], "text/plain")
+        self.assertEqual(params["crs"], "EPSG:28992")
+        self.assertEqual(params["bbox"], "132132.035,395878.872,132134.035,395880.872")
+        self.assertNotRegex(url, r"(?i)key|token|authorization")
+        self.assertIsNone(none)
+        self.assertIsNone(nan)
+
+    def test_the_test_address_old_plan_without_figures(self):
+        model = self.model(FIXTURES["plan"]["mortelplein"])
+        self.assertEqual(model["soort"], "gevonden")
+        self.assertEqual(len(model["bestemmingen"]), 1)
+        self.assertEqual(model["bestemmingen"][0], {
+            "naam": "Wonen", "plan": "Zorgvlied 2008", "datum": "13-03-2009", "status": "vigerend", "maten": [],
+            "regels": "https://ruimtelijkeplannen.nl/documents/NL.IMRO.085500002008003e-/v_NL.IMRO.085500002008003e-_art11.html"})
+        self.assertEqual(model["overlap"], "")
+        self.assertEqual(model["dubbel"], ["Waarde - Appartementen", "Waarde - Flitsbezorging", "Waarde - Parkeren", "Waarde - Terrassen"])
+        # The draft of the delivery rules and the preliminary draft for shops are left out and counted.
+        self.assertEqual(model["nietGetoond"], "Niet getoond: 2 plannen die niet zijn vastgesteld of zijn vervallen (ontwerp, voorontwerp).")
+        self.assertEqual(model["bron"], "Bron: Ruimtelijke plannen (Kadaster, via PDOK), opgevraagd op 19-11-2026. Alleen vastgestelde plannen. "
+                                        "De getallen zijn de maten op de plankaart; de regels kunnen meer zeggen.")
+
+    def test_the_town_hall_with_its_height(self):
+        model = self.model(FIXTURES["plan"]["stadhuis"])
+        item, = model["bestemmingen"]
+        self.assertEqual((item["naam"], item["plan"], item["datum"], item["status"]), ("Centrum-Binnenstad", "Binnenstad 2010", "08-08-2012", "geheel onherroepelijk in werking"))
+        self.assertEqual(item["maten"], [{"label": "Maximum bouwhoogte", "value": "40 m"}])
+        self.assertNotIn("Waarde - Detailhandel", model["dubbel"])  # preliminary draft
+
+    def test_only_adopted_plans_count_one_example_of_each_status(self):
+        for status in self.SHOWN + self.LEFT_OUT:
+            with self.subTest(status=status):
+                model = self.model(plan_text(enkelbestemming=[zoning(status=status)], dubbelbestemming=[zoning("Waarde - Archeologie", status=status, ident="DP1")],
+                                             maatvoering=[figure('"maximum bouwhoogte (m)"="9"', status=status)], bestemmingsplangebied=[plan_area("Testplan", status=status)]))
+                if status in self.SHOWN:
+                    self.assertEqual(model["soort"], "gevonden")
+                    self.assertEqual([item["naam"] for item in model["bestemmingen"]], ["Wonen"])
+                    self.assertEqual(model["bestemmingen"][0]["maten"], [{"label": "Maximum bouwhoogte", "value": "9 m"}])
+                    self.assertEqual(model["dubbel"], ["Waarde - Archeologie"])
+                    self.assertEqual(model["nietGetoond"], "")
+                else:
+                    self.assertEqual(model["soort"], "geen")
+                    self.assertEqual(model["bestemmingen"], [])
+                    self.assertEqual(model["dubbel"], [])
+                    self.assertEqual(model["overigeMaten"], [])
+                    self.assertEqual(model["nietGetoond"], "Niet getoond: 1 plan dat niet is vastgesteld of is vervallen (%s)." % (status or "zonder status"))
+                    self.assertEqual(model["tekst"], "Op dit punt staat geen vastgesteld bestemmingsplan op de kaart van Ruimtelijke plannen.")
+
+    def test_a_plan_that_was_broken_off_annulled_or_is_history_does_not_count(self):
+        for extra, why in (({"dossierstatus": "afgebroken"}, "afgebroken"), ({"dossierstatus": "vernietigd"}, "vernietigd"),
+                           ({"dossierstatus": "Geheel vernietigd"}, "geheel vernietigd"), ({"dossierstatus": "niet in werking"}, "niet in werking"),
+                           ({"historisch": "1"}, "historisch")):
+            with self.subTest(**extra):
+                model = self.model(plan_text(enkelbestemming=[zoning(status="vastgesteld", **extra)]))
+                self.assertEqual(model["soort"], "geen")
+                self.assertEqual(model["nietGetoond"], "Niet getoond: 1 plan dat niet is vastgesteld of is vervallen (%s)." % why)
+        # An adopted plan that is not yet final is shown, with the state of its dossier.
+        model = self.model(plan_text(enkelbestemming=[zoning(status="vastgesteld", dossierstatus="vastgesteld")]))
+        self.assertEqual(model["bestemmingen"][0]["status"], "vastgesteld")
+
+    def test_two_adopted_plans_at_one_point_are_both_shown_and_the_overlap_is_said(self):
+        model = self.model(plan_text(
+            enkelbestemming=[zoning("Wonen", "NL.IMRO.0855.OUD-e001", datum="2009-03-13"), zoning("Gemengd", "NL.IMRO.0855.NIEUW-e001", status="vastgesteld", datum="2021-05-01", ident="EP9")],
+            maatvoering=[figure('"maximum bouwhoogte (m)"="10"', "NL.IMRO.0855.OUD-e001"), figure('"maximum bouwhoogte (m)"="15"', "NL.IMRO.0855.NIEUW-e001", "vastgesteld", "Enkelbestemming=EP9")],
+            bestemmingsplangebied=[plan_area("Oud plan", "NL.IMRO.0855.OUD-e001"), plan_area("Nieuw plan", "NL.IMRO.0855.NIEUW-e001", "vastgesteld")]))
+        self.assertEqual([(item["naam"], item["plan"], item["maten"][0]["value"]) for item in model["bestemmingen"]],
+                         [("Gemengd", "Nieuw plan", "15 m"), ("Wonen", "Oud plan", "10 m")])
+        self.assertEqual(model["overlap"], "Op dit punt liggen 2 vastgestelde plannen over elkaar. Ze staan hieronder allemaal, nieuwste eerst. "
+                                           "De app kiest er geen uit: welk plan voorgaat, staat in de plannen zelf.")
+
+    def test_figures_in_the_forms_the_plans_write_them(self):
+        rows, = adres(["maten", '"maximum bebouwingspercentage terrein (%)"="75", "maximum bouwhoogte (m)"="15", "maatvoering; hoogte; goothoogte; maximum goothoogte (m)"="6.5", '
+                                '"maximum aantal wooneenheden"="26", "maximum dakhelling (graden)"="45", "maximum oppervlakte (m2)"="120", "minimum diepte (cm)"="80", "leeg"=""'])
+        self.assertEqual(rows, [
+            {"label": "Maximum bebouwingspercentage terrein", "value": "75%"}, {"label": "Maximum bouwhoogte", "value": "15 m"},
+            {"label": "Maximum goothoogte", "value": "6,5 m"}, {"label": "Maximum aantal wooneenheden", "value": "26"},
+            {"label": "Maximum dakhelling", "value": "45 graden"}, {"label": "Maximum oppervlakte", "value": "120 m²"}, {"label": "Minimum diepte", "value": "80 cm"}])
+
+    def test_figures_of_another_plan_stay_with_that_plan(self):
+        model = self.model(plan_text(
+            enkelbestemming=[zoning()],
+            maatvoering=[figure('"maximum bouwhoogte (m)"="9"'), figure('"maximum bouwhoogte (m)"="9"'),
+                         figure('"maximum aantal wooneenheden"="4"', "NL.IMRO.0855.PARAPLU-e001", vlak="")],
+            bestemmingsplangebied=[plan_area("Testplan"), plan_area("Parapluplan", "NL.IMRO.0855.PARAPLU-e001")]))
+        self.assertEqual(model["bestemmingen"][0]["maten"], [{"label": "Maximum bouwhoogte", "value": "9 m"}])  # once, not twice
+        self.assertEqual(model["overigeMaten"], [{"plan": "Parapluplan", "maten": [{"label": "Maximum aantal wooneenheden", "value": "4"}]}])
+
+    def test_without_a_figure_the_text_says_that_is_not_without_a_limit(self):
+        model = self.model(plan_text(enkelbestemming=[zoning()]))
+        self.assertEqual(model["bestemmingen"][0]["maten"], [])
+        self.assertIn("Geen getal op de kaart betekent niet: geen beperking.", model["geenGetal"])
+
+    def test_the_warning_about_the_omgevingswet_comes_with_every_answer_with_plans(self):
+        for text in (FIXTURES["plan"]["mortelplein"], FIXTURES["plan"]["stadhuis"], plan_text(enkelbestemming=[zoning(status="ontwerp")]), "GetFeatureInfo results:\n\n  Search returned no results.\n"):
+            with self.subTest(text=text[:60]):
+                self.assertEqual(self.model(text)["waarschuwing"], "Let op: wijzigingen sinds 1-1-2024 (Omgevingswet, omgevingsplan) ontbreken hier. "
+                                                                   "Wat nu geldt, staat in Regels op de kaart van het Omgevingsloket.")
+
+    def test_a_point_without_any_plan(self):
+        model = self.model("GetFeatureInfo results:\n\n  Search returned no results.\n")
+        self.assertEqual((model["soort"], model["bestemmingen"], model["nietGetoond"]), ("geen", [], ""))
+
+    def test_a_service_that_fails_moved_or_changed_gives_its_own_message(self):
+        cases = [(0, "", "onbereikbaar"), (500, "", "onbereikbaar"), (503, "Service Unavailable", "onbereikbaar"), (302, "", "onbereikbaar"),
+                 (404, "Not Found", "gestopt"), (410, "", "gestopt"),
+                 (200, '<?xml version="1.0"?><ServiceExceptionReport><ServiceException code="LayerNotDefined"/></ServiceExceptionReport>', "onbekend"),
+                 (200, "<html><body>Deze dienst is beëindigd</body></html>", "onbekend"), (200, "", "onbekend"), (200, None, "onbekend")]
+        for status, text, soort in cases:
+            with self.subTest(status=status, text=(text or "")[:30]):
+                model = self.model(text, status)
+                self.assertEqual(model["soort"], soort)
+                self.assertTrue(model["opnieuw"])
+                self.assertNotIn("bestemmingen", model)
+        self.assertEqual(self.model("", 0)["tekst"], "De kaart met bestemmingsplannen (Ruimtelijke plannen, via PDOK) antwoordt niet. Bestemming en getallen ontbreken daardoor.")
+        self.assertIn("Mogelijk is hij verplaatst of gestopt.", self.model("", 404)["tekst"])
+        self.assertIn("gaf een antwoord dat de app niet kent. Mogelijk is de dienst gewijzigd of gestopt.", self.model("<html></html>")["tekst"])
+
+    def test_the_link_to_the_rules_goes_only_to_ruimtelijkeplannen(self):
+        for text, wanted in (("https://ruimtelijkeplannen.nl/documents/A/t_A.pdf,https://ruimtelijkeplannen.nl/documents/A/r_A.html", "https://ruimtelijkeplannen.nl/documents/A/r_A.html"),
+                             ("https://ruimtelijkeplannen.nl/documents/A/t_A.pdf", "https://ruimtelijkeplannen.nl/documents/A/t_A.pdf"),
+                             ("javascript:alert(1)", None), ("http://ruimtelijkeplannen.nl/documents/A/r_A.html", None),
+                             ("https://voorbeeld.example/documents/A.html", None), ("https://ruimtelijkeplannen.nl.voorbeeld.example/documents/A.html", None), ("", None)):
+            with self.subTest(text=text):
+                self.assertEqual(adres(["rulesUrl", {"verwijzingnaartekst": text}])[0], wanted)
+
+
 class Tabblad(unittest.TestCase):
     """The tab on the page: what it refers to, and what it must not do."""
 
@@ -626,16 +808,18 @@ class Tabblad(unittest.TestCase):
 
     def test_only_open_sources_without_a_key(self):
         hosts = set(re.findall(r'"https://([^/"]+)', self.logic + self.page))
-        self.assertEqual(hosts, {"api.pdok.nl", "service.pdok.nl", "www.ep-online.nl", "omgevingswet.overheid.nl", "www.openstreetmap.org"})
+        self.assertEqual(hosts, {"api.pdok.nl", "service.pdok.nl", "www.ep-online.nl", "omgevingswet.overheid.nl", "www.openstreetmap.org", "ruimtelijkeplannen.nl"})
         for text in (self.logic, self.page):
             self.assertNotRegex(text, r"(?i)api[-_]?key|x-api-key|authorization|bearer|secret|wachtwoord|password")
-        # Only PDOK is asked for data; the other three hosts are plain links for the user to tap.
+        # Only PDOK is asked for data; the other hosts are plain links for the user to tap.
         asked = re.findall(r'var (\w+) = "https://([^/"]+)', self.logic)
         self.assertEqual({name: host for name, host in asked}, {
-            "SUGGEST": "api.pdok.nl", "BAG": "api.pdok.nl", "PERCEEL": "api.pdok.nl", "KAART": "service.pdok.nl",
-            "EP_ONLINE": "www.ep-online.nl", "REGELS_OP_DE_KAART": "omgevingswet.overheid.nl"})
+            "SUGGEST": "api.pdok.nl", "BAG": "api.pdok.nl", "PERCEEL": "api.pdok.nl", "KAART": "service.pdok.nl", "PLANKAART": "service.pdok.nl",
+            "EP_ONLINE": "www.ep-online.nl", "REGELS_OP_DE_KAART": "omgevingswet.overheid.nl", "RP_DOCUMENTEN": "ruimtelijkeplannen.nl"})
         self.assertEqual(set(re.findall(r"getJson\(([^)]*?)\)", self.page)) - {"url"},
                          {"A.suggestUrl(text, (loaded && loaded.centrum", "A.vboUrl(address.objectId", "A.perceelUrl(code", "A.perceelAtUrl(address.lon, address.lat"})
+        self.assertEqual(set(re.findall(r"getText\(([^)]*?)\)", self.page)) - {"url"}, set())
+        self.assertIn("var url = A.planUrl(address.rd);", self.page)
 
     def test_tab_only_reads(self):
         for text in (self.logic, self.page):
@@ -653,18 +837,29 @@ class Tabblad(unittest.TestCase):
     def test_size_of_the_parcel_carries_the_warning(self):
         self.assertIn("de kadastrale kaart geeft alleen een indicatie van de ligging en de grootte. Er zijn geen maten aan te ontlenen.", self.page)
 
-    def test_energy_label_and_plan_are_marked_as_not_available_with_a_plain_link(self):
-        block = re.search(r"function renderLinks\(address\) \{(.*?)\n  \}", self.page, flags=re.S).group(1)
-        self.assertEqual(block.count('"Nog niet beschikbaar in de app."'), 1)
-        self.assertNotIn("getJson", block)
-        # The energy label says the same as long as no Worker is set (config.json, energielabel_worker).
+    def test_energy_label_without_a_worker_is_marked_as_not_available_with_a_plain_link(self):
+        # The energy label says this as long as no Worker is set (config.json, energielabel_worker).
         label = re.search(r"function loadLabel\(address, mine\) \{(.*?)\n  \}", self.page, flags=re.S).group(1)
         self.assertRegex(label, r'if \(!ask\) \{\s+renderEnergy\(address, function \(box\) \{ box\.appendChild\(el\("p", null, "Nog niet beschikbaar in de app\."\)\); \}\);\s+return;')
+        self.assertEqual(self.page.count("Nog niet beschikbaar in de app."), 1, "het bestemmingsplan staat nog als niet beschikbaar")
         links, = adres(["viewerLinks", {"huisnummer": 118, "huisletter": "a", "toevoeging": "", "postcode": "5037PL", "rd": {"x": 132133.035, "y": 395879.872}}]) if NODE else [None]
         if links:
             self.assertEqual(links["energielabel"], {"url": "https://www.ep-online.nl/Energylabel/Search", "label": "Zoek op EP-Online", "zoekwaarde": "5037PL 118 a"})
             self.assertEqual(links["plan"]["url"], "https://omgevingswet.overheid.nl/regels-op-de-kaart/documenten?locatie-stelsel=RD&locatie-x=132133&locatie-y=395880")
 
+    def test_the_plan_box_keeps_the_link_to_the_current_rules_and_the_warning_at_the_figures(self):
+        block = re.search(r"function renderPlan\(address, fill\) \{(.*?)\n  \}", self.page, flags=re.S).group(1)
+        self.assertIn("fill(plan);", block)
+        self.assertIn("link(links.plan.url, links.plan.label)", block)
+        load = re.search(r"function loadPlan\(address, mine\) \{(.*?)\n  \}\n", self.page, flags=re.S).group(1)
+        # The warning follows the figures of each zoning directly (or the line that there are none),
+        # and stands on its own where no zoning was found.
+        block = re.search(r"function planBlock\(item, model\) \{(.*?)\n  \}", self.page, flags=re.S).group(1)
+        self.assertRegex(block, r'\]\.concat\(item\.maten\)\)\);\s+if \(!item\.maten\.length\) block\.appendChild\(el\("p", "geen-getal", model\.geenGetal\)\);\s+'
+                                r'// [^\n]*\s+block\.appendChild\(el\("p", "stale plan-waarschuwing", model\.waarschuwing\)\);')
+        self.assertIn('if (!model.bestemmingen.length) box.appendChild(el("p", "stale plan-waarschuwing", model.waarschuwing));', load)
+        # A service that fails, moved or answers in an unknown form leaves a message and a button.
+        self.assertIn("failed(box, model.tekst, function () { loadPlan(address, mine); });", load)
 
 @unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
 class Energielabel(unittest.TestCase):

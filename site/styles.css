@@ -253,6 +253,10 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 .vak-inhoud { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .vak-inhoud .ghost { align-self: flex-start; }
 .vak-inhoud .links a { display: inline-block; }
+.planblok { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.planblok + .planblok { border-top: 1px solid var(--line); padding-top: 8px; }
+/* Long names of figures and statuses: the label column may wrap too, and words break only when they must. */
+#adres-plan .feiten { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
 .bezig, .bronregel { color: var(--muted); }
 .bronregel { font-size: 12px; }
 .feiten { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 14px; font-size: 14px; }
