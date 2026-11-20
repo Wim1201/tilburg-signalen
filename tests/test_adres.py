@@ -518,6 +518,76 @@ def playwright_available():
     return bool(NODE) and subprocess.run([NODE, "-e", "require('playwright')"], capture_output=True).returncode == 0
 
 
+@unittest.skipUnless(NODE, "Node is niet geïnstalleerd")
+class LocatieUitEenBericht(unittest.TestCase):
+    """The location report: how a notice fills the tab "Adres" (site/adres.js). Made-up notices about
+    the public test address; the address search is given as its answers would be."""
+
+    CANDIDATES = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.CANDIDATES, = adres(["addresses", FIXTURES["suggest"]])
+
+    def how(self, item, candidates=None):
+        result, = adres(["locatieVanBericht", item, self.CANDIDATES if candidates is None else candidates])
+        return result
+
+    def test_rd_from_gps_within_a_metre(self):
+        # The test address: the address search gives both, in RD and in GPS.
+        rd, none = adres(["wgs84ToRd", 51.55141136, 5.05750626], ["wgs84ToRd", None, 5])
+        self.assertLess(abs(rd["x"] - 132133.035), 1.0)
+        self.assertLess(abs(rd["y"] - 395879.872), 1.0)
+        self.assertIsNone(none)
+
+    def test_one_address_in_the_notice_is_used(self):
+        item = notice("een", "Aanvraag omgevingsvergunning, Burgemeester van de Mortelplein 118a, 5037PL Tilburg",
+                      plaats="Burgemeester van de Mortelplein 118a, 5037PL Tilburg", lat=MORTELPLEIN["lat"], lon=MORTELPLEIN["lon"])
+        result = self.how(item)
+        self.assertEqual(result["soort"], "adres")
+        self.assertEqual((result["adres"]["straat"], result["adres"]["huisnummer"], result["adres"]["huisletter"]), ("Burgemeester van de Mortelplein", 118, "a"))
+
+    def test_more_than_one_address_is_not_one_address(self):
+        for title in ("Aanvraag, Burgemeester van de Mortelplein 118a en 120, 5037PL Tilburg", "Aanvraag, Burgemeester van de Mortelplein 110 tot en met 130 Tilburg"):
+            with self.subTest(titel=title):
+                result = self.how(notice("meer", title, lat=MORTELPLEIN["lat"], lon=MORTELPLEIN["lon"]))
+                self.assertEqual(result["soort"], "punt")
+
+    def test_without_an_address_the_point_and_without_a_point_nothing(self):
+        parcel = notice("perceel", "Wijziging omgevingsplan, perceel Tilburg Q 4688", plaats="Perceel Tilburg (TBG01) Q 4688", lat=MORTELPLEIN["lat"], lon=MORTELPLEIN["lon"])
+        self.assertEqual(self.how(parcel)["soort"], "punt")
+        self.assertEqual(self.how(parcel, [])["reden"], "De bekendmaking noemt geen adres dat eenduidig in de adressenregistratie te vinden is.")
+        approximate = notice("benaderd", "Aanvraag aan de Burgemeester van de Mortelplein", locatieSoort="benaderd", lat=51.552, lon=5.0575)
+        self.assertEqual(self.how(approximate)["soort"], "geen")
+        self.assertIn("benaderd", self.how(approximate)["reden"])
+        town = notice("gemeente", "Aanvraag in Tilburg", locatieSoort="gemeente", lat=None, lon=None)
+        self.assertEqual(self.how(town)["soort"], "geen")
+
+    def test_an_address_elsewhere_is_not_this_one(self):
+        far = notice("ver", "Aanvraag, Burgemeester van de Mortelplein 118a Tilburg", lat=51.60, lon=5.09)
+        self.assertEqual(self.how(far)["soort"], "punt")
+
+    def test_warnings_for_the_place_and_the_class(self):
+        approximate, town, unsure, removed, sure = adres(
+            ["locatieWaarschuwingen", notice("b", "x", locatieSoort="benaderd", klasse="ontwikkellocatie")],
+            ["locatieWaarschuwingen", notice("g", "x", locatieSoort="gemeente", lat=None, lon=None, klasse="ontwikkellocatie")],
+            ["locatieWaarschuwingen", notice("o", "x", klasse="onzeker", waarom="De perceelgrootte is niet te bepalen.")],
+            ["locatieWaarschuwingen", notice("w", "x", waarom="Geen ontwikkelsignaal.")],
+            ["locatieWaarschuwingen", notice("z", "x", klasse="ontwikkellocatie")])
+        self.assertTrue(approximate[0].startswith("De plek is niet vastgesteld. De bekendmaking geeft geen exacte locatie"))
+        self.assertEqual(town, ["De plek is niet vastgesteld. De bekendmaking noemt alleen de gemeente Tilburg."])
+        self.assertEqual(unsure, ["Onzeker bericht (op het kaartje een witte cirkel): uit de bekendmaking is niet vast te stellen of dit een ontwikkellocatie is. De perceelgrootte is niet te bepalen."])
+        self.assertEqual(removed, ["Dit bericht is in de ranglijst weggefilterd: Geen ontwikkelsignaal."])
+        self.assertEqual(sure, [])
+
+    def test_a_summary_is_short_and_never_the_whole_text(self):
+        short, cut, empty = adres(["samenvatting", "  Bouwen   van een woning. "], ["samenvatting", "woord " * 100], ["samenvatting", None])
+        self.assertEqual(short, "Bouwen van een woning.")
+        self.assertTrue(cut.endswith(" …"))
+        self.assertLessEqual(len(cut), 282)
+        self.assertEqual(empty, "")
+
+
 @unittest.skipUnless(os.environ.get("TILBURG_ADRES_LIVE") and playwright_available(),
                      "alleen op verzoek, tegen de echte bronnen: TILBURG_ADRES_LIVE=1 python -m unittest tests.test_adres.EchteBronnen")
 class EchteBronnen(unittest.TestCase):

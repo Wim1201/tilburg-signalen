@@ -419,6 +419,68 @@
     return period + " \"Geen publicaties\" betekent dus niet dat er nooit iets is geweest.";
   }
 
+  /* ---------- A location from a notice (the location report) ---------- */
+
+  /* WGS84 -> RD, the polynomial approximation of Schreutelkamp and Strang van Hees: within about a
+     metre in the Netherlands. The inverse of rd_to_wgs84 in signalen/geo.py. */
+  var RD_R = [[0, 1, 190094.945], [1, 1, -11832.228], [2, 1, -114.221], [0, 3, -32.391], [1, 0, -0.705], [3, 1, -2.340], [1, 3, -0.608], [0, 2, -0.008], [2, 3, 0.148]];
+  var RD_S = [[1, 0, 309056.544], [0, 2, 3638.893], [2, 0, 73.077], [1, 2, -157.984], [3, 0, 59.788], [0, 1, 0.433], [2, 2, -6.439], [1, 1, -0.032], [0, 4, 0.092], [1, 4, -0.054]];
+  function wgs84ToRd(lat, lon) {
+    if (typeof lat !== "number" || typeof lon !== "number" || !isFinite(lat) || !isFinite(lon)) return null;
+    var dphi = 0.36 * (lat - 52.15517440), dlam = 0.36 * (lon - 5.38720621);
+    function sum(terms) { return terms.reduce(function (total, t) { return total + t[2] * Math.pow(dphi, t[0]) * Math.pow(dlam, t[1]); }, 0); }
+    return { x: Math.round((155000 + sum(RD_R)) * 1000) / 1000, y: Math.round((463000 + sum(RD_S)) * 1000) / 1000 };
+  }
+
+  /* How a notice can fill the tab: with one address it names (found in the address search), with
+     the point it carries, or with neither. `candidates` are the addresses the search gave for the
+     place the notice names. Returns { soort: "adres", adres } or { soort: "punt" | "geen", reden }. */
+  function locatieVanBericht(item, candidates) {
+    var located = item && item.locatieSoort === "exact" && typeof item.lat === "number" && typeof item.lon === "number";
+    var text = [item && item.plaats, item && item.titel].filter(Boolean).join(" \n ");
+    var hits = (candidates || []).filter(function (address) {
+      var match = matchNotice(item, address, []);
+      if (!match || match.soort !== "adres") return false;
+      // Only one address: a notice that names a list or a range of numbers is about more than one.
+      // The place and the title often name the same address twice; that counts once.
+      var specs = {};
+      mentions(text, address.straat).forEach(function (mention) {
+        mention.specs.forEach(function (spec) { specs[spec.van !== undefined ? spec.van + "-" + spec.tot : spec.n + "|" + spec.s] = spec; });
+      });
+      var keys = Object.keys(specs);
+      return keys.length === 1 && specs[keys[0]].van === undefined;
+    });
+    if (hits.length === 1) return { soort: "adres", adres: hits[0] };
+    var reden = hits.length > 1 ? "De bekendmaking noemt meer dan één adres." : "De bekendmaking noemt geen adres dat eenduidig in de adressenregistratie te vinden is.";
+    if (located) return { soort: "punt", reden: reden };
+    return { soort: "geen", reden: reden + (item && item.locatieSoort === "benaderd" ? " Het punt op de kaart is benaderd." : " De bekendmaking heeft geen punt op de kaart.") };
+  }
+
+  /* The warnings that go with a notice in the report: about the place and about the class. */
+  function locatieWaarschuwingen(item) {
+    var lines = [];
+    if (!item) return lines;
+    if (item.locatieSoort === "benaderd") {
+      lines.push("De plek is niet vastgesteld. De bekendmaking geeft geen exacte locatie; het punt is benaderd uit een straatnaam in de tekst en kan honderden meters afwijken.");
+    } else if (item.locatieSoort === "gemeente" || !(typeof item.lat === "number" && typeof item.lon === "number")) {
+      lines.push("De plek is niet vastgesteld. De bekendmaking noemt alleen de gemeente" + (item.gemeente ? " " + item.gemeente : "") + ".");
+    }
+    if (item.klasse === "onzeker") {
+      lines.push("Onzeker bericht (op het kaartje een witte cirkel): uit de bekendmaking is niet vast te stellen of dit een ontwikkellocatie is." +
+        (item.waarom ? " " + item.waarom : ""));
+    }
+    if (item.klasse === "weggefilterd") lines.push("Dit bericht is in de ranglijst weggefilterd: " + (item.waarom || "het telt niet als ontwikkellocatie."));
+    return lines;
+  }
+
+  /* A short summary of the description, never the whole text: the link leads to the source. */
+  function samenvatting(text, max) {
+    var clean = String(text || "").replace(/\s+/g, " ").trim(), limit = max || 280;
+    if (clean.length <= limit) return clean;
+    var cut = clean.slice(0, limit), space = cut.lastIndexOf(" ");
+    return (space > limit * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,.;:]+$/, "") + " …";
+  }
+
   /* ---------- Zoning plan (Ruimtelijke plannen, through PDOK) ---------- */
 
   var PLAN_WAARSCHUWING = "Let op: wijzigingen sinds 1-1-2024 (Omgevingswet, omgevingsplan) ontbreken hier. Wat nu geldt, staat in Regels op de kaart van het Omgevingsloket.";
@@ -638,6 +700,7 @@
     mapModel: mapModel, m2: m2,
     numbersAfter: numbersAfter, mentions: mentions, matchNotice: matchNotice, noticeRow: noticeRow, findNotices: findNotices, periodLine: periodLine,
     viewerLinks: viewerLinks,
+    wgs84ToRd: wgs84ToRd, locatieVanBericht: locatieVanBericht, locatieWaarschuwingen: locatieWaarschuwingen, samenvatting: samenvatting,
     planUrl: planUrl, parsePlanText: parsePlanText, planModel: planModel, maten: maten, rulesUrl: rulesUrl, adopted: adopted,
   };
 });

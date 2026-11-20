@@ -203,7 +203,11 @@
     });
     box.appendChild(el("p", "stale", "Let op: de kadastrale kaart geeft alleen een indicatie van de ligging en de grootte. Er zijn geen maten aan te ontlenen."));
     if (found.length > 1) box.appendChild(el("p", "bronregel", "Dit adres is aan " + found.length + " percelen gekoppeld."));
-    if (!linked) box.appendChild(el("p", "bronregel", "Het adres is in de bron niet aan een perceel gekoppeld; dit is het perceel op de plek van het adrespunt."));
+    if (!linked) {
+      box.appendChild(el("p", address.punt ? "stale" : "bronregel", address.punt
+        ? "Dit is het perceel op het punt uit de bekendmaking. Dat punt is omgerekend en kan enkele meters afwijken; bij een groot gebied is het het deel het dichtst bij Tilburg-centrum."
+        : "Het adres is in de bron niet aan een perceel gekoppeld; dit is het perceel op de plek van het adrespunt."));
+    }
     var map = A.mapModel(found, address);
     if (map) {
       box.appendChild(renderMap(map));
@@ -288,6 +292,7 @@
      they lie. */
   function renderNotices() {
     var box = $("adres-publicaties"), loaded = data(), address = current.address;
+    if (!address) return; // a point from a notice: no address to search for
     box.textContent = "";
     if (!loaded || !loaded.berichten) {
       box.appendChild(el("p", "stale", "De berichten van de app zijn niet geladen; er kan niet in worden gezocht."));
@@ -435,13 +440,23 @@
     });
   }
 
-  function choose(address) {
+  /* Every box of the tab; `shown` says per box whether it is in use. A box that is not in use is
+     hidden, and stays off paper too (rapport.js). */
+  function boxes(shown) {
+    [].forEach.call(document.querySelectorAll("#adres-uitkomst section.vak"), function (vak) { vak.hidden = !shown(vak); });
+  }
+
+  /* `notice`: the notice the address was taken from (the location report), or nothing when the
+     address was typed. */
+  function choose(address, notice) {
     var mine = ++chosen;
+    if (!notice) forgetNotice();
+    boxes(function (vak) { return vak.id !== "vak-bekendmaking" || !!notice; });
     typed++; // an answer of the address search that is still on its way no longer counts
     clearTimeout(timer);
     hideSuggestions();
     message("");
-    $("adres-zoek").value = address.label;
+    $("adres-zoek").value = notice ? "" : address.label;
     $("adres-naam").textContent = address.straat ? address.straat + " " + A.houseNumber(address) : address.label;
     $("adres-sub").textContent = [address.postcode, address.woonplaats].filter(Boolean).join(" ") +
       (address.gemeente && address.gemeente !== address.woonplaats ? " · gemeente " + address.gemeente : "");
@@ -455,6 +470,83 @@
     loadParcels(address, mine);
     loadPlan(address, mine);
   }
+
+  /* ---------- A location from a notice (the location report) ---------- */
+
+  function forgetNotice() {
+    $("adres-bekendmaking").textContent = "";
+    $("adres-uitkomst").removeAttribute("data-rapport");
+  }
+
+  /* The box "Bekendmaking": what the notice says, in short, with its warnings, how the rest of the
+     tab was filled, and the source. Never the whole text: the link leads to it. */
+  function renderNotice(item, how) {
+    var L = window.TilburgSignalen, loaded = data(), box = $("adres-bekendmaking");
+    var model = L.cardModel(item, { centre: (loaded && loaded.centrum) || CENTRE, nieuw: {}, ranks: {}, today: L.isoDay(new Date()) });
+    box.textContent = "";
+    box.appendChild(el("p", "pub-titel", item.titel));
+    box.appendChild(facts([
+      { label: "Soort", value: model.kind + (model.fase ? ", " + model.fase.toLowerCase() : "") },
+      { label: "Gemeente", value: item.gemeente || item.overheid },
+      { label: "Datum", value: model.date },
+      { label: "Plek", value: model.place + (item.locatieSoort === "exact" ? "" : item.locatieSoort === "benaderd" ? " (bij benadering)" : " (alleen de gemeente)") },
+    ].concat(model.deadline ? [{ label: "Reageren", value: model.deadline.replace(/^Reageren tot /, "tot ") }] : [])));
+    if (item.waarom) box.appendChild(el("p", null, item.waarom));
+    if (item.omschrijving) box.appendChild(el("p", "samenvatting", "Uit de omschrijving: " + A.samenvatting(item.omschrijving)));
+    A.locatieWaarschuwingen(item).forEach(function (text) { box.appendChild(el("p", "stale", text)); });
+    if (how) box.appendChild(el("p", how.soort === "adres" ? "bronregel" : "stale", how.tekst));
+    if (L.safeUrl(item.url)) { var row = el("p", "links"); row.appendChild(link(item.url, "Open de bekendmaking bij de bron")); box.appendChild(row); }
+    box.appendChild(el("p", "bronregel", "Bron: " + item.publicatie + " " + (item.overheid || "") + ", gepubliceerd op " + model.date +
+      (loaded && loaded.bijgewerkt ? "; in de app sinds de verversing, opgevraagd op " + L.shortDate(String(loaded.bijgewerkt).slice(0, 10)) : "") + "."));
+  }
+
+  var NO_ADDRESS = "Pand (BAG), energielabel en publicaties over het adres zijn daarom overgeslagen.";
+
+  /* Fill the tab from a notice: with the one address it names when the address search finds it
+     unambiguously, else with its point (parcel and zoning plan only), else with the notice alone. */
+  function chooseLocation(item) {
+    var mine = ++chosen;
+    typed++;
+    clearTimeout(timer);
+    hideSuggestions();
+    message("");
+    $("adres-zoek").value = "";
+    current = { address: null, parcels: [], withParcel: false, regios: [], extra: [], regioFout: false };
+    $("adres-uitkomst").setAttribute("data-rapport", "locatie");
+    $("adres-uitkomst").hidden = false;
+    $("adres-naam").textContent = window.TilburgSignalen.cardModel(item, { centre: CENTRE, nieuw: {}, ranks: {}, today: "" }).place;
+    $("adres-sub").textContent = "Locatie uit een bekendmaking" + (item.gemeente ? " · gemeente " + item.gemeente : "");
+    boxes(function (vak) { return vak.id === "vak-bekendmaking"; });
+    renderNotice(item, { soort: "bezig", tekst: "Het adres in de bekendmaking wordt opgezocht…" });
+
+    function withoutAddress(how) {
+      if (mine !== chosen) return;
+      if (how.soort === "punt") {
+        var rd = A.wgs84ToRd(item.lat, item.lon), point = { lon: item.lon, lat: item.lat, rd: rd, percelen: [], punt: true, straat: "", huisnummer: null, huisletter: "", toevoeging: "", postcode: "" };
+        renderNotice(item, { soort: "punt", tekst: "Geen eenduidig adres. " + how.reden + " Perceel en bestemmingsplan zijn opgevraagd op het punt uit de bekendmaking; dat geeft een beperkte nauwkeurigheid. " + NO_ADDRESS });
+        boxes(function (vak) { return vak.id === "vak-bekendmaking" || vak.id === "vak-perceel" || vak.id === "vak-plan"; });
+        loadParcels(point, mine);
+        loadPlan(point, mine);
+      } else {
+        renderNotice(item, { soort: "geen", tekst: "Geen eenduidig adres en geen vaste plek. " + how.reden + " Perceel en bestemmingsplan zijn niet opgevraagd. " + NO_ADDRESS });
+      }
+    }
+
+    var place = item.plaats && /\d/.test(item.plaats) && item.locatieSoort === "exact" ? item.plaats : "";
+    if (!place) { withoutAddress(A.locatieVanBericht(item, [])); return; }
+    var loaded = data(), text = A.searchText(place.replace(/\bte\b/g, " ")) + (item.gemeente && place.toLowerCase().indexOf(item.gemeente.toLowerCase()) === -1 ? " " + item.gemeente : "");
+    getJson(A.suggestUrl(text, (loaded && loaded.centrum) || CENTRE)).then(function (response) {
+      if (mine !== chosen) return;
+      var how = A.locatieVanBericht(item, A.addresses(response));
+      if (how.soort !== "adres") { withoutAddress(how); return; }
+      choose(how.adres, item);
+      renderNotice(item, { soort: "adres", tekst: "Adres afgeleid uit de tekst van de bekendmaking en gevonden in de adressenregistratie (PDOK Locatieserver). Controleer of het het bedoelde adres is." });
+    }).catch(function () {
+      withoutAddress({ soort: item.locatieSoort === "exact" ? "punt" : "geen", reden: "De adreszoeker (PDOK Locatieserver) antwoordde niet." });
+    });
+  }
+
+  window.TilburgAdresApp = { kiesLocatie: chooseLocation };
 
   var input = $("adres-zoek");
   input.addEventListener("input", function () {
