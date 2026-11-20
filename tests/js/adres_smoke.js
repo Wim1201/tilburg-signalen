@@ -391,6 +391,98 @@ module.exports = async function (browser, base) {
   result.label.errors = session.seen.errors;
   await session.context.close();
 
+  // --- The address report on paper (rapport.js), on a phone in the dark theme: the print view must
+  // still be light, show every warning and source of every box, and nothing of the bars or buttons.
+  session = await open(390, [], false, { antwoord: LABEL_FOUND }); page = session.page;
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.click("#tab-adres");
+  result.rapport = { buttonBefore: await page.isVisible("#rapport-afdrukken") };
+  await choose(page);
+  await page.waitForSelector('#adres-plan[data-uitkomst="gevonden"]');
+  await page.waitForSelector('#adres-energie[data-uitkomst="gevonden"]');
+  // A box added later, with a warning that is hidden on the screen: the report takes it along by itself.
+  await page.evaluate(function () {
+    var box = document.createElement("section"); box.className = "vak"; box.id = "test-vak";
+    var head = document.createElement("h3"); head.textContent = "Proefvak"; box.appendChild(head);
+    var body = document.createElement("div"); body.className = "vak-inhoud";
+    var warning = document.createElement("p"); warning.className = "stale"; warning.hidden = true; warning.textContent = "Proefwaarschuwing die op het scherm verborgen is."; body.appendChild(warning);
+    var source = document.createElement("p"); source.className = "bronregel"; source.textContent = "Bron: proefbron, opgevraagd op vandaag."; body.appendChild(source);
+    var off = document.createElement("p"); off.setAttribute("data-afdruk", "nee"); off.textContent = "Alleen op het scherm."; body.appendChild(off);
+    box.appendChild(body); document.getElementById("adres-uitkomst").appendChild(box);
+  });
+  result.rapport.buttonAfter = await page.isVisible("#rapport-afdrukken");
+  result.rapport.explanation = await text(page, "#rapport-uitleg");
+  result.rapport.titleBefore = await page.title();
+  // window.print() would open the dialog of the browser; here it only counts.
+  await page.evaluate(function () { window.__printed = 0; window.print = function () { window.__printed++; }; });
+  await page.click("#rapport-afdrukken");
+  result.rapport.printed = await page.evaluate(function () { return window.__printed; });
+  result.rapport.titleWhilePrinting = await page.title();
+  await page.emulateMedia({ media: "print", colorScheme: "dark" });
+  result.rapport.print = await page.evaluate(function () {
+    function shown(node) { var style = getComputedStyle(node), box = node.getBoundingClientRect(); return style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0; }
+    function clean(value) { return value.replace(/\s+/g, " ").trim(); }
+    var report = document.getElementById("adres-rapport"), live = document.getElementById("adres-uitkomst");
+    var reportText = clean(report.innerText);
+    var warnings = [].map.call(live.querySelectorAll("section.vak .stale, section.vak .plan-waarschuwing, section.vak .geen-getal, section.vak .bronregel, section.vak .periode, section.vak .dubbel"), function (node) { return clean(node.textContent); });
+    var liveLinks = [].map.call(live.querySelectorAll("section.vak a[href]"), function (a) { return a.href; });
+    var urls = [].map.call(report.querySelectorAll(".rapport-links .rapport-url"), function (node) { return node.textContent; });
+    var hiddenInReport = [].filter.call(report.querySelectorAll(".stale, .plan-waarschuwing, .geen-getal, .bronregel, .rapport-bronregel, .rapport-eerst li"), function (node) { return !shown(node); }).length;
+    var smallest = Math.min.apply(null, [].map.call(report.querySelectorAll(".stale, .plan-waarschuwing, .geen-getal, .bronregel, .rapport-bronregel, .rapport-eerst li"), function (node) { return parseFloat(getComputedStyle(node).fontSize); }));
+    var vakken = [].filter.call(live.querySelectorAll("section.vak"), function (vak) { return vak.getAttribute("data-afdruk") !== "nee"; })
+      .map(function (vak) { return clean(vak.querySelector("h3").textContent); });
+    var body = getComputedStyle(document.body);
+    return {
+      reportShown: shown(report), tabs: shown(document.querySelector(".tabs")), masthead: shown(document.querySelector(".masthead")), view: shown(document.getElementById("view-adres")),
+      buttons: [].filter.call(document.querySelectorAll("button"), shown).length, anchors: report.querySelectorAll("a").length, ids: report.querySelectorAll("[id]").length,
+      headings: [].map.call(report.querySelectorAll("h2"), function (node) { return clean(node.textContent); }), vakken: vakken,
+      title: clean(report.querySelector("h1").textContent), address: clean(report.querySelector(".rapport-adres").textContent),
+      when: clean(report.querySelector(".rapport-tijd").textContent),
+      first: [].map.call(report.querySelectorAll(".rapport-eerst li"), function (node) { return clean(node.textContent); }),
+      missingWarnings: warnings.filter(function (line) { return reportText.indexOf(line) === -1; }), warningCount: warnings.length,
+      missingLinks: liveLinks.filter(function (url) { return urls.indexOf(url) === -1; }), linkCount: urls.length, liveLinkCount: liveLinks.length,
+      refs: report.querySelectorAll(".rapport-ref").length,
+      hiddenInReport: hiddenInReport, smallestFont: smallest,
+      streetRows: [].filter.call(report.querySelectorAll("details .pub"), shown).length,
+      sources: [].map.call(report.querySelectorAll(".rapport-bronnen li"), function (node) { return clean(node.textContent); }),
+      stands: [].map.call(report.querySelectorAll(".rapport-stand"), function (node) { return clean(node.textContent); }),
+      lines: report.querySelectorAll(".rapport-lijn").length,
+      unbroken: [].every.call(report.querySelectorAll(".rapport-vak"), function (node) { var style = getComputedStyle(node); return style.breakInside === "avoid" || style.pageBreakInside === "avoid"; }),
+      background: body.backgroundColor, color: body.color, reportColor: getComputedStyle(report).color,
+      onlyScreen: reportText.indexOf("Alleen op het scherm.") !== -1, testBox: reportText.indexOf("Proefwaarschuwing die op het scherm verborgen is.") !== -1,
+      liveDetailsOpen: [].filter.call(live.querySelectorAll("details"), function (node) { return node.open; }).length,
+    };
+  });
+  // Printing done: the old title comes back. A change on the screen afterwards throws the copy away.
+  await page.evaluate(function () { window.dispatchEvent(new Event("afterprint")); });
+  result.rapport.titleAfter = await page.title();
+  await page.evaluate(function () { document.getElementById("test-vak").querySelector(".vak-inhoud").appendChild(document.createElement("p")); });
+  await page.waitForTimeout(50);
+  result.rapport.afterChange = await page.evaluate(function () { var report = document.getElementById("adres-rapport"); return { built: report.classList.contains("klaar"), children: report.children.length }; });
+  result.rapport.viewAfterChange = await page.isVisible("#view-adres");
+  // Printing through the menu of the browser (no button): beforeprint builds the report again.
+  await page.evaluate(function () { window.dispatchEvent(new Event("beforeprint")); });
+  result.rapport.viaMenu = await page.evaluate(function () { var report = document.getElementById("adres-rapport"); return { built: report.classList.contains("klaar"), shown: getComputedStyle(report).display !== "none", title: document.title }; });
+  await page.evaluate(function () { window.dispatchEvent(new Event("afterprint")); });
+  // The other tabs print as before: with the tab "Berichten" open the report stays off paper.
+  await page.emulateMedia({ media: "screen", colorScheme: "dark" });
+  await page.click("#tab-berichten");
+  await page.waitForSelector("#view-berichten:not([hidden])");
+  await page.emulateMedia({ media: "print", colorScheme: "dark" });
+  result.rapport.otherTab = await page.evaluate(function () { return { report: getComputedStyle(document.getElementById("adres-rapport")).display, view: getComputedStyle(document.getElementById("view-berichten")).display, tabs: getComputedStyle(document.querySelector(".tabs")).display }; });
+  // The paper itself: A4, as Chromium makes the PDF.
+  await page.emulateMedia({ media: "screen", colorScheme: "dark" });
+  await page.click("#tab-adres");
+  await page.waitForSelector("#view-adres:not([hidden])");
+  await page.evaluate(function () { window.dispatchEvent(new Event("beforeprint")); });
+  await page.emulateMedia({ media: "print", colorScheme: "dark" });
+  var pdf = await page.pdf({ format: "A4", preferCSSPageSize: true });
+  result.rapport.pdfPages = (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length;
+  if (process.env.TILBURG_RAPPORT_PDF) require("fs").writeFileSync(process.env.TILBURG_RAPPORT_PDF, pdf);
+  result.rapport.errors = session.seen.errors;
+  result.rapport.elsewhere = session.seen.elsewhere;
+  await session.context.close();
+
   // --- The address search accepts the request and then stays silent: the app stops waiting.
   session = await open(390, ["zoeker:stil"]); page = session.page;
   await page.click("#tab-adres");

@@ -136,6 +136,10 @@
         <p class="adres-naam" id="adres-naam"></p>
         <p class="adres-sub" id="adres-sub"></p>
       </div>
+      <div class="rapport-knop">
+        <button type="button" class="ghost" id="rapport-afdrukken">Rapport afdrukken</button>
+        <p class="bronregel" id="rapport-uitleg">Een rapport van alles hieronder, met de waarschuwingen en bronnen. Op een iPhone: tik op de knop, of in Safari op Delen en dan Afdrukken. Spreid in het voorbeeld twee vingers: het rapport opent als PDF. Tik dan op Delen en Bewaar in Bestanden.</p>
+      </div>
       <section class="vak" aria-labelledby="kop-adres-bag">
         <h3 id="kop-adres-bag">Pand (BAG)</h3>
         <div class="vak-inhoud" id="adres-bag"></div>
@@ -158,6 +162,8 @@
       </section>
     </div>
   </section>
+  <!-- The address report for paper (rapport.js): empty on the screen, filled just before printing. -->
+  <section id="adres-rapport" class="rapport" aria-hidden="true"></section>
 </main>
 
 <nav class="tabs" aria-label="Onderdelen">
@@ -177,5 +183,6 @@
 <script src="app.js"></script>
 <script src="adres.js"></script>
 <script src="adres-app.js"></script>
+<script src="rapport.js"></script>
 </body>
 </html>

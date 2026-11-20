@@ -700,10 +700,33 @@ class Pagina(unittest.TestCase):
     def test_logic_is_loaded_before_the_app(self):
         scripts = re.findall(r'<script src="([^"]+)"', self.html)
         # The tab "Adres" (adres.js, adres-app.js) comes after the app it is added to.
-        self.assertEqual(scripts, ["logic.js", "app.js", "adres.js", "adres-app.js"])
+        # The report on paper (rapport.js) comes last: it copies what the tab "Adres" built.
+        self.assertEqual(scripts, ["logic.js", "app.js", "adres.js", "adres-app.js", "rapport.js"])
 
     def test_app_builds_text_not_markup(self):
         self.assertNotRegex(self.app, r"innerHTML|insertAdjacentHTML|document\.write")
+        self.assertNotRegex(read("rapport.js"), r"innerHTML|insertAdjacentHTML|document\.write")
+
+    def test_the_report_names_no_box_and_no_address(self):
+        """The report copies every box of the tab "Adres"; a box added later comes along by itself.
+        So the code of the report names none of the boxes, and holds no address."""
+        code = read("rapport.js")
+        boxes = re.findall(r'<section class="vak" aria-labelledby="(kop-[\w-]+)">', self.html)
+        self.assertGreaterEqual(len(boxes), 5)
+        for box in boxes + [box.replace("kop-", "", 1) for box in boxes]:
+            with self.subTest(vak=box):
+                self.assertNotIn(box, code)
+        self.assertNotRegex(code, r"\b\d{4} ?[A-Z]{2}\b", "een postcode in de code van het rapport")
+
+    def test_the_print_style_is_light_a4_and_keeps_boxes_whole(self):
+        css = read("styles.css")
+        self.assertRegex(css, r"@page \{[^}]*size: A4")
+        self.assertIn("counter(page)", css)
+        printing = css[css.index("@media print"):]
+        self.assertIn("--bg: #ffffff", printing)
+        self.assertIn("--ink: #000000", printing)
+        self.assertRegex(printing, r"\.rapport-vak \{[^}]*break-inside: avoid")
+        self.assertRegex(printing, r"\.tabs, \.masthead[^{]*\{ display: none !important; \}")
 
     def test_service_worker_keeps_everything_the_app_needs_offline(self):
         worker = read("sw.js")
@@ -1757,6 +1780,105 @@ class InDeBrowser(unittest.TestCase):
         self.assertEqual(parts["shapes"], 2)
         self.assertIn("De achtergrondkaart kon niet worden geladen; alleen de omtrek van het perceel is getekend.", parts["mapText"])
         self.assertEqual(parts["errors"], [])
+
+    # --- The address report on paper (rapport.js), in the print view, with the phone in the dark theme.
+
+    def test_the_report_button_comes_with_an_address_and_says_how_to_get_a_pdf_on_an_iphone(self):
+        report = self.seen["adres"]["rapport"]
+        self.assertFalse(report["buttonBefore"])
+        self.assertTrue(report["buttonAfter"])
+        for part in ("Op een iPhone", "Delen", "Afdrukken", "twee vingers", "PDF", "Bewaar in Bestanden"):
+            self.assertIn(part, report["explanation"])
+        self.assertEqual(report["printed"], 1)
+        self.assertEqual(report["errors"], [])
+        self.assertEqual(report["elsewhere"], [], "het rapport vraagt iets op bij een andere dienst")
+
+    def test_on_paper_only_the_report_without_bars_buttons_or_the_screen(self):
+        paper = self.seen["adres"]["rapport"]["print"]
+        self.assertTrue(paper["reportShown"])
+        self.assertFalse(paper["tabs"], "de tabbalk staat op papier")
+        self.assertFalse(paper["masthead"])
+        self.assertFalse(paper["view"], "het scherm zelf staat ook op papier")
+        self.assertEqual(paper["buttons"], 0)
+        self.assertEqual(paper["ids"], 0, "de kopie heeft de id's van het scherm")
+
+    def test_the_report_is_light_whatever_the_theme_of_the_screen(self):
+        paper = self.seen["adres"]["rapport"]["print"]
+        self.assertEqual(paper["background"], "rgb(255, 255, 255)")
+        self.assertEqual(paper["color"], "rgb(0, 0, 0)")
+        self.assertEqual(paper["reportColor"], "rgb(0, 0, 0)")
+
+    def test_the_report_has_its_parts_in_order_and_every_box_of_the_tab(self):
+        paper = self.seen["adres"]["rapport"]["print"]
+        self.assertEqual(paper["title"], "Adresrapport")
+        self.assertEqual(paper["address"], self.seen["adres"]["name"])
+        self.assertRegex(paper["when"], r"^Opgevraagd op \d{1,2} \w+ \d{4} om \d\d:\d\d\. Dit rapport is gemaakt op ")
+        self.assertEqual(paper["headings"], ["Lees dit eerst"] + paper["vakken"] + ["Eigen aantekeningen", "Bronnen en beperkingen", "Links"])
+        self.assertIn("Proefvak", paper["vakken"], "een vak dat later is toegevoegd, komt niet mee")
+        self.assertTrue(paper["testBox"], "de verborgen waarschuwing van het nieuwe vak staat niet op papier")
+        self.assertFalse(paper["onlyScreen"], "wat alleen voor het scherm is, staat op papier")
+        self.assertEqual(paper["lines"], 12)
+        self.assertTrue(all(stand.startswith("Opgevraagd op ") for stand in paper["stands"]))
+        self.assertEqual(len(paper["stands"]), len(paper["vakken"]))
+
+    def test_read_this_first_holds_the_four_warnings(self):
+        first = " ".join(self.seen["adres"]["rapport"]["print"]["first"])
+        for part in ("geen advies", "Wijzigingen sinds 1-1-2024", "Geen getal betekent niet: geen beperking", "Geen resultaat betekent alleen: niet gevonden in die bron"):
+            self.assertIn(part, first)
+
+    def test_every_warning_and_source_of_the_screen_is_on_paper_readable(self):
+        paper = self.seen["adres"]["rapport"]["print"]
+        self.assertGreaterEqual(paper["warningCount"], 10)
+        self.assertEqual(paper["missingWarnings"], [])
+        self.assertEqual(paper["hiddenInReport"], 0)
+        # 8 points is 10.67 CSS pixels: no warning or source line is smaller than that.
+        self.assertGreaterEqual(paper["smallestFont"], 10.6, "een waarschuwing of bronregel is kleiner dan 8 punt")
+        # What is folded on the screen (the same street, without house number) is open on paper.
+        self.assertEqual(paper["streetRows"], 1)
+        self.assertEqual(paper["liveDetailsOpen"], 0, "het scherm zelf is opengeklapt")
+
+    def test_links_are_readable_text_together_at_the_end(self):
+        paper = self.seen["adres"]["rapport"]["print"]
+        self.assertEqual(paper["anchors"], 0)
+        self.assertEqual(paper["missingLinks"], [])
+        self.assertEqual(paper["linkCount"], paper["liveLinkCount"])
+        self.assertEqual(paper["refs"], paper["linkCount"])
+
+    def test_sources_and_limitations_list_every_box_with_the_moment_it_was_asked(self):
+        paper = self.seen["adres"]["rapport"]["print"]
+        sources = paper["sources"]
+        self.assertTrue(sources[0].startswith("Adres: PDOK Locatieserver (Kadaster), opgevraagd op "))
+        for name in paper["vakken"]:
+            with self.subTest(vak=name):
+                self.assertEqual(len([line for line in sources if line.startswith(name + ": opgevraagd op ")]), 1)
+        self.assertTrue(any(line.startswith("Berichten van de app: laatst ververst op ") for line in sources))
+        self.assertTrue(any("Bron: EP-Online" in line for line in sources))
+        self.assertTrue(any("Bron: Ruimtelijke plannen" in line for line in sources))
+
+    def test_boxes_are_not_broken_and_the_paper_is_a4(self):
+        report = self.seen["adres"]["rapport"]
+        self.assertTrue(report["print"]["unbroken"])
+        self.assertGreaterEqual(report["pdfPages"], 2)
+
+    def test_the_title_holds_the_address_only_while_printing(self):
+        report = self.seen["adres"]["rapport"]
+        self.assertEqual(report["titleBefore"], "Tilburg Signalen")
+        self.assertRegex(report["titleWhilePrinting"], r"^Adresrapport " + re.escape(self.seen["adres"]["name"]) + r" \d{4}-\d\d-\d\d$")
+        self.assertEqual(report["titleAfter"], "Tilburg Signalen")
+
+    def test_printing_through_the_menu_builds_the_report_and_a_change_throws_the_copy_away(self):
+        report = self.seen["adres"]["rapport"]
+        self.assertEqual(report["afterChange"], {"built": False, "children": 0})
+        self.assertTrue(report["viewAfterChange"])
+        self.assertTrue(report["viaMenu"]["built"])
+        self.assertTrue(report["viaMenu"]["shown"])
+        self.assertTrue(report["viaMenu"]["title"].startswith("Adresrapport "))
+
+    def test_another_tab_prints_without_the_report(self):
+        other = self.seen["adres"]["rapport"]["otherTab"]
+        self.assertEqual(other["report"], "none")
+        self.assertNotEqual(other["view"], "none")
+        self.assertEqual(other["tabs"], "none")
 
 
 if __name__ == "__main__":

@@ -34,3 +34,4 @@ Opbouw
 * Energielabel: Cloudflare Worker `tilburg-signalen-energielabel` (`tools/energielabel/`), adres in een POST, logboek bij Cloudflare uit. Na een wijziging moet Wim zelf `npx wrangler deploy` doen in die map.
 * Workflows: `Dagelijkse verversing` en `tests.yml` (tests bij elke pull request).
 * Cache: let op de grens van 1,5 MB.
+* Adresrapport: `site/rapport.js` kopieert bij het afdrukken elk `section.vak` van de Adres-tab, zonder vaste lijst. Een nieuw vak komt vanzelf mee; maak waarschuwingen `.stale` en bronregels `.bronregel` (met "Bron:" of "opgevraagd"), en zet wat alleen voor het scherm is op `data-afdruk="nee"`. Waarschuwingen, bron en datum mogen nooit van papier af.

@@ -26,7 +26,8 @@ is een keuze van deze app en komt niet uit de bronnen. Wat in geen trede valt, s
 
 Het tabblad **Adres** staat daar los van: typ een adres en zie het pand (BAG), het kadastrale perceel
 met een kaartje, en de publicaties over dat adres uit de berichten die de app al heeft. Het vraagt
-de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel.
+de gegevens rechtstreeks vanuit de browser op bij PDOK, zonder sleutel. Met **Rapport afdrukken** komt
+alles wat het tabblad toont op papier of in een PDF, met de waarschuwingen en bronnen (`site/rapport.js`).
 
 Blijft de app open staan, dan haalt hij de berichten opnieuw op zodra hij weer in beeld komt en de
 laatste keer meer dan een kwartier geleden is. "Bijgewerkt" volgt dan mee; een gekozen regio, een
@@ -49,7 +50,7 @@ zoekopdracht, de filters en een opgezocht adres blijven staan.
 | `signalen/bronnen.json` | De bronnenlijst die de app toont (aangesloten en niet aangesloten) |
 | `site/` | De app zelf: statische bestanden, installeerbaar op de telefoon |
 | `site/logic.js` | Wat de app toont, zonder de pagina: rangorde, filters, "nieuw sinds vorig bezoek" en de inhoud van een kaart. `site/app.js` bouwt daar de pagina van |
-| `site/adres.js` | Het tabblad Adres zonder de pagina: schrijfwijzen van adressen gelijktrekken, publicaties aan een adres koppelen, en wat de antwoorden van BAG en Kadaster betekenen. `site/adres-app.js` bouwt daar het tabblad van en vraagt de bronnen op |
+| `site/adres.js` | Het tabblad Adres zonder de pagina: schrijfwijzen van adressen gelijktrekken, publicaties aan een adres koppelen, en wat de antwoorden van BAG en Kadaster betekenen. `site/adres-app.js` bouwt daar het tabblad van en vraagt de bronnen op. `site/rapport.js` maakt er het adresrapport voor de afdrukweergave van |
 | `site/styles.css` | De huisstijl: kleuren, lettertypen en opmaak, licht en donker |
 | `.github/workflows/dagelijks.yml` | Ververst de gegevens op vaste tijden (werkdagen 06:45, 09:35, 10:20, 12:10 en 16:10 uur Nederlandse tijd) en publiceert de app op GitHub Pages. Bij een push en een handmatige run draaien vooraf ook de tests in een echte browser; na elk publiceren test een eigen job de pagina op de live site |
 | `.github/workflows/tests.yml` | Draait bij elke pull request alleen de tests en de tests in een echte browser, zodat een fout zichtbaar is vóór het samenvoegen. Haalt niets op, publiceert niets en schrijft niets terug; het schema en de planner kennen dit bestand niet |
