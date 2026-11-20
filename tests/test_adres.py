@@ -574,7 +574,7 @@ class EchteBronnen(unittest.TestCase):
     def test_a_letter_and_an_addition_keep_their_own_address(self):
         # A house letter is an address object of its own, with its own size; in the same building it
         # lies on the same parcel. That a letter can have a parcel of its own is tested with made-up
-        # answers (Adressen.test_the_parcel_is_the_one_of_this_letter_not_of_the_number).
+        # answers (AdresUitDeZoeker.test_the_parcel_is_the_one_of_this_letter_not_of_the_number).
         letter = self.by_label["Claudius Prinsenlaan 10A, 4811DJ Breda"]
         number = self.by_label["Claudius Prinsenlaan 10, 4811DJ Breda"]
         self.assertEqual(letter["name"], "Claudius Prinsenlaan 10A")
