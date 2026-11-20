@@ -49,6 +49,35 @@ function addNotices(data) {
   ].concat(data.berichten);
 }
 
+/* Notices for the location report, all about the public test address or its parcel; shown in the
+   lists (high score), one only behind the switch. Made up, in the forms the sources use. */
+var LOCATIES = ["test-locatie-adres", "test-locatie-punt", "test-locatie-benaderd", "test-locatie-gemeente", "test-locatie-weg"];
+function addLocations(data) {
+  var base = data.berichten[0];
+  function notice(id, extra) {
+    return Object.assign({}, base, {
+      id: id, bron: "officielebekendmakingen", publicatie: "Gemeenteblad", overheid: "Tilburg", gemeente: "Tilburg", regio: "kern", type: "vergunning", soort: null,
+      fase: "Aanvraag", datum: data.berichten[0].datum, activiteiten: ["bouwen"], omschrijving: null, reactieTot: null, planId: null, signalen: ["woningbouw"],
+      woningen: 12, perceelM2: null, afstandKm: 2.4, url: "https://zoek.officielebekendmakingen.nl/" + id + ".html", urlTekst: null, score: 99, klasse: "ontwikkellocatie",
+      waarom: "Proeflocatie: twaalf nieuwe woningen.", locatieSoort: "exact", lat: ADDRESS.lat, lon: ADDRESS.lon,
+    }, extra);
+  }
+  var long = "Proeflocatie. Het bouwen van twaalf woningen met bergingen en een parkeerplaats op het achterterrein, " +
+    "het slopen van de bestaande bebouwing en het kappen van twee bomen. Dit is een verzonnen omschrijving voor de test van het locatierapport; " +
+    "de app mag haar niet volledig overnemen, alleen een korte samenvatting met een link naar de bron, want de volledige tekst staat daar.";
+  data.berichten = [
+    notice("test-locatie-adres", { titel: "Proeflocatie: aanvraag omgevingsvergunning, Burgemeester van de Mortelplein 118a, 5037PL Tilburg", plaats: "Burgemeester van de Mortelplein 118a, 5037PL Tilburg", omschrijving: long }),
+    notice("test-locatie-punt", { titel: "Proeflocatie: wijziging omgevingsplan, perceel Tilburg Q 4688", plaats: "Perceel Tilburg (TBG01) Q 4688", klasse: "onzeker", score: 40,
+      waarom: "Proeflocatie: het aantal woningen is niet te bepalen.", type: "plan", soort: "Omgevingsplan", fase: "Ontwerp" }),
+    notice("test-locatie-benaderd", { titel: "Proeflocatie: aanvraag voor woningen aan de Burgemeester van de Mortelplein", plaats: "omgeving Burgemeester van de Mortelplein, Tilburg", locatieSoort: "benaderd",
+      lat: ADDRESS.lat + 0.001, lon: ADDRESS.lon, score: 98 }),
+    notice("test-locatie-gemeente", { titel: "Proeflocatie: aanvraag voor woningen in Tilburg", plaats: null, locatieSoort: "gemeente", lat: null, lon: null, klasse: "onzeker", score: 30,
+      waarom: "Proeflocatie: geen exacte locatie." }),
+    notice("test-locatie-weg", { titel: "Proeflocatie: kappen van een boom, Burgemeester van de Mortelplein 118a, 5037PL Tilburg", plaats: "Burgemeester van de Mortelplein 118a, 5037PL Tilburg",
+      klasse: "weggefilterd", score: 0, waarom: "Geen nieuwbouw van woningen en geen ontwikkelsignaal in de bekendmaking.", signalen: [], woningen: null }),
+  ].concat(data.berichten);
+}
+
 /* The data without anything about the test address: nothing that names the square, nothing near it. */
 function removeNotices(data) {
   data.berichten = data.berichten.filter(function (item) {
@@ -72,6 +101,10 @@ function answer(url) {
   if (which === "zoeker") return /middelburg/i.test(params.get("q")) ? outside.suggest : fixtures.suggest;
   if (which === "adresobject") return params.get("identificatie") === OUTSIDE.objectId ? outside.vbo : fixtures.vbo;
   if (which === "pand") { var id = url.split("?")[0].split("/").pop(); return fixtures.pand[id] || outside.pand[id]; }
+  if (which === "perceel" && params.get("bbox")) {
+    // The parcels around a point (a point from a notice): both parcels of the test address.
+    return { type: "FeatureCollection", features: fixtures.perceel["4688"].features.concat(fixtures.perceel["4489"].features) };
+  }
   if (which === "perceel") return fixtures.perceel[params.get("perceelnummer")] || outside.perceel[params.get("perceelnummer")];
   return null;
 }
@@ -85,7 +118,7 @@ module.exports = async function (browser, base) {
   /* `label`: the energy label Worker is set, and answers as `label.antwoord` says at that moment:
      { status, body } or "weg" (no connection). Without `label` the setting is empty. The setting in
      the data the site serves is never used: on the live site it is the real Worker. */
-  async function open(width, down, withoutNotices, label) {
+  async function open(width, down, withoutNotices, label, locations) {
     var context = await browser.newContext({ viewport: { width: width, height: 844 }, locale: "nl-NL", timezoneId: "Europe/Amsterdam", serviceWorkers: "block" });
     var page = await context.newPage(), seen = { errors: [], pdok: [], elsewhere: [] };
     page.on("pageerror", function (error) { seen.errors.push(error.message); });
@@ -102,6 +135,7 @@ module.exports = async function (browser, base) {
     await page.route("**/data/berichten.json", async function (route) {
       var data = await (await route.fetch()).json();
       if (withoutNotices) removeNotices(data); else addNotices(data);
+      if (locations) addLocations(data);
       seen.regioTest = data.regioTest;
       seen.regios = (data.regios || []).map(function (regio) { return regio.naam; });
       delete data.regioTest;
@@ -424,12 +458,12 @@ module.exports = async function (browser, base) {
     function clean(value) { return value.replace(/\s+/g, " ").trim(); }
     var report = document.getElementById("adres-rapport"), live = document.getElementById("adres-uitkomst");
     var reportText = clean(report.innerText);
-    var warnings = [].map.call(live.querySelectorAll("section.vak .stale, section.vak .plan-waarschuwing, section.vak .geen-getal, section.vak .bronregel, section.vak .periode, section.vak .dubbel"), function (node) { return clean(node.textContent); });
-    var liveLinks = [].map.call(live.querySelectorAll("section.vak a[href]"), function (a) { return a.href; });
+    var warnings = [].map.call(live.querySelectorAll("section.vak:not([hidden]) .stale, section.vak:not([hidden]) .plan-waarschuwing, section.vak:not([hidden]) .geen-getal, section.vak:not([hidden]) .bronregel, section.vak:not([hidden]) .periode, section.vak:not([hidden]) .dubbel"), function (node) { return clean(node.textContent); });
+    var liveLinks = [].map.call(live.querySelectorAll("section.vak:not([hidden]) a[href]"), function (a) { return a.href; });
     var urls = [].map.call(report.querySelectorAll(".rapport-links .rapport-url"), function (node) { return node.textContent; });
     var hiddenInReport = [].filter.call(report.querySelectorAll(".stale, .plan-waarschuwing, .geen-getal, .bronregel, .rapport-bronregel, .rapport-eerst li"), function (node) { return !shown(node); }).length;
     var smallest = Math.min.apply(null, [].map.call(report.querySelectorAll(".stale, .plan-waarschuwing, .geen-getal, .bronregel, .rapport-bronregel, .rapport-eerst li"), function (node) { return parseFloat(getComputedStyle(node).fontSize); }));
-    var vakken = [].filter.call(live.querySelectorAll("section.vak"), function (vak) { return vak.getAttribute("data-afdruk") !== "nee"; })
+    var vakken = [].filter.call(live.querySelectorAll("section.vak"), function (vak) { return !vak.hidden && vak.getAttribute("data-afdruk") !== "nee"; })
       .map(function (vak) { return clean(vak.querySelector("h3").textContent); });
     var body = getComputedStyle(document.body);
     return {
@@ -447,7 +481,9 @@ module.exports = async function (browser, base) {
       sources: [].map.call(report.querySelectorAll(".rapport-bronnen li"), function (node) { return clean(node.textContent); }),
       stands: [].map.call(report.querySelectorAll(".rapport-stand"), function (node) { return clean(node.textContent); }),
       lines: report.querySelectorAll(".rapport-lijn").length,
-      unbroken: [].every.call(report.querySelectorAll(".rapport-vak"), function (node) { var style = getComputedStyle(node); return style.breakInside === "avoid" || style.pageBreakInside === "avoid"; }),
+      // A box stays whole; a long box (many notices) may run over a page, but each notice stays whole.
+      unbroken: [].every.call(report.querySelectorAll(".rapport-vak:not(.rapport-lang), .rapport-lang .pub, .rapport-lang li"), function (node) { var style = getComputedStyle(node); return style.breakInside === "avoid" || style.pageBreakInside === "avoid"; }),
+      longBoxes: [].map.call(report.querySelectorAll(".rapport-vak.rapport-lang h2"), function (node) { return clean(node.textContent); }),
       background: body.backgroundColor, color: body.color, reportColor: getComputedStyle(report).color,
       onlyScreen: reportText.indexOf("Alleen op het scherm.") !== -1, testBox: reportText.indexOf("Proefwaarschuwing die op het scherm verborgen is.") !== -1,
       liveDetailsOpen: [].filter.call(live.querySelectorAll("details"), function (node) { return node.open; }).length,
@@ -481,6 +517,90 @@ module.exports = async function (browser, base) {
   if (process.env.TILBURG_RAPPORT_PDF) require("fs").writeFileSync(process.env.TILBURG_RAPPORT_PDF, pdf);
   result.rapport.errors = session.seen.errors;
   result.rapport.elsewhere = session.seen.elsewhere;
+  await session.context.close();
+
+  // --- The location report: from a card in the lists, the tab "Adres" filled from the notice, and
+  // the same report on paper. Four places: an address, only a point, an approximate point, only the
+  // municipality; and a notice that is filtered out, behind the switch.
+  session = await open(390, [], false, { antwoord: LABEL_FOUND }, true); page = session.page;
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.evaluate(function () { window.__printed = 0; window.print = function () { window.__printed++; }; });
+  result.locatie = {};
+  result.locatie.removedHidden = await page.$$eval('.card[data-id="test-locatie-weg"]', function (nodes) { return nodes.length; });
+  async function fromCard(id, view, removed) {
+    await page.emulateMedia({ media: "screen", colorScheme: "dark" });
+    await page.click("#tab-berichten");
+    await page.waitForSelector("#view-berichten:not([hidden])");
+    await page.click("#tile-" + view);
+    // Every made-up notice has "Proeflocatie" in its title: the search shows them whatever their rank.
+    if ((await page.inputValue("#zoek")) !== "Proeflocatie") await page.fill("#zoek", "Proeflocatie");
+    if (removed && !(await page.isChecked("#toon-weg"))) await page.check("#toon-weg");
+    var card = (removed ? "#removed" : "#list") + ' .card[data-id="' + id + '"]';
+    await page.waitForSelector(card);
+    await page.click(card + " summary");
+    await page.click(card + " .rapport-locatie");
+    await page.waitForSelector("#view-adres:not([hidden])");
+    await page.waitForFunction(function () { return !document.querySelector("#adres-uitkomst .bezig"); });
+    await page.waitForFunction(function () { var image = document.querySelector(".kaartvlak img"); return !image || image.complete; });
+    var screen = await page.evaluate(function () {
+      function clean(value) { return value.replace(/\s+/g, " ").trim(); }
+      var u = document.getElementById("adres-uitkomst"), box = document.getElementById("adres-bekendmaking"), facts = {};
+      [].forEach.call(box.querySelectorAll(".feiten dt"), function (dt) { facts[dt.textContent] = dt.nextElementSibling.textContent; });
+      return {
+        rapport: u.getAttribute("data-rapport"), hash: location.hash, input: document.getElementById("adres-zoek").value,
+        vakken: [].filter.call(u.querySelectorAll("section.vak"), function (vak) { return !vak.hidden; }).map(function (vak) { return clean(vak.querySelector("h3").textContent); }),
+        name: clean(document.getElementById("adres-naam").textContent), sub: clean(document.getElementById("adres-sub").textContent),
+        title: clean(box.querySelector(".pub-titel").textContent), facts: facts, text: clean(box.innerText),
+        warnings: [].map.call(box.querySelectorAll(".stale"), function (node) { return clean(node.textContent); }),
+        notes: [].map.call(box.querySelectorAll(".bronregel"), function (node) { return clean(node.textContent); }),
+        summary: (box.querySelector(".samenvatting") || { textContent: "" }).textContent,
+        links: [].map.call(box.querySelectorAll("a"), function (a) { return a.href; }),
+        failed: u.querySelectorAll(".vak-inhoud > button").length, overflow: document.documentElement.scrollWidth - window.innerWidth,
+        parcelNote: [].map.call(document.querySelectorAll("#adres-perceel .stale, #adres-perceel .bronregel"), function (node) { return clean(node.textContent); }),
+        plan: document.getElementById("adres-plan").getAttribute("data-uitkomst"),
+      };
+    });
+    await page.click("#rapport-afdrukken");
+    await page.emulateMedia({ media: "print", colorScheme: "dark" });
+    var paper = await page.evaluate(function () {
+      function clean(value) { return value.replace(/\s+/g, " ").trim(); }
+      function shown(node) { var style = getComputedStyle(node), box = node.getBoundingClientRect(); return style.display !== "none" && box.width > 0 && box.height > 0; }
+      var report = document.getElementById("adres-rapport"), u = document.getElementById("adres-uitkomst"), text = clean(report.innerText);
+      var live = [].filter.call(u.querySelectorAll("section.vak"), function (vak) { return !vak.hidden; });
+      var lines = [];
+      live.forEach(function (vak) { [].forEach.call(vak.querySelectorAll(".stale, .plan-waarschuwing, .geen-getal, .bronregel, .periode"), function (node) { lines.push(clean(node.textContent)); }); });
+      return {
+        h1: clean(report.querySelector("h1").textContent), headings: [].map.call(report.querySelectorAll("h2"), function (node) { return clean(node.textContent); }),
+        first: [].map.call(report.querySelectorAll(".rapport-eerst li"), function (node) { return clean(node.textContent); }),
+        missing: lines.filter(function (line) { return text.indexOf(line) === -1; }), lines: lines.length,
+        hidden: [].filter.call(report.querySelectorAll(".stale, .bronregel, .rapport-bronregel, .rapport-eerst li"), function (node) { return !shown(node); }).length,
+        sources: [].map.call(report.querySelectorAll(".rapport-bronnen li"), function (node) { return clean(node.textContent); }),
+        urls: [].map.call(report.querySelectorAll(".rapport-url"), function (node) { return node.textContent; }), title: document.title,
+        shown: shown(report), tabs: shown(document.querySelector(".tabs")),
+      };
+    });
+    return { screen: screen, paper: paper };
+  }
+  result.locatie.adres = await fromCard("test-locatie-adres", "ranglijst");
+  var locationPdf = await page.pdf({ format: "A4", preferCSSPageSize: true });
+  result.locatie.adres.pdfPages = (locationPdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length;
+  if (process.env.TILBURG_LOCATIE_PDF) require("fs").writeFileSync(process.env.TILBURG_LOCATIE_PDF, locationPdf);
+  await page.evaluate(function () { window.dispatchEvent(new Event("afterprint")); });
+  result.locatie.punt = await fromCard("test-locatie-punt", "onzeker");
+  result.locatie.benaderd = await fromCard("test-locatie-benaderd", "ranglijst");
+  result.locatie.gemeente = await fromCard("test-locatie-gemeente", "onzeker");
+  result.locatie.weg = await fromCard("test-locatie-weg", "ranglijst", true);
+  // A typed address afterwards: the box of the notice is gone again, and the report is an address report.
+  await page.emulateMedia({ media: "screen", colorScheme: "dark" });
+  await choose(page);
+  result.locatie.daarna = await page.evaluate(function () {
+    var u = document.getElementById("adres-uitkomst");
+    return { rapport: u.getAttribute("data-rapport"), notice: !document.getElementById("vak-bekendmaking").hidden,
+      vakken: [].filter.call(u.querySelectorAll("section.vak"), function (vak) { return !vak.hidden; }).length };
+  });
+  result.locatie.printed = await page.evaluate(function () { return window.__printed; });
+  result.locatie.errors = session.seen.errors;
+  result.locatie.elsewhere = session.seen.elsewhere;
   await session.context.close();
 
   // --- The address search accepts the request and then stays silent: the app stops waiting.

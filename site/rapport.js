@@ -24,7 +24,8 @@
     "Geen resultaat betekent alleen: niet gevonden in die bron, op dat moment. Het betekent niet dat er niets is.",
   ];
 
-  var LIJNEN = 12; // lines for own notes
+  var LIJNEN = 8; // lines for own notes
+  var LANG = 4;   // notices or list items in a box above which the box may run over a page break
 
   function tweeCijfers(n) { return (n < 10 ? "0" : "") + n; }
 
@@ -45,10 +46,14 @@
 
   /* The title of the page while printing: most browsers name the PDF after it. Only the address as
      the user chose it, never stored; the old title comes back after printing. */
-  function afdrukTitel(adres, date) {
+  function afdrukTitel(adres, date, soort) {
     var naam = String(adres || "").replace(/[\\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
-    return "Adresrapport" + (naam ? " " + naam : "") + " " + isoDag(date);
+    return (soort || "Adresrapport") + (naam ? " " + naam : "") + " " + isoDag(date);
   }
+
+  /* A report from a notice (the tab carries data-rapport="locatie") is a location report. */
+  function soortRapport(uitkomst) { return uitkomst.getAttribute("data-rapport") === "locatie" ? "Locatierapport" : "Adresrapport"; }
+  var LEES_OOK_LOCATIE = "Een bekendmaking staat hier kort samengevat. De volledige tekst, en wat er precies is aangevraagd of besloten, staat bij de bron (zie Links).";
 
   /* Links numbered in order of first appearance; the same address twice keeps one number. */
   function Links() { this.lijst = []; }
@@ -78,7 +83,7 @@
       .filter(function (text) { return /^bron\b|opgevraagd/i.test(text); });
   }
 
-  var exported = { LEES_DIT_EERST: LEES_DIT_EERST, moment: moment, isoDag: isoDag, afdrukTitel: afdrukTitel, Links: Links, STAND_TEKST: STAND_TEKST };
+  var exported = { LEES_DIT_EERST: LEES_DIT_EERST, LEES_OOK_LOCATIE: LEES_OOK_LOCATIE, moment: moment, isoDag: isoDag, afdrukTitel: afdrukTitel, Links: Links, STAND_TEKST: STAND_TEKST };
   if (typeof module === "object" && module.exports) module.exports = exported;
   if (!root.document) return;
   root.TilburgRapport = exported;
@@ -148,24 +153,30 @@
 
     var kop = el("header", "rapport-kop");
     kop.appendChild(el("p", "rapport-merk", "Tilburg Signalen"));
-    kop.appendChild(el("h1", null, "Adresrapport"));
+    var soort = soortRapport(uitkomst);
+    kop.appendChild(el("h1", null, soort));
     kop.appendChild(el("p", "rapport-adres", $("adres-naam").textContent));
     kop.appendChild(el("p", "rapport-sub", $("adres-sub").textContent));
     kop.appendChild(el("p", "rapport-tijd", "Opgevraagd op " + moment(gekozen || nu) + ". Dit rapport is gemaakt op " + moment(nu) + "."));
     rapport.appendChild(kop);
 
     var eerst = sectie("Lees dit eerst", "rapport-eerst"), lijst = el("ul");
-    LEES_DIT_EERST.forEach(function (text) { lijst.appendChild(el("li", null, text)); });
+    LEES_DIT_EERST.concat(soort === "Locatierapport" ? [LEES_OOK_LOCATIE] : []).forEach(function (text) { lijst.appendChild(el("li", null, text)); });
     eerst.appendChild(lijst);
     rapport.appendChild(eerst);
 
     [].forEach.call(uitkomst.querySelectorAll("section.vak"), function (vak) {
-      if (vak.getAttribute("data-afdruk") === "nee") return;
+      // A box that is not in use (hidden as a whole, for example the notice box for a typed address) stays off paper.
+      if (vak.hidden || vak.getAttribute("data-afdruk") === "nee") return;
       var kopTekst = (vak.querySelector("h3, h2") || {}).textContent || "Vak", inhoud = vak.querySelector(".vak-inhoud") || vak;
       var toen = gevuld.get(vak) || gekozen || nu, hoe = stand(vak);
       var box = sectie(kopTekst);
       box.appendChild(el("p", "rapport-stand", "Opgevraagd op " + moment(toen) + ". " + STAND_TEKST[hoe]));
-      box.appendChild(kopie(inhoud, links));
+      var copy = kopie(inhoud, links);
+      box.appendChild(copy);
+      // A long box (many notices) would not fit on one page anyway: it may then start on the page it
+      // comes to and run over, between its parts; each part (a notice, a list of facts) stays whole.
+      if (copy.querySelectorAll(".pub, li").length > LANG) box.classList.add("rapport-lang");
       rapport.appendChild(box);
       bronnen.push({ titel: kopTekst, toen: toen, stand: hoe, regels: bronregels(vak) });
     });
@@ -175,10 +186,12 @@
     notities.appendChild(lijnen);
     rapport.appendChild(notities);
 
-    var bron = sectie("Bronnen en beperkingen", "rapport-bronnen"), lijstBronnen = el("ul");
+    var bron = sectie("Bronnen en beperkingen", "rapport-bronnen rapport-lang"), lijstBronnen = el("ul");
     var adresRegel = el("li");
     adresRegel.appendChild(el("strong", null, "Adres"));
-    adresRegel.appendChild(document.createTextNode(": PDOK Locatieserver (Kadaster), opgevraagd op " + moment(gekozen || nu) + "."));
+    adresRegel.appendChild(document.createTextNode(soort === "Locatierapport"
+      ? ": afgeleid uit de bekendmaking, opgevraagd op " + moment(gekozen || nu) + "; zie het vak Bekendmaking."
+      : ": PDOK Locatieserver (Kadaster), opgevraagd op " + moment(gekozen || nu) + "."));
     lijstBronnen.appendChild(adresRegel);
     var gegevens = root.TilburgSignalenGegevens;
     bronnen.forEach(function (item) {
@@ -199,7 +212,7 @@
     rapport.appendChild(bron);
 
     if (links.lijst.length) {
-      var linkVak = sectie("Links", "rapport-links"), lijstLinks = el("ol");
+      var linkVak = sectie("Links", "rapport-links rapport-lang"), lijstLinks = el("ol");
       links.lijst.forEach(function (link) {
         var regel = el("li");
         regel.appendChild(document.createTextNode(link.label + ": "));
@@ -218,7 +231,7 @@
   function voorAfdrukken() {
     if ($("view-adres").hidden || !bouw()) return;
     if (oudeTitel === null) oudeTitel = document.title;
-    document.title = afdrukTitel($("adres-naam").textContent, new Date());
+    document.title = afdrukTitel($("adres-naam").textContent, new Date(), soortRapport(uitkomst));
   }
   function naAfdrukken() {
     if (oudeTitel !== null) { document.title = oudeTitel; oudeTitel = null; }
