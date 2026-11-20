@@ -7,6 +7,7 @@
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | officielebekendmakingen.nl (zoekdienst SRU), opgevraagd 17-11-2026 tussen 20:25 en 20:37 uur; gemeente-indeling van het CBS, "Gebieden in Nederland 2026" (tabel 86247NED) |
 | Van / aan | Claude Code aan Wim |
+| Aangepast | 20-11-2026: de twee proefadressen in Middelburg en Breda zijn uit dit verslag gehaald en vervangen door een omschrijving. De tests gebruiken sinds die dag de stadskantoren; zie `tilburg-signalen_verslag_proefadressen_20-11-2026.md` |
 | Vervolg op | `tilburg-signalen_verslag_tabblad-adres_17-11-2026.md` |
 
 ## Stand
@@ -312,7 +313,7 @@ bij herhaling alle slaagden. Zie "Open punten".
 | De bestanden in de repo | 5 tests: `berichten.json` houdt alleen de kern en noemt de regio's; elk regiobestand houdt alleen zijn regio en klopt met het overzicht; geen bericht staat in twee bestanden; faillissementen en de Vlaamse bron blijven in de kern; elk bestand blijft onder 1,5 MB | Geslaagd |
 | Regiofilter in de browser, op 320 pixels | 7 tests: de keuze wordt aangeboden en niets is gekozen bij het openen; alles past op 320 pixels (knoppen 44 pixels hoog of meer); een gekozen regio komt erbij op Gebied en Berichten, het kaartje verandert niet, en er wordt precies één bestand gelezen; tikken op een gemeente van de regio toont haar berichten; terug naar de kern en alle regio's tegelijk; de app opent weer met de kern en bewaart de keuze niet; een regiobestand dat niet komt laat de kern staan met een melding | Geslaagd |
 | Ochtendscherm | De app leest bij het openen geen regiobestand; met een regio erbij blijven de ochtendzin en de tegel Nieuw gelijk; na "Alleen de kern" is het scherm gelijk aan het begin | Geslaagd |
-| Tabblad Adres met een adres buiten de kern (browser, nagespeelde bronnen) | Noordweg 402 in Middelburg: het bericht uit het bestand van Zeeland staat onder "Dit adres", het bestand is één keer gelezen, en de app zelf toont nog alleen de kern | Geslaagd |
+| Tabblad Adres met een adres buiten de kern (browser, nagespeelde bronnen) | Een adres in Middelburg: het bericht uit het bestand van Zeeland staat onder "Dit adres", het bestand is één keer gelezen, en de app zelf toont nog alleen de kern | Geslaagd |
 | Alle tests | `python -m unittest discover tests` | 336 tests, geslaagd; 10 overgeslagen (6 filmtests zoals voorheen, 4 die alleen op verzoek tegen de echte bronnen draaien) |
 | Tegen de echte bronnen | `TILBURG_ADRES_LIVE=1 python -m unittest tests.test_adres.EchteBronnen`, 20:47 uur, 320 pixels | Geslaagd, 26 seconden, zeven adressen; zie hieronder |
 
@@ -320,8 +321,8 @@ bij herhaling alle slaagden. Zie "Open punten".
 
 | Adres | Pand volgens BAG | Perceel | Publicaties | Regiobestand |
 |---|---|---|---|---|
-| Noordweg 402, Middelburg | 1622, industriefunctie en woonfunctie, 391 m², pand in gebruik | Middelburg T 3010, 6.249 m² | Dit adres: 1 (aanvraag omgevingsvergunning, 16-11-2026) | `regio-zeeland.json`, één keer gelezen; "Doorzocht: 2.205 berichten … en die van Zeeland" |
-| Prinsenkade 10, Breda | 1900, kantoorfunctie, 699 m², pand in gebruik | Breda F 1290, 566 m² | Dit adres: 1 (beslistermijn opgeschort, 16-11-2026) | `regio-west-brabant.json`, één keer gelezen; "Doorzocht: 2.498 berichten … en die van West-Brabant" |
+| Een pand in Middelburg | 1622, industriefunctie en woonfunctie, pand in gebruik | Eén perceel | Dit adres: 1 (aanvraag omgevingsvergunning, 16-11-2026) | `regio-zeeland.json`, één keer gelezen; "Doorzocht: 2.205 berichten … en die van Zeeland" |
+| Een kantoor in Breda | 1900, kantoorfunctie, pand in gebruik | Eén perceel | Dit adres: 1 (beslistermijn opgeschort, 16-11-2026) | `regio-west-brabant.json`, één keer gelezen; "Doorzocht: 2.498 berichten … en die van West-Brabant" |
 
 Bij beide: het kaartbeeld geladen, niets breder dan het scherm, geen fouten. Voor de twee adressen
 in Tilburg uit dezelfde proef is geen regiobestand gelezen.

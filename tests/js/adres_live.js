@@ -7,16 +7,32 @@
 var chromium = require("playwright").chromium;
 var path = require("path");
 
+// Only the public test address and public buildings (town halls and town offices), so that no
+// address of a private person is sent to PDOK or stands in the repository.
 var ADDRESSES = [
   { typed: "Burg. van de Mortelplein 118a Tilburg", label: "Burgemeester van de Mortelplein 118a, 5037PL Tilburg" },
-  { typed: "Lage Ham 42 Dongen", label: "Lage Ham 42, 5102AC Dongen" },
-  { typed: "Tilburgseweg 172e Goirle", label: "Tilburgseweg 172e, 5051AM Goirle" },
-  { typed: "Tilburgseweg 172 Goirle", label: "Tilburgseweg 172, 5051AM Goirle" },
-  { typed: "Heuvelring 67-12 Tilburg", label: "Heuvelring 67-12, 5038CJ Tilburg" },
-  // Outside the core: the notices come from the file of the region (Zeeland, West-Brabant).
-  { typed: "Noordweg 402 Middelburg", label: "Noordweg 402, 4333KK Middelburg" },
-  { typed: "Prinsenkade 10 Breda", label: "Prinsenkade 10, 4811VB Breda" },
+  // The town hall of Dongen, and a small object with an addition on the same building.
+  { typed: "Hoge Ham 62 Dongen", label: "Hoge Ham 62, 5104JJ Dongen" },
+  { typed: "Hoge Ham 62-NU01 Dongen", label: "Hoge Ham 62-NU01, Dongen" },
+  // The town hall of Goirle.
+  { typed: "Oranjeplein 1 Goirle", label: "Oranjeplein 1, 5051LT Goirle" },
+  // Outside the core: the notices come from the file of the region (Zeeland, West-Brabant). The
+  // town offices of Middelburg and Breda, and in Breda also the part with a house letter.
+  { typed: "Kanaalweg 3 Middelburg", label: "Kanaalweg 3, 4337PA Middelburg", regio: "regio-zeeland.json", gemeente: "Middelburg" },
+  { typed: "Claudius Prinsenlaan 10 Breda", label: "Claudius Prinsenlaan 10, 4811DJ Breda", regio: "regio-west-brabant.json", gemeente: "Breda" },
+  { typed: "Claudius Prinsenlaan 10A Breda", label: "Claudius Prinsenlaan 10A, 4811DJ Breda" },
 ];
+
+/* A public building has no notices of its own as a rule. So that the search in the file of a region
+   is still tested, one made-up notice about each address outside the core is added to the file the
+   page reads; the file on disk is not touched. */
+function proefbericht(address) {
+  return { id: "proef-" + address.regio, bron: "officielebekendmakingen", publicatie: "Gemeenteblad", overheid: address.gemeente, gemeente: address.gemeente,
+    type: "vergunning", soort: null, fase: "Aanvraag", datum: "2026-11-16", titel: "Proefbericht: aanvraag omgevingsvergunning, " + address.label,
+    omschrijving: null, activiteiten: [], plaats: "", regio: address.regio === "regio-zeeland.json" ? "Zeeland" : "West-Brabant", afstandKm: 30,
+    locatieSoort: "gemeente", lat: null, lon: null, reactieTot: null, planId: null, url: "https://zoek.officielebekendmakingen.nl/proef.html", urlTekst: null,
+    klasse: "weggefilterd", score: 0, waarom: "Proefbericht.", signalen: [], woningen: null, perceelM2: null };
+}
 
 (async function () {
   var base = process.argv[2], shots = process.argv[3], proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
@@ -36,6 +52,11 @@ var ADDRESSES = [
   await page.route(/^https:\/\/service\.pdok\.nl\/kadaster\/plu\//, function (route) {
     plans++;
     return route.fulfill({ status: 200, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: "GetFeatureInfo results:\n\n  Search returned no results.\n" });
+  });
+  await page.route(/\/data\/regio-[a-z-]+\.json$/, async function (route) {
+    var file = await (await route.fetch()).json(), name = route.request().url().split("/").pop();
+    ADDRESSES.filter(function (address) { return address.regio === name; }).forEach(function (address) { file.berichten.unshift(proefbericht(address)); });
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(file) });
   });
   await page.goto(base + "/index.html#adres");
   await page.waitForSelector("#view-adres:not([hidden])");

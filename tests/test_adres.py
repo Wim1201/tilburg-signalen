@@ -118,11 +118,11 @@ class Huisnummers(unittest.TestCase):
 
     FORMS = [
         ("Sleutelbloem 16, 5102HH Dongen", "Sleutelbloem", [{"n": 16, "s": ""}], "5102hh"),
-        ("Lage Ham 42, 5102 AD Dongen", "Lage Ham", [{"n": 42, "s": ""}], "5102ad"),
+        ("Lage Teststraat 42, 9999 ZY Teststad", "Lage Teststraat", [{"n": 42, "s": ""}], "9999zy"),
         ("Heuvelstraat 6 A te Moergestel", "Heuvelstraat", [{"n": 6, "s": "a"}], None),
         ("Grotestraat 231 b te Waalwijk", "Grotestraat", [{"n": 231, "s": "b"}], None),
         ("Burgemeester van de Mortelplein 118a, 5037PL Tilburg", "Burgemeester van de Mortelplein", [{"n": 118, "s": "a"}], "5037pl"),
-        ("Tilburgseweg 172 e, 5051 AM Goirle, Goirle (GLE01) E 5983", "Tilburgseweg", [{"n": 172, "s": "e"}], "5051am"),
+        ("Teststraat 172 e, 9999 ZX Teststad, Teststad (TST01) E 5983", "Teststraat", [{"n": 172, "s": "e"}], "9999zx"),
         ("Emmastraat 40 a 1 te Goirle", "Emmastraat", [{"n": 40, "s": "a1"}], None),
         ("Dongepark 1V-3004, 5102DB Dongen", "Dongepark", [{"n": 1, "s": "v3004"}], "5102db"),
         ("Waspikse weg 17A, 5109RE 's Gravenmoer", "Waspikse weg", [{"n": 17, "s": "a"}], "5109re"),
@@ -134,7 +134,7 @@ class Huisnummers(unittest.TestCase):
         ("Wilhelminapark 141a, 141b, 5041EJ Tilburg", "Wilhelminapark", [{"n": 141, "s": "a"}, {"n": 141, "s": "b"}], "5041ej"),
         ("Hultenseweg 16 Tilburg", "Hultenseweg", [{"n": 16, "s": ""}], None),
         # Made up, forms that occur elsewhere:
-        ("Heuvelring 67-12, 5038CJ Tilburg", "Heuvelring", [{"n": 67, "s": "12"}], "5038cj"),
+        ("Teststraat 67-12, 9999ZZ Teststad", "Teststraat", [{"n": 67, "s": "12"}], "9999zz"),
         ("Kerkstr. 12 t/m 18 te Dongen", "Kerkstraat", [{"van": 12, "tot": 18}], None),
         ("Kerkstraat 12 tot en met 18", "Kerkstraat", [{"van": 12, "tot": 18}], None),
         ("Kerkstraat 12, 14 en 16 te Dongen", "Kerkstraat", [{"n": 12, "s": ""}, {"n": 14, "s": ""}, {"n": 16, "s": ""}], None),
@@ -197,10 +197,10 @@ class AdresUitDeZoeker(unittest.TestCase):
         self.assertEqual((where["lat"], where["lon"]), (51.55141136, 5.05750626))
 
     def test_the_parcel_is_the_one_of_this_letter_not_of_the_number(self):
-        # Real answers of 17-11-2026: on Tilburgseweg 172 in Goirle every letter has a parcel of its own.
-        docs = [{"weergavenaam": "Tilburgseweg 172, 5051AM Goirle", "huisnummer": 172, "gekoppeld_perceel": ["GLE01-E-1061"]},
-                {"weergavenaam": "Tilburgseweg 172a, 5051AM Goirle", "huisnummer": 172, "huisletter": "a", "gekoppeld_perceel": ["GLE01-E-2643"]},
-                {"weergavenaam": "Tilburgseweg 172e, 5051AM Goirle", "huisnummer": 172, "huisletter": "e", "gekoppeld_perceel": ["GLE01-E-5983"]}]
+        # Made up, in the form of real answers: on one number every letter can have a parcel of its own.
+        docs = [{"weergavenaam": "Teststraat 172, 9999ZX Teststad", "huisnummer": 172, "gekoppeld_perceel": ["TST01-E-1061"]},
+                {"weergavenaam": "Teststraat 172a, 9999ZX Teststad", "huisnummer": 172, "huisletter": "a", "gekoppeld_perceel": ["TST01-E-2643"]},
+                {"weergavenaam": "Teststraat 172e, 9999ZX Teststad", "huisnummer": 172, "huisletter": "e", "gekoppeld_perceel": ["TST01-E-5983"]}]
         found_addresses, = adres(["addresses", {"response": {"docs": docs}}])
         self.assertEqual([(a["huisletter"], a["percelen"][0]["nummer"]) for a in found_addresses], [("", 1061), ("a", 2643), ("e", 5983)])
         urls = adres(*[["perceelUrl", a["percelen"][0]] for a in found_addresses])
@@ -215,7 +215,7 @@ class AdresUitDeZoeker(unittest.TestCase):
         self.assertEqual(where["percelen"], [{"gemeente": "DGN01", "sectie": "I", "nummer": 2677}])
         self.assertIsNone(where["objectId"])
         self.assertIsNone(where["rd"])
-        bare, = adres(["addressFromDoc", {"weergavenaam": "Lage Ham 42, 5102AC Dongen", "huisnummer": 42}])
+        bare, = adres(["addressFromDoc", {"weergavenaam": "Teststraat 42, 9999ZY Teststad", "huisnummer": 42}])
         self.assertEqual((bare["percelen"], bare["lat"], bare["huisletter"]), ([], None, ""))
 
     def test_search_asks_for_addresses_near_tilburg_first_without_a_key(self):
@@ -358,8 +358,8 @@ class PublicatiesBijEenAdres(unittest.TestCase):
                  notice("a2", "Aanvraag Emmastraat 40a-2 Goirle", gemeente="Goirle"), notice("40", "Aanvraag Emmastraat 40 Goirle", gemeente="Goirle")]
         where = address("Emmastraat", 40, "a", "1", postcode="5051LN", gemeente="Goirle")
         self.assertEqual(found(items, where), {"adres": ["a1", "a-1"], "mogelijk": ["40"], "straat": []})
-        zeros = [notice("67-1", "Aanvraag Heuvelring 67-1 Tilburg"), notice("67-12", "Aanvraag Heuvelring 67-12 Tilburg")]
-        self.assertEqual(found(zeros, address("Heuvelring", 67, toevoeging="01"))["adres"], ["67-1"])
+        zeros = [notice("67-1", "Aanvraag Teststraat 67-1 Tilburg"), notice("67-12", "Aanvraag Teststraat 67-12 Tilburg")]
+        self.assertEqual(found(zeros, address("Teststraat", 67, toevoeging="01"))["adres"], ["67-1"])
 
     def test_ranges_and_lists_of_house_numbers(self):
         items = [notice("reeks", "Verduurzamen Predikherenlaan 529-721 Tilburg"), notice("lijst", "Aanvraag Predikherenlaan 601, 603 en 605 Tilburg"),
@@ -380,13 +380,13 @@ class PublicatiesBijEenAdres(unittest.TestCase):
         self.assertEqual(found(items, where), {"adres": ["zonder plek", "hier"], "mogelijk": [], "straat": []})
 
     def test_a_wrong_postcode_in_the_notice_does_not_hide_it(self):
-        # As in gmb-2026-532440: the notice says 5102 AD, the BAG says 5102 AC for Lage Ham 42 in Dongen.
-        where = address("Lage Ham", 42, postcode="5102AC", gemeente="Dongen", lat=51.63514482, lon=4.9335373)
-        near = notice("bij het adres", "Besluit voor bouwen van een woning op locatie Lage Ham 42, 5102 AD Dongen", gemeente="Dongen", lat=51.6351, lon=4.9336)
-        unplaced = notice("zonder plek", "Besluit op locatie Lage Ham 42, 5102 AD Dongen", gemeente="Dongen", locatieSoort="gemeente", lat=None, lon=None)
+        # Made up, as a notice of 16-11-2026 did: the notice gives another postcode than the BAG.
+        where = address("Teststraat", 42, postcode="9999ZX", gemeente="Dongen", lat=51.60014482, lon=4.9005373)
+        near = notice("bij het adres", "Besluit voor bouwen van een woning op locatie Teststraat 42, 9999 ZY Dongen", gemeente="Dongen", lat=51.6001, lon=4.9006)
+        unplaced = notice("zonder plek", "Besluit op locatie Teststraat 42, 9999 ZY Dongen", gemeente="Dongen", locatieSoort="gemeente", lat=None, lon=None)
         result, = adres(["findNotices", [near, unplaced], where, []])
         self.assertEqual([row["id"] for row in result["adres"]], ["bij het adres"])
-        self.assertEqual(result["adres"][0]["reden"], "Het bericht noemt postcode 5102 AD; het adres heeft 5102 AC.")
+        self.assertEqual(result["adres"][0]["reden"], "Het bericht noemt postcode 9999 ZY; het adres heeft 9999 ZX.")
         self.assertEqual([row["id"] for row in result["mogelijk"]], ["zonder plek"])
 
     def test_longer_street_name_does_not_match(self):
@@ -399,14 +399,14 @@ class PublicatiesBijEenAdres(unittest.TestCase):
         self.assertEqual(found(items, address("Kapelmeesterlaan", 3)), {"adres": [], "mogelijk": [], "straat": ["straat"]})
 
     def test_notice_on_the_same_parcel_without_the_address_in_its_text(self):
-        where = address("Lage Ham", 42, gemeente="Dongen", lat=51.6351, lon=4.9335)
-        items = [notice("getekend", "Aanvraag omgevingsvergunning, Ingetekende geometrie", gemeente="Dongen", lat=51.63512, lon=4.93355),
-                 notice("oud nummer", "Termijnverlenging voor bouwen van een woning op locatie Lage Ham 40", gemeente="Dongen", lat=51.63508, lon=4.93349),
-                 notice("buren", "Dakkapel Lage Ham 44 Dongen", gemeente="Dongen", lat=51.6356, lon=4.9335),
-                 notice("zonder plek", "Aanvraag omgevingsvergunning Dongen", gemeente="Dongen", locatieSoort="gemeente", lat=51.6351, lon=4.9335)]
-        self.assertEqual(found(items, where, [square(4.9335, 51.6351)]), {"adres": [], "mogelijk": ["getekend", "oud nummer"], "straat": []})
+        where = address("Teststraat", 42, gemeente="Dongen", lat=51.6001, lon=4.9005)
+        items = [notice("getekend", "Aanvraag omgevingsvergunning, Ingetekende geometrie", gemeente="Dongen", lat=51.60012, lon=4.90055),
+                 notice("oud nummer", "Termijnverlenging voor bouwen van een woning op locatie Teststraat 40", gemeente="Dongen", lat=51.60008, lon=4.90049),
+                 notice("buren", "Dakkapel Teststraat 44 Dongen", gemeente="Dongen", lat=51.6006, lon=4.9005),
+                 notice("zonder plek", "Aanvraag omgevingsvergunning Dongen", gemeente="Dongen", locatieSoort="gemeente", lat=51.6001, lon=4.9005)]
+        self.assertEqual(found(items, where, [square(4.9005, 51.6001)]), {"adres": [], "mogelijk": ["getekend", "oud nummer"], "straat": []})
         self.assertEqual(found(items, where), {"adres": [], "mogelijk": [], "straat": []})  # without the parcel there is nothing to go by
-        result, = adres(["findNotices", items, where, [square(4.9335, 51.6351)]])
+        result, = adres(["findNotices", items, where, [square(4.9005, 51.6001)]])
         self.assertEqual(result["mogelijk"][0]["reden"], "De tekst noemt dit adres niet, maar de locatie van het bericht ligt op hetzelfde perceel.")
 
     def test_filtered_out_notices_are_searched_too_and_every_class_is_kept(self):
@@ -521,8 +521,8 @@ def playwright_available():
 @unittest.skipUnless(os.environ.get("TILBURG_ADRES_LIVE") and playwright_available(),
                      "alleen op verzoek, tegen de echte bronnen: TILBURG_ADRES_LIVE=1 python -m unittest tests.test_adres.EchteBronnen")
 class EchteBronnen(unittest.TestCase):
-    """The tab against the real registers of PDOK, with real addresses in Tilburg, Dongen and Goirle,
-    at 320 px. Not part of the normal run: it fails when PDOK does not answer, and the registers
+    """The tab against the real registers of PDOK, with the public test address and public buildings
+    (town halls and town offices in Dongen, Goirle, Middelburg and Breda), at 320 px. Not part of the normal run: it fails when PDOK does not answer, and the registers
     change over time. With TILBURG_ADRES_SHOTS=<map> the script also saves screenshots there."""
 
     @classmethod
@@ -571,31 +571,35 @@ class EchteBronnen(unittest.TestCase):
                 self.assertEqual(entry["map"]["shapes"], len(entry["parcels"]))
                 self.assertLessEqual(entry["overflow"], 0)
 
-    def test_an_addition_gives_its_own_parcel(self):
-        with_letter = self.by_label["Tilburgseweg 172e, 5051AM Goirle"]["parcels"]
-        without = self.by_label["Tilburgseweg 172, 5051AM Goirle"]["parcels"]
-        self.assertEqual(len(with_letter), 1)
-        self.assertTrue(with_letter[0]["Aanduiding"].startswith("Goirle E "))
-        self.assertNotIn(with_letter[0]["Aanduiding"], [parcel["Aanduiding"] for parcel in without])
-        self.assertEqual(self.by_label["Tilburgseweg 172e, 5051AM Goirle"]["name"], "Tilburgseweg 172e")
-        self.assertEqual(self.by_label["Heuvelring 67-12, 5038CJ Tilburg"]["name"], "Heuvelring 67-12")
+    def test_a_letter_and_an_addition_keep_their_own_address(self):
+        # A house letter is an address object of its own, with its own size; in the same building it
+        # lies on the same parcel. That a letter can have a parcel of its own is tested with made-up
+        # answers (Adressen.test_the_parcel_is_the_one_of_this_letter_not_of_the_number).
+        letter = self.by_label["Claudius Prinsenlaan 10A, 4811DJ Breda"]
+        number = self.by_label["Claudius Prinsenlaan 10, 4811DJ Breda"]
+        self.assertEqual(letter["name"], "Claudius Prinsenlaan 10A")
+        self.assertNotEqual(letter["bag"]["Oppervlakte"], number["bag"]["Oppervlakte"])
+        self.assertEqual(letter["parcels"], number["parcels"])
+        addition = self.by_label["Hoge Ham 62-NU01, Dongen"]
+        self.assertEqual(addition["name"], "Hoge Ham 62-NU01")
+        self.assertEqual(addition["parcels"], self.by_label["Hoge Ham 62, 5104JJ Dongen"]["parcels"])
 
     def test_addresses_outside_the_core_find_the_notices_of_their_region(self):
-        # With the region files as they are in the repository (run of 17-11-2026) each of these two
-        # addresses has a notice of 16-11-2026. The app itself shows the core; the tab reads the file.
-        for label, regio, file in (("Noordweg 402, 4333KK Middelburg", "Zeeland", "regio-zeeland.json"),
-                                   ("Prinsenkade 10, 4811VB Breda", "West-Brabant", "regio-west-brabant.json")):
+        # adres_live.js adds one made-up notice about each of these two addresses to the file of its
+        # region, as the page reads it. The app itself shows the core; the tab reads the file.
+        for label, regio, file in (("Kanaalweg 3, 4337PA Middelburg", "Zeeland", "regio-zeeland.json"),
+                                   ("Claudius Prinsenlaan 10, 4811DJ Breda", "West-Brabant", "regio-west-brabant.json")):
             with self.subTest(adres=label):
                 entry = self.by_label[label]
                 self.assertEqual(entry["regionFiles"], [file])
                 self.assertIn("en die van " + regio, entry["searched"])
                 self.assertTrue(entry["notices"].get("Dit adres"), "geen publicatie over dit adres gevonden")
-        for label in ("Heuvelring 67-12, 5038CJ Tilburg", "Burgemeester van de Mortelplein 118a, 5037PL Tilburg"):
-            self.assertEqual(self.by_label[label]["regionFiles"], [], "voor een adres in Tilburg is een regiobestand gelezen")
+        for label in ("Hoge Ham 62-NU01, Dongen", "Burgemeester van de Mortelplein 118a, 5037PL Tilburg"):
+            self.assertEqual(self.by_label[label]["regionFiles"], [], "voor een adres in de kern is een regiobestand gelezen")
 
     def test_tilburg_and_dongen(self):
         tilburg = self.by_label["Burgemeester van de Mortelplein 118a, 5037PL Tilburg"]
-        dongen = self.by_label["Lage Ham 42, 5102AC Dongen"]
+        dongen = self.by_label["Hoge Ham 62, 5104JJ Dongen"]
         self.assertTrue(all(parcel["Aanduiding"].startswith("Tilburg ") for parcel in tilburg["parcels"]))
         self.assertTrue(all(parcel["Aanduiding"].startswith("Dongen ") for parcel in dongen["parcels"]))
         self.assertEqual(tilburg["links"][0], "https://www.ep-online.nl/Energylabel/Search")
@@ -887,14 +891,14 @@ class Energielabel(unittest.TestCase):
     def test_the_address_goes_along_in_the_body_as_the_worker_expects_it(self):
         self.assertEqual(self.ask(self.WORKER), (self.WORKER + "/", {"postcode": "5037PL", "huisnummer": "118", "huisletter": "a"}))
         self.assertEqual(self.ask(self.WORKER + "/"), (self.WORKER + "/", {"postcode": "5037PL", "huisnummer": "118", "huisletter": "a"}))
-        self.assertEqual(self.ask(self.WORKER, {"postcode": "4333KK", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}),
-                         (self.WORKER + "/", {"postcode": "4333KK", "huisnummer": "402", "toevoeging": "2"}))
+        self.assertEqual(self.ask(self.WORKER, {"postcode": "9999ZZ", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}),
+                         (self.WORKER + "/", {"postcode": "9999ZZ", "huisnummer": "402", "toevoeging": "2"}))
         self.assertEqual(self.ask(self.WORKER, {"postcode": "5037PL", "huisnummer": 12, "huisletter": "B", "toevoeging": "bis"}),
                          (self.WORKER + "/", {"postcode": "5037PL", "huisnummer": "12", "huisletter": "B", "toevoeging": "bis"}))
 
     def test_the_address_is_never_in_the_url_of_the_request(self):
         # The url of a request can be recorded on the way (Cloudflare did so on 18-11-2026); a body is not.
-        for address in (self.ADDRESS, {"postcode": "4333KK", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}):
+        for address in (self.ADDRESS, {"postcode": "9999ZZ", "huisnummer": 402, "huisletter": "", "toevoeging": "2"}):
             url = adres(["energielabelVraag", self.WORKER + "/pad/", address])[0]["url"]
             self.assertEqual(url, self.WORKER + "/pad/")
             for part in ("?", "postcode", str(address["huisnummer"]), address["postcode"]):

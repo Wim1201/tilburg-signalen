@@ -8,6 +8,7 @@
 | Brondata | `site/data/berichten.json` zoals het in de repo staat (bijgewerkt 16-11-2026, 15:37 uur, 1.116 berichten); antwoorden van PDOK van 17-11-2026 tussen 16:53 en 17:20 uur |
 | Van / aan | Claude Code aan Wim |
 | Vervolg op | `tilburg-signalen_verslag_video_16-11-2026.md` |
+| Aangepast | 20-11-2026: de proefadressen van woningen zijn uit dit verslag gehaald en vervangen door een omschrijving (woning A in Dongen, woningen B en C in Goirle, appartement D in Tilburg). De livetest gebruikt sinds die dag openbare gebouwen; zie `tilburg-signalen_verslag_proefadressen_20-11-2026.md` |
 
 ## Stand
 
@@ -133,8 +134,8 @@ indicatie van de ligging en de grootte. Er zijn geen maten aan te ontlenen."
 | Het tabblad staat in eigen bestanden; `app.js` wisselt er alleen naartoe | Het ochtendscherm en de drie bestaande tabbladen blijven zoals ze zijn. Wat het tabblad nodig heeft, wordt pas opgevraagd als je er iets typt |
 | Publicaties worden gezocht in de berichten die de app al geladen heeft (`data/berichten.json`) | Daarin staan alle berichten, ook de weggefilterde (1.012 van de 1.116). Er gaat geen extra verzoek uit en de verversing verandert niet. **`cache/ophaalcache.json` wordt niet gelezen**: dat bestand staat niet op de site, dus de browser kan er niet bij. Het is niet aangeraakt |
 | Het tabblad schrijft nergens iets weg | Geen opslag op het toestel, geen verzoek dat iets wijzigt. Een test bewaakt dat zoeken de berichten ongewijzigd laat |
-| Het perceel komt uit de koppeling tussen adres en perceel van het Kadaster, niet uit het punt op de kaart | De Locatieserver geeft per adres het gekoppelde perceel, per huisletter. Tilburgseweg 172 in Goirle heeft perceel E 1061, 172e heeft E 5983. Het adrespunt alleen kan net op het perceel van de buren vallen |
-| Staat die koppeling er niet, dan het perceel op de plek van het adrespunt, met een regel die dat zegt | Kwam voor bij Lage Ham 42 in Dongen (nieuwbouw). Zonder die terugval was er geen perceel |
+| Het perceel komt uit de koppeling tussen adres en perceel van het Kadaster, niet uit het punt op de kaart | De Locatieserver geeft per adres het gekoppelde perceel, per huisletter. Bij woning B in Goirle hoort een ander perceel dan bij woning C, met hetzelfde huisnummer en een huisletter. Het adrespunt alleen kan net op het perceel van de buren vallen |
+| Staat die koppeling er niet, dan het perceel op de plek van het adrespunt, met een regel die dat zegt | Kwam voor bij woning A in Dongen (nieuwbouw). Zonder die terugval was er geen perceel |
 | De grootte is de grootte die het Kadaster registreert, niet uit het kaartje gemeten | Dat is het officiële getal. Erachter staat "vastgesteld" of "voorlopig", zoals de bron het geeft. De waarschuwing staat er direct onder |
 | Het kaartje is het officiële kaartbeeld van de kadastrale kaart met het perceel eroverheen getekend | Eén afbeelding geeft perceelgrenzen, perceelnummers, gebouwen en huisnummers. Het perceel zelf tekent de app, zodat het ook zichtbaar is als de afbeelding niet komt |
 | Het kaartje heeft ook in het donkere thema een witte ondergrond | De kaartdienst tekent zwart op wit |
@@ -207,10 +208,10 @@ Dit blijft de zwakste schakel. Een gemist bericht is in de app niet te zien.
 | Adres | Pand volgens BAG | Perceel | Publicaties in de app |
 |---|---|---|---|
 | Burgemeester van de Mortelplein 118a, Tilburg | 1962, gezondheidszorgfunctie, 280 m², verbouwing pand | Twee gekoppelde percelen: Tilburg Q 4688 (46 m²) en Q 4489 (248 m²) | Dit adres: 2 (aanvraag 10-11, besluit 13-11) |
-| Lage Ham 42, Dongen | 2027, woonfunctie, 173 m², bouwvergunning verleend | Dongen B 5732 (382 m², voorlopig), bepaald op de plek van het adrespunt | Dit adres: 1 (besluit 16-11, met de opmerking over de postcode). Mogelijk: 1 (termijnverlenging "Lage Ham 40" van 15-10, op hetzelfde perceel). Zelfde straat: 1 |
-| Tilburgseweg 172e, Goirle | 2024, woonfunctie, 304 m², pand in gebruik | Goirle E 5983 (2.510 m²) | Dit adres: 1 (04-11; het bericht noemt zelf perceel E 5983) |
-| Tilburgseweg 172, Goirle | 1921, woonfunctie, 262 m², pand in gebruik | Goirle E 1061 (2.580 m²) | Mogelijk: 2 (berichten over 172c en 172e, met de reden erbij) |
-| Heuvelring 67-12, Tilburg | 1982, woonfunctie, 62 m², pand in gebruik | Tilburg M 10348 (527 m²), het grondperceel van het gebouw | Geen |
+| Woning A, Dongen | 2027, woonfunctie, bouwvergunning verleend | Eén perceel (voorlopig), bepaald op de plek van het adrespunt | Dit adres: 1 (besluit 16-11, met de opmerking over de postcode). Mogelijk: 1 (termijnverlenging met een ander huisnummer van 15-10, op hetzelfde perceel). Zelfde straat: 1 |
+| Woning B (met huisletter), Goirle | 2024, woonfunctie, pand in gebruik | Eén perceel, een ander dan bij C | Dit adres: 1 (04-11; het bericht noemt zelf het perceel) |
+| Woning C (zelfde nummer, zonder letter), Goirle | 1921, woonfunctie, pand in gebruik | Eén perceel | Mogelijk: 2 (berichten over twee adressen met een huisletter, met de reden erbij) |
+| Appartement D (met toevoeging), Tilburg | 1982, woonfunctie, pand in gebruik | Het grondperceel van het gebouw | Geen |
 
 Bij alle vijf: het kaartbeeld geladen, het perceel getekend, niets breder dan het scherm, geen
 fouten, en alleen verzoeken naar `api.pdok.nl` en `service.pdok.nl`.
@@ -234,7 +235,7 @@ Tests: twee voor de tekst (de gebruikelijke getallen, andere getallen, ontbreken
 de getallen in het gegevensbestand die van `config.json` zijn) en één in de browser op 320 pixels:
 de regel is het eerste in het blok en staat er één keer, ook bij een adres zonder publicaties, waar
 daarna "Geen publicaties over … in de berichten van de app." volgt. Bekeken op een schermafbeelding
-van Heuvelring 67-12 in Tilburg (geen publicaties): de regel beslaat daar vijf regels tekst.
+van appartement D in Tilburg (geen publicaties): de regel beslaat daar vijf regels tekst.
 
 ## Samengevoegd en live (17-11-2026, 18:19 – 18:22 uur)
 
@@ -281,9 +282,9 @@ op zijn telefoon.
 
 | Tijdstip | Wat | Wat ermee gedaan is |
 |---|---|---|
-| rond 17:08 uur | **Een bericht met een andere postcode dan de BAG.** Het besluit van 16-11 voor Lage Ham 42 in Dongen noemt "5102 AD"; de BAG geeft 5102 AC. De eerste versie verwierp het bericht daarom als "dezelfde straatnaam in een andere plaats" | Een afwijkende postcode verwerpt een bericht niet meer als het op de plek van het adres ligt. Het staat onder "Dit adres" met de opmerking "Het bericht noemt postcode 5102 AD; het adres heeft 5102 AC." Test toegevoegd |
-| rond 17:08 uur | **Hetzelfde perceel, ander huisnummer.** Een termijnverlenging van 15-10 noemt "Lage Ham 40" en ligt op het perceel van Lage Ham 42 | Staat onder "Mogelijk dit adres". Zonder het koppelen op ligging was dit bericht gemist |
-| rond 17:08 uur | **Lage Ham 42 is in de bron niet aan een perceel gekoppeld** | De terugval op de plek van het adrespunt gaf het perceel; het tabblad zegt dat erbij |
+| rond 17:08 uur | **Een bericht met een andere postcode dan de BAG.** Het besluit van 16-11 voor woning A in Dongen noemt een andere postcode dan de BAG. De eerste versie verwierp het bericht daarom als "dezelfde straatnaam in een andere plaats" | Een afwijkende postcode verwerpt een bericht niet meer als het op de plek van het adres ligt. Het staat onder "Dit adres" met de opmerking "Het bericht noemt postcode …; het adres heeft …." Test toegevoegd |
+| rond 17:08 uur | **Hetzelfde perceel, ander huisnummer.** Een termijnverlenging van 15-10 noemt een ander huisnummer in dezelfde straat en ligt op het perceel van woning A | Staat onder "Mogelijk dit adres". Zonder het koppelen op ligging was dit bericht gemist |
+| rond 17:08 uur | **Woning A is in de bron niet aan een perceel gekoppeld** | De terugval op de plek van het adrespunt gaf het perceel; het tabblad zegt dat erbij |
 | rond 17:15 uur | **Bij een heel groot perceel zou het kaartbeeld leeg zijn.** De kaartdienst tekent niets boven schaal 1:6000. Een test met een perceel van ruim een kilometer liet zien dat de eerste versie daaroverheen ging | De afbeelding wordt groter gevraagd naarmate het kader breder is, tot 2.048 pixels (goed voor ruim 2,8 kilometer). Daarboven blijft alleen de getekende omtrek over |
 | rond 17:17 uur | **Eén browsertest las het scherm uit voordat het tabblad gewisseld was** en faalde daardoor bij één van de runs | De test wacht nu tot het tabblad zichtbaar is |
 
@@ -318,7 +319,7 @@ vanuit de testbrowser niet te bekijken.
   is onaangeroerd.
 - **Wat Wim zelf wil nakijken** (uit de opdracht): of een adres met een toevoeging het goede perceel
   geeft; of de publicaties bij een adres kloppen; of het tabblad op de telefoon bruikbaar is. Voor
-  het eerste punt is Tilburgseweg 172 tegenover 172e in Goirle een goede proef.
+  het eerste punt is woning C tegenover woning B in Goirle een goede proef (het adres staat niet meer in de repo; de livetest gebruikt nu een huisletter in het stadskantoor van Breda).
 - **Het tabblad Bronnen noemt de drie registers van het tabblad Adres niet.** Die lijst komt uit
   `signalen/bronnen.json` en de verversing; die zijn bewust niet aangeraakt. De bronnen staan op het
   tabblad Adres zelf, in elk vak.
