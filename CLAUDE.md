@@ -25,6 +25,7 @@ Niet doen
 * Je kunt geen workflow starten (403); handmatige runs start Wim zelf.
 * Geen sleutels in code, tests, logs of verslagen. Vraag Wim nooit een sleutel in een chat te plakken.
 * Geen adressen van Wim, zijn familie of bezoekers in de repo. Alleen openbare testadressen.
+* Proefadressen: het openbare testadres (Burgemeester van de Mortelplein 118a) en openbare gebouwen (gemeentehuizen, stadskantoren, het stadhuis). In unit-tests verzonnen adressen: Teststraat, Teststad, postcodes 9999 ZX/ZY/ZZ. Nooit een woning of bedrijf als proefadres.
 * Tests (ook de livetests) roepen nooit de echte energielabel-Worker of EP-Online aan. Gebruik nagespeelde antwoorden.
 * Niet onderzoeken: de Vlaamse bron.
 

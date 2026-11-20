@@ -9,9 +9,9 @@ var A = require("../../site/adres.js");
 var PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 var ADDRESS = A.addresses(fixtures.suggest)[0];
 var TYPED = "Burg. van de Mortelplein 118a";
-// An address outside the core: Noordweg 402 in Middelburg, a municipality of the region Zeeland.
+// An address outside the core: the town office of Middelburg (a public building), in the region Zeeland.
 var OUTSIDE = A.addresses(fixtures.buitenKern.suggest)[0];
-var TYPED_OUTSIDE = "Noordweg 402 Middelburg";
+var TYPED_OUTSIDE = "Kanaalweg 3 Middelburg";
 // The energy label Worker (tools/energielabel) as the app would be set to it; the answers are played here.
 var LABEL_WORKER = "https://energielabel.worker.test";
 var LABEL_FOUND = { status: 200, body: { status: "gevonden", klasse: "A+", registratiedatum: "2023-06-12", geldigTot: "2033-06-12", gebouw: "Woningbouw" } };
@@ -37,8 +37,8 @@ function addNotices(data) {
     }, extra || {});
   }
   // A notice about the address outside the core: it belongs in the file of its region, not in the core.
-  data.regioTest = notice("test-regio-zeeland", "Aanvraag omgevingsvergunning reguliere procedure Noordweg 402, 4333 KK Middelburg",
-    { gemeente: "Middelburg", overheid: "Middelburg", regio: "Zeeland", lat: OUTSIDE.lat, lon: OUTSIDE.lon, afstandKm: 103.1 });
+  data.regioTest = notice("test-regio-zeeland", "Aanvraag omgevingsvergunning reguliere procedure Kanaalweg 3, 4337 PA Middelburg",
+    { gemeente: "Middelburg", overheid: "Middelburg", regio: "Zeeland", lat: OUTSIDE.lat, lon: OUTSIDE.lon, afstandKm: 102.0 });
   data.berichten = [
     notice("test-adres-zelf", "Aanvraag omgevingsvergunning, Burg. van de Mortelplein 118A, 5037 PL Tilburg"),
     notice("test-adres-zonder", "Besluit omgevingsvergunning, Burgemeester van de Mortelplein 118 te Tilburg", { fase: "Verleend", klasse: "onzeker", waarom: "Sloop, maar de perceelgrootte is niet te bepalen.", datum: "2026-11-03" }),
