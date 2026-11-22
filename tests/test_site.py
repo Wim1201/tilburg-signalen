@@ -711,9 +711,10 @@ class Pagina(unittest.TestCase):
         """The report copies every box of the tab "Adres"; a box added later comes along by itself.
         So the code of the report names none of the boxes, and holds no address."""
         code = read("rapport.js")
-        boxes = re.findall(r'<section class="vak" aria-labelledby="(kop-[\w-]+)">', self.html)
-        self.assertGreaterEqual(len(boxes), 5)
-        for box in boxes + [box.replace("kop-", "", 1) for box in boxes]:
+        boxes = re.findall(r'<section class="vak"[^>]*aria-labelledby="(kop-[\w-]+)"', self.html)
+        self.assertGreaterEqual(len(boxes), 6)
+        ids = re.findall(r'<section class="vak" id="([\w-]+)"', self.html)
+        for box in boxes + [box.replace("kop-", "", 1) for box in boxes] + ids:
             with self.subTest(vak=box):
                 self.assertNotIn(box, code)
         self.assertNotRegex(code, r"\b\d{4} ?[A-Z]{2}\b", "een postcode in de code van het rapport")
@@ -1817,7 +1818,7 @@ class InDeBrowser(unittest.TestCase):
         self.assertIn("Proefvak", paper["vakken"], "een vak dat later is toegevoegd, komt niet mee")
         self.assertTrue(paper["testBox"], "de verborgen waarschuwing van het nieuwe vak staat niet op papier")
         self.assertFalse(paper["onlyScreen"], "wat alleen voor het scherm is, staat op papier")
-        self.assertEqual(paper["lines"], 12)
+        self.assertEqual(paper["lines"], 8)
         self.assertTrue(all(stand.startswith("Opgevraagd op ") for stand in paper["stands"]))
         self.assertEqual(len(paper["stands"]), len(paper["vakken"]))
 
@@ -1858,7 +1859,11 @@ class InDeBrowser(unittest.TestCase):
     def test_boxes_are_not_broken_and_the_paper_is_a4(self):
         report = self.seen["adres"]["rapport"]
         self.assertTrue(report["print"]["unbroken"])
+        # Only a box with many notices or list items may run over a page; the lists at the end may too.
+        self.assertEqual([name for name in report["print"]["longBoxes"] if name not in ("Bronnen en beperkingen", "Links")], ["Publicaties over dit adres"])
         self.assertGreaterEqual(report["pdfPages"], 2)
+        # Compact: the test address with every box and a test box was six pages on 20-11-2026.
+        self.assertLessEqual(report["pdfPages"], 5)
 
     def test_the_title_holds_the_address_only_while_printing(self):
         report = self.seen["adres"]["rapport"]
@@ -1880,6 +1885,88 @@ class InDeBrowser(unittest.TestCase):
         self.assertNotEqual(other["view"], "none")
         self.assertEqual(other["tabs"], "none")
 
+    # --- The location report (adres-app.js, rapport.js): from a card, the tab "Adres" filled from
+    # the notice, on paper with the same set-up. Made-up notices about the public test address.
+
+    def test_the_location_report_starts_from_a_card_and_fills_the_tab(self):
+        places = self.seen["adres"]["locatie"]
+        self.assertEqual(places["errors"], [])
+        self.assertEqual(places["elsewhere"], [], "het locatierapport vraagt iets op bij een andere dienst")
+        for name in ("adres", "punt", "benaderd", "gemeente", "weg"):
+            with self.subTest(locatie=name):
+                screen = places[name]["screen"]
+                self.assertEqual((screen["rapport"], screen["hash"], screen["input"]), ("locatie", "#adres", ""))
+                self.assertEqual(screen["vakken"][0], "Bekendmaking")
+                self.assertEqual(screen["failed"], 0)
+                self.assertLessEqual(screen["overflow"], 0)
+                self.assertTrue(screen["title"].startswith("Proeflocatie"))
+                self.assertEqual(set(screen["facts"]), {"Soort", "Gemeente", "Datum", "Plek"})
+                self.assertEqual(screen["links"], ["https://zoek.officielebekendmakingen.nl/test-locatie-%s.html" % name])
+                self.assertTrue(any(note.startswith("Bron: Gemeenteblad Tilburg, gepubliceerd op ") for note in screen["notes"]))
+        self.assertEqual(places["printed"], 5)
+
+    def test_a_notice_with_one_address_gets_every_box_of_the_address(self):
+        found = self.seen["adres"]["locatie"]["adres"]["screen"]
+        self.assertEqual(found["vakken"], ["Bekendmaking", "Pand (BAG)", "Kadastraal perceel", "Publicaties over dit adres", "Energielabel", "Bestemmingsplan en omgevingsplan"])
+        self.assertEqual((found["name"], found["sub"]), (self.seen["adres"]["name"], self.seen["adres"]["sub"]))
+        self.assertIn("Adres afgeleid uit de tekst van de bekendmaking", " ".join(found["notes"]))
+        self.assertEqual(found["warnings"], [])
+
+    def test_the_notice_is_summarised_not_copied(self):
+        found = self.seen["adres"]["locatie"]["adres"]["screen"]
+        self.assertTrue(found["summary"].startswith("Uit de omschrijving: Proeflocatie."))
+        self.assertTrue(found["summary"].endswith(" …"))
+        self.assertLess(len(found["summary"]), 320)
+        self.assertNotIn("want de volledige tekst staat daar", found["text"])
+
+    def test_a_notice_without_one_address_uses_its_point_and_says_so(self):
+        point = self.seen["adres"]["locatie"]["punt"]["screen"]
+        self.assertEqual(point["vakken"], ["Bekendmaking", "Kadastraal perceel", "Bestemmingsplan en omgevingsplan"])
+        self.assertEqual(point["plan"], "gevonden")
+        text = " ".join(point["warnings"])
+        self.assertIn("Geen eenduidig adres.", text)
+        self.assertIn("beperkte nauwkeurigheid", text)
+        self.assertIn("Pand (BAG), energielabel en publicaties over het adres zijn daarom overgeslagen.", text)
+        self.assertTrue(any(note.startswith("Dit is het perceel op het punt uit de bekendmaking.") for note in point["parcelNote"]))
+
+    def test_an_uncertain_place_or_class_gets_a_clear_warning(self):
+        places = self.seen["adres"]["locatie"]
+        approximate = " ".join(places["benaderd"]["screen"]["warnings"])
+        self.assertIn("De plek is niet vastgesteld.", approximate)
+        self.assertEqual(places["benaderd"]["screen"]["vakken"], ["Bekendmaking"])
+        municipality = " ".join(places["gemeente"]["screen"]["warnings"])
+        self.assertIn("De plek is niet vastgesteld. De bekendmaking noemt alleen de gemeente Tilburg.", municipality)
+        self.assertIn("Onzeker bericht (op het kaartje een witte cirkel)", municipality)
+        self.assertEqual(places["gemeente"]["screen"]["vakken"], ["Bekendmaking"])
+        self.assertIn("Onzeker bericht (op het kaartje een witte cirkel)", " ".join(places["punt"]["screen"]["warnings"]))
+
+    def test_a_filtered_out_notice_only_behind_the_switch(self):
+        places = self.seen["adres"]["locatie"]
+        self.assertEqual(places["removedHidden"], 0, "een weggefilterd bericht is te zien zonder de schakelaar")
+        self.assertIn("Dit bericht is in de ranglijst weggefilterd", " ".join(places["weg"]["screen"]["warnings"]))
+
+    def test_the_location_report_on_paper(self):
+        places = self.seen["adres"]["locatie"]
+        for name in ("adres", "punt", "benaderd", "gemeente", "weg"):
+            with self.subTest(locatie=name):
+                paper, screen = places[name]["paper"], places[name]["screen"]
+                self.assertEqual(paper["h1"], "Locatierapport")
+                self.assertEqual(paper["headings"], ["Lees dit eerst"] + screen["vakken"] + ["Eigen aantekeningen", "Bronnen en beperkingen", "Links"])
+                self.assertEqual(len(paper["first"]), 5)
+                self.assertIn("De volledige tekst", paper["first"][-1])
+                self.assertEqual(paper["missing"], [], "een waarschuwing of bron van het scherm staat niet op papier")
+                self.assertEqual(paper["hidden"], 0)
+                self.assertTrue(paper["shown"])
+                self.assertFalse(paper["tabs"])
+                self.assertTrue(paper["title"].startswith("Locatierapport "))
+                self.assertTrue(paper["sources"][0].startswith("Adres: afgeleid uit de bekendmaking, opgevraagd op "))
+                self.assertTrue(any(line.startswith("Bekendmaking: opgevraagd op ") for line in paper["sources"]))
+                self.assertIn("https://zoek.officielebekendmakingen.nl/test-locatie-%s.html" % name, paper["urls"])
+        self.assertLessEqual(places["adres"]["pdfPages"], 5)
+
+    def test_a_typed_address_after_a_location_report_is_an_address_report_again(self):
+        after = self.seen["adres"]["locatie"]["daarna"]
+        self.assertEqual(after, {"rapport": None, "notice": False, "vakken": 5})
 
 if __name__ == "__main__":
     unittest.main()

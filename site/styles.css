@@ -252,6 +252,8 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 .vak h3 { margin: 0 0 8px; }
 .vak-inhoud { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .vak-inhoud .ghost { align-self: flex-start; }
+.details-body .rapport-locatie { align-self: flex-start; margin-top: 2px; }
+.vak-inhoud .samenvatting { color: var(--muted); }
 .vak-inhoud .links a { display: inline-block; }
 .planblok { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .planblok + .planblok { border-top: 1px solid var(--line); padding-top: 8px; }
@@ -301,7 +303,7 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
    With the tab "Adres" open and the report built, only the report is printed. */
 @page {
   size: A4;
-  margin: 16mm 15mm 18mm;
+  margin: 13mm 14mm 15mm;
   @bottom-right { content: "Pagina " counter(page) " van " counter(pages); font: 8pt "Instrument Sans", system-ui, sans-serif; color: #444; }
 }
 @media print {
@@ -320,19 +322,24 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
   main:has(> #view-adres:not([hidden])) > #adres-rapport.klaar { display: block; }
 
   .rapport { color: #000000; font-size: 10pt; }
-  .rapport h1 { font: 800 20pt/1.1 var(--font-display); margin: 0 0 2mm; }
-  .rapport h2 { font: 700 12.5pt/1.2 var(--font-display); margin: 0 0 2.5mm; break-after: avoid; page-break-after: avoid; }
-  .rapport-kop { border-bottom: 1.5pt solid #000000; padding-bottom: 3mm; margin-bottom: 4mm; }
-  .rapport-merk { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 1mm; }
-  .rapport-adres { font: 700 14pt/1.2 var(--font-display); margin: 0; }
-  .rapport-sub, .rapport-tijd { margin: 1mm 0 0; }
-  .rapport-vak { border: 0.75pt solid #999999; border-radius: 2mm; padding: 3.5mm 4mm; margin: 0 0 4mm; break-inside: avoid; page-break-inside: avoid; }
-  .rapport-eerst { border: 1.5pt solid #000000; }
+  /* Compact, with white instead of frames: a thin rule above each box, no box around it. Only
+     "Lees dit eerst" and the warnings keep a frame. Warnings and source lines keep their size. */
+  .rapport h1 { font: 800 17pt/1.1 var(--font-display); margin: 0 0 1mm; }
+  .rapport h2 { font: 700 11.5pt/1.2 var(--font-display); margin: 0 0 1.5mm; break-after: avoid; page-break-after: avoid; }
+  .rapport-kop { border-bottom: 1.5pt solid #000000; padding-bottom: 2mm; margin-bottom: 3.5mm; }
+  .rapport-merk { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 0.5mm; }
+  .rapport-adres { font: 700 13pt/1.2 var(--font-display); margin: 0; }
+  .rapport-sub, .rapport-tijd { margin: 0.5mm 0 0; }
+  .rapport-vak { border-top: 0.75pt solid #999999; padding: 2.5mm 0 0; margin: 0 0 5mm; break-inside: avoid; page-break-inside: avoid; display: flow-root; }
+  .rapport-vak.rapport-lang { break-inside: auto; page-break-inside: auto; }
+  .rapport-stand { break-after: avoid; page-break-after: avoid; }
+  .rapport-lang li { break-inside: avoid; page-break-inside: avoid; }
+  .rapport-eerst { border: 1.5pt solid #000000; border-radius: 2mm; padding: 2.5mm 3.5mm; }
   .rapport-eerst ul, .rapport-bronnen ul { margin: 0; padding-left: 5mm; }
-  .rapport-eerst li, .rapport-bronnen li { margin: 0 0 1.5mm; }
-  .rapport-stand { font-size: 8.5pt; color: #333333; margin: -1mm 0 2.5mm; }
+  .rapport-eerst li, .rapport-bronnen li { margin: 0 0 1mm; }
+  .rapport-stand { font-size: 8.5pt; color: #333333; margin: 0 0 1.5mm; }
   .rapport .vak-inhoud { display: block; font-size: 9.5pt; }
-  .rapport .vak-inhoud > * { margin: 0 0 2mm; }
+  .rapport .vak-inhoud > * { margin: 0 0 1.5mm; }
   /* Warnings and source lines never smaller than readable, never hidden. */
   .rapport .stale, .rapport .plan-waarschuwing, .rapport .geen-getal {
     display: block !important; background: #fff6dc; color: #000000; border: 0.75pt solid #8a6a00; border-radius: 1.5mm;
@@ -340,14 +347,16 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
   }
   .rapport .bronregel, .rapport .periode, .rapport .dubbel, .rapport-bronregel { display: block !important; font-size: 8.5pt; color: #222222; }
   .rapport-bronregel { margin-top: 0.8mm; }
-  .rapport .feiten { display: grid; grid-template-columns: 38mm 1fr; gap: 0.8mm 3mm; margin: 0 0 2mm; }
+  .rapport .feiten { display: grid; grid-template-columns: 32mm 1fr; gap: 0.3mm 3mm; margin: 0 0 1.5mm; }
   .rapport .feiten dt { font-weight: 600; }
   .rapport .feiten dd { margin: 0; }
   .rapport .pub, .rapport .planblok, .rapport .feiten, .rapport figure { break-inside: avoid; page-break-inside: avoid; }
-  .rapport .pub { border-top: 0.5pt solid #cccccc; padding-top: 1.5mm; }
+  .rapport .pub { border-top: 0.5pt solid #cccccc; padding-top: 1mm; }
+  .rapport .pub > * { margin: 0 0 0.5mm; }
   .rapport details > summary { list-style: none; font-weight: 600; }
   .rapport details > summary::-webkit-details-marker { display: none; }
-  .rapport .perceelkaart { max-width: 80mm; margin: 0 0 2mm; }
+  /* The small map beside the facts instead of under them. */
+  .rapport .perceelkaart { float: right; width: 52mm; margin: 0 0 2mm 5mm; }
   .rapport .kaartvlak { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rapport .label-klasse strong { font-size: 16pt; background: #ffffff; color: #000000; border: 1.5pt solid #000000; }
   .rapport .dot, .rapport .perceelkaart { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -357,6 +366,6 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
   .rapport-links li { margin: 0 0 1mm; }
   .rapport-url { font-family: var(--font-data); overflow-wrap: anywhere; word-break: break-all; }
   .rapport-lijnen { padding-top: 2mm; }
-  .rapport-lijn { height: 8.5mm; border-bottom: 0.5pt solid #888888; }
+  .rapport-lijn { height: 8mm; border-bottom: 0.5pt solid #888888; }
   .rapport-voet { font-size: 8pt; color: #333333; margin: 2mm 0 0; }
 }

@@ -205,6 +205,15 @@
     var links = el("p", "links");
     model.links.forEach(function (entry) { links.appendChild(link(entry.url, entry.label)); });
     body.appendChild(links);
+    // The location report: the tab "Adres" filled from this notice (adres-app.js), ready to print.
+    var report = el("button", "ghost rapport-locatie", "Locatierapport");
+    report.type = "button";
+    report.addEventListener("click", function () {
+      if (!window.TilburgAdresApp) return;
+      window.TilburgAdresApp.kiesLocatie(item);
+      location.hash = "#adres";
+    });
+    body.appendChild(report);
     more.appendChild(body);
     main.appendChild(more);
 
