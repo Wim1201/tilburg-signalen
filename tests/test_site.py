@@ -1470,9 +1470,9 @@ class InDeBrowser(unittest.TestCase):
     def test_address_outside_the_core_finds_its_notices_while_the_app_shows_the_core(self):
         outside = self.seen["adres"]["outside"]
         self.assertEqual(outside["errors"], [])
-        self.assertEqual((outside["name"], outside["sub"]), ("Noordweg 402", "4333KK Middelburg"))
-        self.assertEqual(outside["bag"]["Bouwjaar"], "1622")
-        self.assertEqual(outside["parcels"], [{"Aanduiding": "Middelburg T 3010 (MDB01 T 3010)", "Grootte": "6.249 m², vastgesteld"}])
+        self.assertEqual((outside["name"], outside["sub"]), ("Kanaalweg 3", "4337PA Middelburg"))
+        self.assertEqual(outside["bag"]["Bouwjaar"], "2003")
+        self.assertEqual(outside["parcels"], [{"Aanduiding": "Middelburg O 4293 (MDB01 O 4293)", "Grootte": "3.972 m², vastgesteld"}])
         self.assertLessEqual(outside["overflow"], 0)
         if "Zeeland" in outside["regios"]:
             # The notices of Zeeland are in a file of their own; the tab read it for this address, once.

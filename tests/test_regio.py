@@ -197,10 +197,10 @@ class RegioVanEenBericht(unittest.TestCase):
     def test_municipality_of_a_region_counts_whole(self):
         breda = item("Breda", marker("POINT (112000 400000)", "Breda"))
         self.assertEqual((breda["regio"], breda["gemeente"], breda["afstandKm"], breda["locatieSoort"]), ("West-Brabant", "Breda", 22.7, "exact"))
-        zeeland = item("Middelburg", marker("POINT (31425.025 393778.813)", "Middelburg"))
-        self.assertEqual((zeeland["regio"], zeeland["afstandKm"]), ("Zeeland", 103.1))
-        self.assertAlmostEqual(zeeland["lat"], 51.5194, places=3)  # the place itself, not a point pulled to the circle
-        self.assertAlmostEqual(zeeland["lon"], 3.6066, places=3)
+        zeeland = item("Middelburg", marker("POINT (32611.768 391328.84)", "Middelburg"))
+        self.assertEqual((zeeland["regio"], zeeland["afstandKm"]), ("Zeeland", 102.0))
+        self.assertAlmostEqual(zeeland["lat"], 51.4977, places=3)  # the place itself, not a point pulled to the circle
+        self.assertAlmostEqual(zeeland["lon"], 3.6246, places=3)
 
     def test_rest_of_a_core_municipality_belongs_to_its_region(self):
         found = item("Oosterhout", marker("POINT (118000 407000)", "Oosterhout"))
