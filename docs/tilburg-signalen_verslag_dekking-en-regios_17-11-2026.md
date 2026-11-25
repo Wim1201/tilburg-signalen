@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) en 09:20 – 09:29 uur (run 23 op GitHub) en 09:31 – 09:48 uur (toelichting in de workflow, groei van de bestanden, pull request) en 09:55 – 09:56 uur (besluit over het voorstel, uitleg van de zondagse run, nulmeting van de repo) |
+| Datum | 17-11-2026, 20:22 – 20:53 uur; aangevuld 17-11-2026, 21:18 – 21:35 uur (voorstel andere rubrieken) en 18-11-2026, 08:15 – 08:37 uur (run 22 op GitHub) en 08:49 – 09:05 uur (grens, telling per regio, wekelijkse beurt) en 09:20 – 09:29 uur (run 23 op GitHub) en 09:31 – 09:48 uur (toelichting in de workflow, groei van de bestanden, pull request) en 09:55 – 09:56 uur (besluit over het voorstel, uitleg van de zondagse run, nulmeting van de repo); aangevuld 25-11-2026, 10:01 – 10:02 uur (meting van de repo een week later) |
 | Versie | versie 2 van de app met het tabblad Adres, branch `claude/optimistic-gauss-sb0xpy`, gestart vanaf `main` op commit `edf4150` (na PR #16) |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | officielebekendmakingen.nl (zoekdienst SRU), opgevraagd 17-11-2026 tussen 20:25 en 20:37 uur; gemeente-indeling van het CBS, "Gebieden in Nederland 2026" (tabel 86247NED) |
@@ -28,6 +28,8 @@ gemeten; zie "Open punten".
 
 | Tijdstip | Wat |
 |---|---|
+| 25-11-2026, 10:02 uur | **De repo is een week na de nulmeting opnieuw gemeten; "De meting wordt op 25-11-2026 herhaald" is daarmee afgehandeld.** De cache-commits voegden in zeven dagen 348 kB op schijf toe, waarvan 199 kB door één versie die GitHub volledig levert in plaats van als verschil. Zie "Meting een week later". |
+| 25-11-2026, 10:02 uur | **Twee getallen in de tabel van de nulmeting hangen af van de kopie.** De versie van 17-11 11:36 uur kost nu 1.230 bytes (toen 890), die van 18-11 06:46 uur 56 bytes (toen 55.546, volledig bewaard). GitHub pakt elke kopie opnieuw in; de nulmeting was dus één momentopname van hoe GitHub levert, geen vaste maat. |
 | 18-11-2026, 09:56 uur | **Besluit van Wim over het voorstel bij de groei: A wel, B en C niet.** A (vangnet en waarschuwing voor de cache) komt in een aparte pull request en wordt pas gebouwd nadat PR 17 is samengevoegd. "Graag je akkoord per onderdeel" onder "Voorstel (niet gebouwd)" is daarmee beantwoord. |
 | 18-11-2026, 09:56 uur | **De opmerking achter de cron-regel van zondag 04:30 uur ("cache negeren") blijft staan, op verzoek van Wim.** Ze klopt niet meer met wat de run doet; de juiste uitleg staat onder "Welke regio wanneer", in "De opmerking bij de cron-regel van zondag". |
 | 18-11-2026, 09:56 uur | **De repo is gemeten als nulmeting; "De geschiedenis van de repo: niet gemeten" en "gecomprimeerd 191 kB per versie" onder "Niet getest of nog open bij dit onderdeel" zijn daarmee achterhaald.** De zeven versies van de cache nemen samen 134 kB in, omdat de meeste als verschil met de vorige zijn opgeslagen. Zie "Nulmeting van de repo". De meting wordt op 25-11-2026 herhaald. |
@@ -714,6 +716,87 @@ niet te zeggen; hoe GitHub het aan zijn eigen kant bewaart, is van hieruit niet 
 **De meting wordt op 25-11-2026 herhaald**, op dezelfde manier: de hele repo, `main`, het aantal
 cache-commits per dag en wat de versies van de cache samen op schijf innemen. Het verschil met deze
 nulmeting wordt gesplitst in wat PR 17 zelf toevoegde en wat de cache-commits toevoegden.
+
+## Meting een week later (25-11-2026, 10:01 uur)
+
+Op dezelfde manier als de nulmeting: een verse volledige kopie van GitHub (`git clone --bare`), in de
+werkmap van de sessie. "Op schijf" is de grootte zoals git het in die kopie bewaart, gecomprimeerd.
+Een verse kopie laat zien hoe GitHub de repo levert, niet hoe GitHub hem zelf bewaart.
+
+| Wat | Nulmeting 18-11, 09:55 uur | Nu 25-11, 10:01 uur | Verschil |
+|---|---:|---:|---:|
+| De hele repo, alle branches | 2.297 kB, 556 objecten | 2.941 kB, 1.046 objecten | +644 kB, +490 objecten |
+| `main` op schijf | 1.813 kB (`8f587be`), 451 objecten | 2.980 kB (`b545462`), 1.038 objecten | +1.168 kB |
+| `main` uitgepakt | 11,6 MB | 37,8 MB | +26,2 MB |
+| Commits op `main` | 59, waarvan 7 van de cache | 160, waarvan 25 van de cache | +101, waarvan 18 van de cache |
+| Alle versies van de cache samen, op schijf | 134 kB (7 versies) | 421 kB (25 versies, alle verschillend) | +287 kB |
+| `cache/ophaalcache.json` op `main` | 296 kB (alleen de kern) | 957.885 bytes (kern en regio's) | |
+
+De nulmeting-commit `8f587be` kost in de nieuwe kopie 1.790 kB op schijf, tegen 1.813 kB toen: hetzelfde
+inhoud, anders ingepakt. Het verschil tussen de twee metingen is daardoor op enkele tientallen kB na
+nauwkeurig.
+
+### De groei gesplitst
+
+Gerekend over wat er op `main` bij kwam sinds `8f587be`: 587 objecten, 1.190 kB op schijf.
+
+| Bron | Objecten | Op schijf | Aandeel |
+|---|---:|---:|---:|
+| De 18 cache-commits (elk een commit, twee mappen en de nieuwe versie van de cache) | 72 | 348 kB | 29 procent |
+| Alles daarbuiten: PR 17 tot en met 38 en hun samenvoegingen | 515 | 842 kB | 71 procent |
+| waarvan PR 17 (nulmeting: wat de werkbranch toevoegde) | 97 | 500 kB | |
+| waarvan PR 18 tot en met 38 | 418 | ongeveer 342 kB | |
+
+Dat de hele repo minder groeide (+644 kB) dan `main` (+1.190 kB), komt doordat PR 17 bij de nulmeting
+al als branch in de repo stond: die 500 kB telde toen al mee in de hele repo.
+
+### De cache-commits per stuk
+
+| Wat | Aantal | Op schijf | Toelichting |
+|---|---:|---:|---|
+| Het vullen van de regio's (18-11, 10:50 – 12:29 uur) | 4 | 129 kB | De cache groeide in vier stappen van 296 kB naar 963 kB |
+| Eén versie volledig geleverd (19-11, 09:37 uur) | 1 | 199 kB | GitHub levert deze versie niet als verschil maar heel |
+| De andere | 13 | 21 kB | 74 tot 5.760 bytes per versie, gemiddeld 1,6 kB |
+| Samen | 18 | 348 kB | 7,0 dagen: gemiddeld 50 kB per dag, 19 kB per cache-commit |
+
+Cache-commits per dag: 16-11: 3, 17-11: 2, 18-11: 7, 19-11: 3, 20-11: 2, 21-11: 1, 22-11: 1, 23-11: 2,
+24-11: 2, 25-11: 2 (tot 10:01 uur). Sinds 20-11 dus één tot twee per dag.
+
+Twee cache-commits vielen buiten de slots van de planner: 24-11 om 03:10 uur en 25-11 om 00:52 uur.
+**Niet uitgezocht** waardoor; vermoedelijk het eigen schema van GitHub, dat volgens `CLAUDE.md`
+onbetrouwbaar is en dan laat start.
+
+### De grootte van de cache nu
+
+957.885 bytes op `main`. Er gelden drie grenzen (`signalen/cache.py`):
+
+| Grens | Waarde | Nu |
+|---|---:|---:|
+| Waarschuwing in het log van de run | 1.200.000 bytes | 80 procent |
+| Een run schrijft nooit een grotere cache | 1.400.000 bytes | 68 procent |
+| Geen bestand in de repo groter (test) | 1.500.000 bytes | 64 procent |
+
+Sinds de regio's erin staan, ligt de cache tussen 925.596 en 963.499 bytes. **Feit:** in deze week
+groeide hij niet door. Dat past bij "Ze groeien niet door; ze volgen het venster" hierboven.
+
+### Doorrekening (voorzichtig)
+
+**Feit:** de gewone cache-commit kost als verschil gemiddeld 1,6 kB. **Feit:** in deze week leverde
+GitHub één versie van de 18 heel (199 kB). **Onbekend:** hoe vaak dat gebeurt; het hangt af van hoe
+GitHub inpakt en kan per kopie verschillen (zie de correctie bovenaan).
+
+| Aanname | Per maand | Per jaar |
+|---|---:|---:|
+| Alleen verschillen, twee cache-commits per dag | ongeveer 100 kB | ongeveer 1,2 MB |
+| Zoals deze week zonder het vullen van de regio's: 219 kB in 14 commits, twee per dag | ongeveer 0,9 MB | ongeveer 11 MB |
+
+**Vermoeden:** de werkelijkheid ligt tussen die twee. Ook bij de hoge schatting blijft de repo na een
+jaar onder de 15 MB; GitHub raadt aan een repo onder 1 GB te houden. De pull requests droegen deze
+week meer bij dan de cache. Een volgende meting over een maand zegt meer over hoe vaak een versie
+heel wordt geleverd.
+
+**Niet gemeten:** hoe GitHub de repo aan zijn eigen kant bewaart, en de grootte van de branches die
+niet in `main` zitten afzonderlijk.
 
 ## Niet getest of nog open bij dit onderdeel
 
