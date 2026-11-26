@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Datum | 26-11-2026, 08:00 – 09:00 uur |
+| Datum | 26-11-2026, 08:00 – 09:00 uur; aangevuld om 09:15 uur met het besluit van Wim, het open punt en de herkomst van 1,5 MB |
 | Versie | `main` op commit `eae2055`, branch `claude/charming-goodall-lvhulj`; niets gebouwd |
 | Omgeving | Claude Code in de cloud (tijdelijke container), repo `Wim1201/tilburg-signalen` |
 | Brondata | logs van de runs 69, 71, 77, 87, 97 – 103, 106 en 107 (via GitHub); het Pages-pakket van run 102 (`regio-west-brabant.json` van 25-11, 17:09 uur); de live site, opgehaald 26-11 rond 08:00 uur (stand van run 107) |
@@ -11,6 +11,13 @@
 | Vervolg op | `tilburg-signalen_meting_west-brabant-andere-rubrieken_19-11-2026.md`, `tilburg-signalen_verslag_dekking-en-regios_17-11-2026.md` |
 
 **Dit is een onderzoek. Er is niets gebouwd; code, cache en databestanden zijn niet gewijzigd.**
+
+## Besluit van Wim (26-11-2026)
+
+| Keuze | Besluit |
+|---|---|
+| Optie d (afleidbare `url` en `urlTekst` niet meer opschrijven) | Gepland voor januari 2027; nu niet bouwen. Zie "Open punt" |
+| Opties a, b en c | Niet |
 
 ## 1. Het bestand groeit niet sneller: de 97% is de piek van de woensdag
 
@@ -87,13 +94,22 @@ van 19-11 is op een donderdag gedaan, en de jaartelling werkt met vensters van h
 
 | Waar | Regel | Wat |
 |---|---|---|
-| `tests/test_ververst.py` | regel 101 | Geen bestand in git groter dan 1.500.000 bytes. Ingevoerd op 16-11-2026 na de film (zie `tilburg-signalen_verslag_video_16-11-2026.md`, regel 608), om grote bestanden uit de repo te houden |
+| `tests/test_ververst.py` | regel 101 | Geen bestand in git groter dan 1.500.000 bytes. Ingevoerd op 16-11-2026, zie "Waarom 1,5 MB" hieronder |
 | `tests/test_regio.py` | regel 931 | Elk databestand in de momentopname `site/data/` kleiner dan 1.500.000 bytes |
 | `signalen/cache.py` | regel 37 | `REPO_BYTES = 1_500_000`, de maat voor de percentages in het log; `tests/test_cache.py` regel 294 houdt hem gelijk aan de test |
 | `signalen/update.py` | regel 319 en 322 – 337 | `BESTAND_WAARSCHUW_BYTES = 1_350_000`: de waarschuwing vanaf 90% |
 
 GitHub weigert pas bestanden boven 100 MB en waarschuwt vanaf 50 MB. Dat heb ik niet nagelezen in deze
 sessie; het staat in de documentatie van GitHub zoals ik die ken.
+
+### Waarom 1,5 MB (16-11-2026)
+
+| | |
+|---|---|
+| Aanleiding | Op 16-11 om 20:51 uur was de film (5.167.073 bytes) met een stilstaand beeld in git gezet en gepusht, zonder dat de grootte was genoemd. Wim wees erop dat zo'n bestand in een openbare repo voorgoed in de geschiedenis blijft; de commit is herschreven |
+| Maatregel | Commit `1b3b453` (16-11, 21:05 uur): `.gitignore` slaat films over, en een test faalt bij een film in git of een bestand boven 1,5 MB. Doel: herhaling voorkomen (`tilburg-signalen_verslag_video_16-11-2026.md`, "Film uit de repository") |
+| Waarom juist 1,5 MB | **Nergens vastgelegd.** Het verslag en de commit noemen het getal zonder onderbouwing. Wat wel vaststaat: het grootste bestand in die commit was de stem van de film (`tools/video/geluid/stem.mp3`, 1.048.692 bytes, bewust gehouden), daarna `berichten.json` (992.806 bytes). 1,5 MB ligt daar net boven en ver onder de film. Dat het getal zo gekozen is, is mijn afleiding, geen vastgelegd feit |
+| Waar het niet voor bedoeld was | De regiobestanden bestonden nog niet (17-11). De grens is een bewaker tegen grote bestanden in de geschiedenis van git, geen maat voor wat de site of de telefoon aankan. Hij is daarna overgenomen als maat voor de databestanden (17-11, `tests/test_regio.py`) en de cache (18-11, `signalen/cache.py`) |
 
 De grens geldt alleen voor wat in git staat. De verversing schrijft `regio-west-brabant.json`,
 publiceert het en zet het niet terug in de repo (alleen de cache gaat terug). Boven 1.500 kB gebeurt er
@@ -129,6 +145,28 @@ Zeeland, en geeft ruim 20% ruimte voor de drukke maanden. a pas als er een regio
 b werkt niet per gemeente en levert te weinig op. c alleen als je de waarschuwing wilt stillen zonder
 iets aan het bestand te doen. Er is geen haast: boven 1,5 MB strandt geen run en blijft de site werken.
 
+## Open punt: optie d, gepland voor januari 2027
+
+Niet gebouwd. Voorwaarden van Wim (26-11-2026):
+
+| Voorwaarde | Uitwerking |
+|---|---|
+| Een test vergelijkt voor **alle bestaande berichten** de afgeleide `url` en `urlTekst` met de echte | Over elk bericht in de momentopname (`site/data/berichten.json` en de drie regiobestanden), niet over een steekproef. Dat kan alleen zolang de momentopname de echte velden nog bevat: de test moet er dus zijn vóórdat de velden uit de bestanden gaan |
+| Waar afleiden niet lukt, blijft de echte url staan | Per bericht en per veld: het veld vervalt alleen als de afgeleide waarde gelijk is aan de echte. Anders wordt het gewoon opgeschreven en gebruikt de app wat er staat |
+
+Nog uit te zoeken bij het bouwen:
+
+| Punt | Toelichting |
+|---|---|
+| De kern en Zeeland | Afleiden is alleen voor West-Brabant gecontroleerd (1.550 van 1.550). In de kern staan ook faillissementen en de Vlaamse bron, met andere adressen; daar blijft de echte url waarschijnlijk staan |
+| Een tweede versie van een publicatie | `urlTekst` bevat een versienummer (`/1/`); bij een rectificatie kan dat anders zijn |
+| Volgorde | Eerst de app zo maken dat hij een ontbrekend veld afleidt en een aanwezig veld gebruikt, en dat live hebben; pas daarna de velden weglaten. Anders toont een telefoon met de oude app berichten zonder link |
+| Momentopname | Daarna vernieuwen, zodat tests en browsertests de nieuwe vorm gebruiken |
+| Raakt | `signalen/update.py`, `site/logic.js`, tests. Geen workflow |
+
+Tot januari: de waarschuwing vanaf 90 procent blijft in het log van elke run staan, op woensdag tot
+ongeveer 97 procent. Dat is geen reden om in te grijpen; boven 1,5 MB strandt geen run.
+
 ## Wat ik niet heb kunnen controleren
 
 | Punt | Toelichting |
@@ -138,5 +176,6 @@ iets aan het bestand te doen. Er is geen haast: boven 1,5 MB strandt geen run en
 | Rubriek per bericht | Staat niet in het bestand; het aandeel van de extra rubrieken komt uit de meting van 19-11 |
 | De schatting voor 2027 | Gebaseerd op de jaartelling van 17-11 (één jaar, per groep geteld); geen meting |
 | Grens van GitHub | Niet nagelezen in deze sessie |
+| Waarom juist 1,5 MB | Niet vastgelegd in het verslag of de commit van 16-11; de sessie van toen kan ik niet inzien |
 | Dat `urlTekst` altijd uit het `id` af te leiden is | Gecontroleerd voor West-Brabant (1.550 van 1.550); niet voor de kern en Zeeland, en niet voor publicaties met een tweede versie |
 | Gedrag op een iPhone bij 1,5 MB of meer | Niet gemeten |
